@@ -88,6 +88,7 @@ function agendarSync() {
 
 // ===== CRUD DÍVIDAS =====
 function adicionarDivida(divida) {
+  if (!divida.isExemplo) DB.dividas = DB.dividas.filter(d => !d.isExemplo);
   divida.id = gerarId();
   divida.criadaEm = new Date().toISOString();
   divida.parcelas = gerarParcelas(divida);
