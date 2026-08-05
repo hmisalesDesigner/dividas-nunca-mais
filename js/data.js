@@ -83,7 +83,12 @@ async function carregarDoDrive() {
 
 function agendarSync() {
   clearTimeout(syncTimeout);
-  syncTimeout = setTimeout(() => salvarNoDrive(), 1500);
+  syncTimeout = setTimeout(() => {
+    // Salva no localStorage imediatamente
+    if (typeof salvarLocalStorage === 'function') salvarLocalStorage();
+    // Tenta salvar no Drive
+    salvarNoDrive();
+  }, 1500);
 }
 
 // ===== CRUD DÍVIDAS =====

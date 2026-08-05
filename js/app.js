@@ -3,6 +3,15 @@
 function iniciarApp() {
   document.getElementById('app').style.display = 'flex';
 
+  // Restaura estado do sidebar
+  const sidebarState = localStorage.getItem('dnm_sidebar');
+  if (sidebarState === 'collapsed') {
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
+
+  // Agenda sync periódico no localStorage
+  setInterval(() => salvarLocalStorage(), 30000);
+
   // Atualiza header
   document.getElementById('user-photo').src = DB.usuario.foto || '';
 
@@ -63,6 +72,8 @@ function navigateTo(page, el) {
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   sidebar.classList.toggle('collapsed');
+  // Salva estado no localStorage
+  localStorage.setItem('dnm_sidebar', sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded');
 }
 
 // ===== DADOS DE EXEMPLO =====

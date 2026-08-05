@@ -9,11 +9,11 @@ function renderConfiguracoes() {
       <h3>👤 Perfil</h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Nome</label>
-          <input id="cfg-nome" type="text" value="${u.nome || ''}" />
+          <label>Nome *</label>
+          <input id="cfg-nome" type="text" value="${u.nome || ''}" placeholder="Seu nome completo" />
         </div>
         <div class="form-group">
-          <label>E-mail</label>
+          <label>E-mail *</label>
           <input id="cfg-email" type="email" value="${u.email || ''}" placeholder="seu@email.com" />
         </div>
       </div>
@@ -25,8 +25,8 @@ function renderConfiguracoes() {
         <div class="form-group">
           <label>Avatar</label>
           <div style="display:flex;align-items:center;gap:12px;">
-            <img src="${u.foto || ''}" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);" onerror="this.style.display='none'" />
-            <span style="color:var(--text-secondary);font-size:12px;">Foto do Google</span>
+            <img id="cfg-avatar-preview" src="${u.foto || ''}" style="width:40px;height:40px;border-radius:50%;border:2px solid var(--border);${u.foto ? '' : 'display:none'}" />
+            <span style="color:var(--text-secondary);font-size:12px;">Foto do Google (automática)</span>
           </div>
         </div>
       </div>
@@ -37,8 +37,8 @@ function renderConfiguracoes() {
       <h3>💰 Financeiro</h3>
       <div class="form-row">
         <div class="form-group">
-          <label>Renda Mensal (R$)</label>
-          <input id="cfg-renda" type="text" value="${formatarMoeda(u.renda)}" oninput="formatMoney(this)" />
+          <label>Renda Mensal (R$) *</label>
+          <input id="cfg-renda" type="text" value="${formatarMoeda(u.renda || 0)}" oninput="formatMoney(this)" />
         </div>
         <div class="form-group">
           <label>Alertar quando saldo for menor que (R$)</label>
@@ -64,7 +64,7 @@ function renderConfiguracoes() {
       <h3>🔒 Segurança</h3>
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div>
-          <div style="font-weight:600;">Conta Google conectada</div>
+          <div style="font-weight:600;">Conta Google</div>
           <div style="font-size:12px;color:var(--text-secondary);">${u.email || 'Não conectado'}</div>
         </div>
         <button class="btn-danger" onclick="signOut()">Desconectar</button>
@@ -81,7 +81,7 @@ function renderConfiguracoes() {
         <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importarBackup(this)" />
       </div>
       <div style="margin-top:12px;font-size:12px;color:var(--text-muted);">
-        Os dados são sincronizados automaticamente com o Google Drive.
+        Dados sincronizados automaticamente com o Google Drive.
       </div>
     </div>
 
@@ -93,20 +93,36 @@ function renderConfiguracoes() {
 }
 
 function salvarConfiguracoes() {
-  DB.usuario.nome = document.getElementById('cfg-nome').value.trim() || DB.usuario.nome;
-  DB.usuario.email = document.getElementById('cfg-email').value.trim() || DB.usuario.email;
+  const nome = document.getElementById('cfg-nome').value.trim();
+  const email = document.getElementById('cfg-email').value.trim();
+  const renda = parseMoney(document.getElementById('cfg-renda').value);
+
+  if (!nome) { showAlert('⚠️', 'Informe seu nome.'); return; }
+  if (!email) { showAlert('⚠️', 'Informe seu e-mail.'); return; }
+  if (!renda || renda <= 0) { showAlert('⚠️', 'Informe sua renda mensal.'); return; }
+
+  DB.usuario.nome = nome;
+  DB.usuario.email = email;
   DB.usuario.dataNascimento = document.getElementById('cfg-nascimento').value;
-  DB.usuario.renda = parseMoney(document.getElementById('cfg-renda').value);
-  DB.usuario.limiteAlerta = parseMoney(document.getElementById('cfg-limite').value);
+  DB.usuario.renda = renda;
+  DB.usuario.limiteAlerta = parseMoney(document.getElementById('cfg-limite').value) || 500;
+
+  // Salva tudo no localStorage
+  salvarLocalStorage();
 
   agendarSync();
+
+  // Atualiza saudação no header se tiver
+  const titulo = document.getElementById('page-title');
+  if (titulo) titulo.textContent = 'Configurações';
+
   showAlert('✅', 'Configurações salvas com sucesso!');
   renderizarAlertas();
 }
 
 function alternarTema(escuro) {
   DB.usuario.tema = escuro ? 'escuro' : 'claro';
-  // TODO: implementar tema claro alterando CSS vars
+  salvarLocalStorage();
   agendarSync();
 }
 
