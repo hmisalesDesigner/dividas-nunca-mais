@@ -18,6 +18,9 @@ function iniciarApp() {
 
   // Dados de exemplo se banco estiver vazio
   if (DB.dividas.length === 0) carregarDadosExemplo();
+
+  // Remove dados de exemplo após 24 horas
+  removerExemplosExpirados();
 }
 
 function navigateTo(page, el) {
@@ -83,6 +86,22 @@ function carregarDadosExemplo() {
     { nome: 'Internet', categoria: '🔁 Gastos Recorrentes', subcategoria: 'Internet', valor: 120, dataVencimento: futuro(10), status: 'pendente', jurosMes: 0, totalParcelas: 1 },
   ];
 
-  exemplos.forEach(e => adicionarDivida(e));
+  exemplos.forEach(e => {
+    e.isExemplo = true;
+    e.exemploExpira = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    adicionarDivida(e);
+  });
   renderizarAlertas();
+}
+
+function removerExemplosExpirados() {
+  const agora = new Date();
+  const antes = DB.dividas.length;
+  DB.dividas = DB.dividas.filter(d => {
+    if (d.isExemplo && d.exemploExpira) {
+      return new Date(d.exemploExpira) > agora;
+    }
+    return true;
+  });
+  if (DB.dividas.length < antes) agendarSync();
 }

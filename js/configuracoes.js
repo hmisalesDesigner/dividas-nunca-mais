@@ -14,7 +14,7 @@ function renderConfiguracoes() {
         </div>
         <div class="form-group">
           <label>E-mail</label>
-          <input id="cfg-email" type="email" value="${u.email || ''}" readonly style="opacity:0.6;" />
+          <input id="cfg-email" type="email" value="${u.email || ''}" placeholder="seu@email.com" />
         </div>
       </div>
       <div class="form-row">
@@ -94,6 +94,7 @@ function renderConfiguracoes() {
 
 function salvarConfiguracoes() {
   DB.usuario.nome = document.getElementById('cfg-nome').value.trim() || DB.usuario.nome;
+  DB.usuario.email = document.getElementById('cfg-email').value.trim() || DB.usuario.email;
   DB.usuario.dataNascimento = document.getElementById('cfg-nascimento').value;
   DB.usuario.renda = parseMoney(document.getElementById('cfg-renda').value);
   DB.usuario.limiteAlerta = parseMoney(document.getElementById('cfg-limite').value);
