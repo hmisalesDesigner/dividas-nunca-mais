@@ -28,54 +28,53 @@ let driveFileId = null;
 let syncTimeout = null;
 
 async function salvarNoDrive() {
-  if (!gapi || !gapi.client) return;
+  if (!accessToken) return;
   try {
     const content = JSON.stringify(DB, null, 2);
+    const headers = { 
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    };
+
     if (driveFileId) {
-      await gapi.client.request({
-        path: `/upload/drive/v3/files/${driveFileId}`,
-        method: 'PATCH',
-        params: { uploadType: 'media' },
-        headers: { 'Content-Type': 'application/json' },
-        body: content
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        method: 'PATCH', headers, body: content
       });
     } else {
-      const meta = await gapi.client.drive.files.create({
-        resource: { name: DRIVE_FILENAME, mimeType: 'application/json' },
-        fields: 'id'
-      });
-      driveFileId = meta.result.id;
-      await gapi.client.request({
-        path: `/upload/drive/v3/files/${driveFileId}`,
-        method: 'PATCH',
-        params: { uploadType: 'media' },
-        headers: { 'Content-Type': 'application/json' },
-        body: content
+      // Cria o arquivo
+      const meta = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: DRIVE_FILENAME, mimeType: 'application/json' })
+      }).then(r => r.json());
+      driveFileId = meta.id;
+      await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`, {
+        method: 'PATCH', headers, body: content
       });
     }
-  } catch (e) {
-    console.warn('Drive sync error:', e);
+    console.log('Drive sync OK');
+  } catch(e) {
+    console.warn('Drive save error:', e);
   }
 }
 
 async function carregarDoDrive() {
-  if (!gapi || !gapi.client) return false;
+  if (!accessToken) return false;
   try {
-    const res = await gapi.client.drive.files.list({
-      q: `name='${DRIVE_FILENAME}' and trashed=false`,
-      fields: 'files(id,name)'
-    });
-    if (res.result.files && res.result.files.length > 0) {
-      driveFileId = res.result.files[0].id;
-      const file = await gapi.client.drive.files.get({
-        fileId: driveFileId,
-        alt: 'media'
-      });
-      const data = typeof file.result === 'string' ? JSON.parse(file.result) : file.result;
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILENAME}'+and+trashed=false&fields=files(id,name)`, {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    }).then(r => r.json());
+
+    if (res.files && res.files.length > 0) {
+      driveFileId = res.files[0].id;
+      const data = await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }).then(r => r.json());
       Object.assign(DB, data);
+      console.log('Drive load OK');
       return true;
     }
-  } catch (e) {
+  } catch(e) {
     console.warn('Drive load error:', e);
   }
   return false;
