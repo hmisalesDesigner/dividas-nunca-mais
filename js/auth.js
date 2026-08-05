@@ -30,6 +30,7 @@ function gisLoaded() {
     // Habilita botão quando GIS estiver pronto
     const btn = document.querySelector('.btn-google');
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    concluirBarra();
 
   } catch(e) {
     console.warn('GIS error:', e);
@@ -134,6 +135,45 @@ function signOut() {
   }
 }
 
+// ===== BARRA DE PROGRESSO =====
+let loadProgress = 0;
+let progressInterval = null;
+
+function iniciarBarraProgresso() {
+  const etapas = [
+    { pct: 15, status: 'Carregando APIs do Google...' },
+    { pct: 35, status: 'Inicializando autenticação...' },
+    { pct: 55, status: 'Configurando Drive...' },
+    { pct: 75, status: 'Quase lá...' },
+    { pct: 90, status: 'Finalizando...' },
+  ];
+  let etapaAtual = 0;
+
+  progressInterval = setInterval(() => {
+    if (etapaAtual < etapas.length) {
+      const etapa = etapas[etapaAtual];
+      atualizarBarra(etapa.pct, etapa.status);
+      etapaAtual++;
+    }
+  }, 1200);
+}
+
+function atualizarBarra(pct, status) {
+  const bar = document.getElementById('loading-bar');
+  const pctEl = document.getElementById('loading-pct');
+  const statusEl = document.getElementById('loading-status');
+  if (bar) bar.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (statusEl && status) statusEl.textContent = status;
+}
+
+function concluirBarra() {
+  clearInterval(progressInterval);
+  atualizarBarra(100, 'Pronto! Clique em Entrar com Google');
+  const pctEl = document.getElementById('loading-pct');
+  if (pctEl) pctEl.style.color = '#22c55e';
+}
+
 // Botão começa desabilitado até GIS carregar
 window.addEventListener('DOMContentLoaded', () => {
   const btn = document.querySelector('.btn-google');
@@ -141,4 +181,5 @@ window.addEventListener('DOMContentLoaded', () => {
     btn.disabled = true;
     btn.style.opacity = '0.5';
   }
+  iniciarBarraProgresso();
 });
