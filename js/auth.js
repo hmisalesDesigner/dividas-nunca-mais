@@ -59,7 +59,10 @@ async function onTokenReceived(resp) {
 
 function signInWithGoogle() {
   if (!window._tokenClient) {
-    showAlert('❌', 'Google ainda carregando. Aguarde 3 segundos e tente novamente.');
+    // Entra direto sem Google se APIs não carregaram
+    const nome = prompt('Qual é o seu nome?') || 'Usuário';
+    const email = prompt('Qual é o seu e-mail?') || '';
+    onLoginSuccess({ name: nome, email: email, picture: '' });
     return;
   }
   window._tokenClient.requestAccessToken({ prompt: 'select_account' });
@@ -174,12 +177,32 @@ function concluirBarra() {
   if (pctEl) pctEl.style.color = '#22c55e';
 }
 
-// Botão começa desabilitado até GIS carregar
+// Botão sempre habilitado — não bloqueia o usuário
 window.addEventListener('DOMContentLoaded', () => {
   const btn = document.querySelector('.btn-google');
-  if (btn) {
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-  }
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   iniciarBarraProgresso();
+
+  // Verifica progresso a cada segundo
+  let checks = 0;
+  const checker = setInterval(() => {
+    checks++;
+    const pct = Math.min(Math.round((checks / 15) * 90), 90);
+    if (!window._tokenClient) {
+      atualizarBarra(pct, 'Aguardando Google Identity Services...');
+    }
+    // GIS carregou
+    if (window._tokenClient) {
+      clearInterval(checker);
+      concluirBarra();
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    }
+    // Timeout: 15s — habilita botão mesmo sem GIS
+    if (checks >= 15) {
+      clearInterval(checker);
+      concluirBarra();
+      if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+      atualizarBarra(100, 'Pronto!');
+    }
+  }, 1000);
 });

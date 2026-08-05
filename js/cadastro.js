@@ -20,6 +20,7 @@ function renderCadastro() {
       </div>
       <div class="toolbar-right">
         <button class="btn-secondary btn-sm" onclick="abrirLixeira()">🗑️ Lixeira</button>
+        <button class="btn-secondary" onclick="abrirModalMultiParcelas()">+ Múltiplas Parcelas</button>
         <button class="btn-primary" onclick="abrirModalNovaDivida()">+ Nova Dívida <span class="shortcut">Ctrl+N</span></button>
       </div>
     </div>
@@ -411,4 +412,176 @@ function confirmarAcordo() {
   fecharModal();
   renderTabelaDividas();
   showAlert('🤝', `Acordo registrado para ${checks.length} dívida(s)!`);
+}
+
+// ===== MÚLTIPLAS PARCELAS =====
+function abrirModalMultiParcelas() {
+  abrirModal('📋 Cadastrar Múltiplas Parcelas', htmlMultiParcelas(), '700px');
+  renderCategorias('mp-categoria');
+}
+
+function htmlMultiParcelas() {
+  return `
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+      Use para dívidas com parcelas de valores diferentes (ex: boletos atrasados com juros distintos).
+    </p>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nome do Credor *</label>
+        <input id="mp-nome" type="text" placeholder="Ex: Fênix Acrílicos" />
+      </div>
+      <div class="form-group">
+        <label>Categoria *</label>
+        <select id="mp-categoria" onchange="renderSubcategorias(this.value,'mp-subcategoria')">
+          <option value="">Selecionar...</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Subcategoria</label>
+        <select id="mp-subcategoria"><option value="">Selecionar...</option></select>
+      </div>
+      <div class="form-group">
+        <label>Credor / Empresa</label>
+        <input id="mp-credor" type="text" placeholder="Ex: Fênix Acrílicos EIRELE" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Observações gerais</label>
+      <input id="mp-obs" type="text" placeholder="Ex: Histórico financeiro 05/08/2026" />
+    </div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:16px 0 8px;">
+      <label style="font-size:13px;font-weight:600;">Parcelas</label>
+      <button class="btn-secondary btn-sm" onclick="adicionarLinhaParcela()">+ Adicionar Parcela</button>
+    </div>
+
+    <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+      <div style="display:grid;grid-template-columns:40px 1fr 130px 130px 120px 100px 36px;gap:0;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-secondary);font-weight:600;text-transform:uppercase;">
+        <span>#</span><span>Nº/Descrição</span><span>Vencimento</span><span>Valor (R$)</span><span>Jur Mora (R$)</span><span>Status</span><span></span>
+      </div>
+      <div id="mp-linhas"></div>
+    </div>
+
+    <div style="margin-top:12px;padding:12px;background:var(--bg-secondary);border-radius:8px;display:flex;justify-content:space-between;font-size:13px;">
+      <span style="color:var(--text-secondary);">Total de parcelas: <strong id="mp-total-count">0</strong></span>
+      <span style="color:var(--text-secondary);">Valor total: <strong id="mp-total-valor" style="color:var(--red);">R$ 0,00</strong></span>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" onclick="salvarMultiParcelas()">💾 Salvar Todas</button>
+    </div>
+  `;
+}
+
+let mpLinhaCount = 0;
+
+function adicionarLinhaParcela(num='', venc='', valor='', mora='', status='atrasado') {
+  mpLinhaCount++;
+  const id = mpLinhaCount;
+  const container = document.getElementById('mp-linhas');
+  if (!container) return;
+
+  const div = document.createElement('div');
+  div.id = 'mp-linha-' + id;
+  div.style.cssText = 'display:grid;grid-template-columns:40px 1fr 130px 130px 120px 100px 36px;gap:0;padding:6px 12px;border-bottom:1px solid var(--border);align-items:center;';
+  div.innerHTML = `
+    <span style="font-size:12px;color:var(--text-muted);">${id}</span>
+    <input type="text" placeholder="Ex: Parcela 170" value="${num}" 
+      style="background:transparent;border:none;color:var(--text-primary);font-size:12px;padding:4px;" 
+      id="mp-desc-${id}" />
+    <input type="date" value="${venc}" 
+      style="background:transparent;border:none;color:var(--text-primary);font-size:12px;padding:4px;" 
+      id="mp-venc-${id}" onchange="recalcularTotalMP()" />
+    <input type="text" placeholder="R$ 0,00" value="${valor}" 
+      style="background:transparent;border:none;color:var(--text-primary);font-size:12px;padding:4px;" 
+      id="mp-valor-${id}" oninput="formatMoneyInline(this);recalcularTotalMP()" />
+    <input type="text" placeholder="R$ 0,00" value="${mora}" 
+      style="background:transparent;border:none;color:var(--yellow);font-size:12px;padding:4px;" 
+      id="mp-mora-${id}" oninput="formatMoneyInline(this);recalcularTotalMP()" />
+    <select id="mp-status-${id}" style="background:var(--bg-primary);border:none;color:var(--text-primary);font-size:12px;padding:4px;border-radius:4px;">
+      <option value="atrasado" ${status==='atrasado'?'selected':''}>Atrasado</option>
+      <option value="pendente" ${status==='pendente'?'selected':''}>Pendente</option>
+      <option value="pago" ${status==='pago'?'selected':''}>Pago</option>
+    </select>
+    <button onclick="removerLinhaParcela(${id})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
+  `;
+  container.appendChild(div);
+  recalcularTotalMP();
+}
+
+function formatMoneyInline(input) {
+  let value = input.value.replace(/\D/g, '');
+  if (!value) { input.value = ''; return; }
+  value = (parseInt(value) / 100).toFixed(2);
+  input.value = 'R$ ' + value.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function removerLinhaParcela(id) {
+  const el = document.getElementById('mp-linha-' + id);
+  if (el) el.remove();
+  recalcularTotalMP();
+}
+
+function recalcularTotalMP() {
+  let total = 0;
+  let count = 0;
+  document.querySelectorAll('[id^="mp-valor-"]').forEach(el => {
+    total += parseMoney(el.value);
+    count++;
+  });
+  document.querySelectorAll('[id^="mp-mora-"]').forEach(el => {
+    total += parseMoney(el.value);
+  });
+  const totalEl = document.getElementById('mp-total-valor');
+  const countEl = document.getElementById('mp-total-count');
+  if (totalEl) totalEl.textContent = formatarMoeda(total);
+  if (countEl) countEl.textContent = count;
+}
+
+function salvarMultiParcelas() {
+  const nome = document.getElementById('mp-nome').value.trim();
+  const categoria = document.getElementById('mp-categoria').value;
+
+  if (!nome) { showAlert('⚠️', 'Informe o nome do credor.'); return; }
+  if (!categoria) { showAlert('⚠️', 'Selecione uma categoria.'); return; }
+
+  const linhas = document.querySelectorAll('[id^="mp-linha-"]');
+  if (linhas.length === 0) { showAlert('⚠️', 'Adicione ao menos uma parcela.'); return; }
+
+  let salvas = 0;
+  linhas.forEach(linha => {
+    const id = linha.id.replace('mp-linha-', '');
+    const desc = document.getElementById('mp-desc-' + id)?.value || '';
+    const venc = document.getElementById('mp-venc-' + id)?.value;
+    const valor = parseMoney(document.getElementById('mp-valor-' + id)?.value);
+    const mora = parseMoney(document.getElementById('mp-mora-' + id)?.value);
+    const status = document.getElementById('mp-status-' + id)?.value || 'atrasado';
+
+    if (!venc || !valor) return; // pula linhas incompletas
+
+    const divida = {
+      nome: nome + (desc ? ' — ' + desc : ''),
+      categoria,
+      subcategoria: document.getElementById('mp-subcategoria').value,
+      credor: document.getElementById('mp-credor').value,
+      observacoes: document.getElementById('mp-obs').value,
+      valor: valor + mora,
+      dataVencimento: venc,
+      status,
+      jurosMes: 0,
+      multa: mora,
+      totalParcelas: 1
+    };
+
+    adicionarDivida(divida);
+    salvas++;
+  });
+
+  fecharModal();
+  renderTabelaDividas();
+  renderizarAlertas();
+  showAlert('✅', salvas + ' parcela(s) cadastrada(s) com sucesso!');
 }
