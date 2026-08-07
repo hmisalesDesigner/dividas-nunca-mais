@@ -14,6 +14,8 @@ function iniciarApp() {
 
   // Atualiza header
   document.getElementById('user-photo').src = DB.usuario.foto || '';
+  const benPhoto = document.getElementById('user-photo-ben');
+  if (benPhoto) benPhoto.src = DB.usuario.foto || '';
 
   // Inicia datetime
   atualizarDatetime();
@@ -50,7 +52,8 @@ function navigateTo(page, el) {
     planejador: 'Planejador de Quitação',
     calendario: 'Calendário Financeiro',
     orcamentos: 'Orçamentos',
-    configuracoes: 'Configurações'
+    configuracoes: 'Configurações',
+
   };
   document.getElementById('page-title').textContent = titulos[page] || page;
 
@@ -66,6 +69,7 @@ function navigateTo(page, el) {
     case 'calendario': renderCalendario(); break;
     case 'orcamentos': renderOrcamentos(); break;
     case 'configuracoes': renderConfiguracoes(); break;
+
   }
 }
 

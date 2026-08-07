@@ -373,3 +373,41 @@ function exportarExcel() {
   a.download = `dividas-nunca-mais-${new Date().toISOString().split('T')[0]}.csv`;
   a.click();
 }
+
+// ===== CASHBACK & PONTOS =====
+if (!DB.programas) DB.programas = [
+  { id: 1, nome: 'Livelo', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#e63946', logo: '💎' },
+  { id: 2, nome: 'Méliuz', tipo: 'cashback', saldo: 0, expiracao: null, cor: '#00b4d8', logo: '💰' },
+  { id: 3, nome: 'Dinheiro na Nota', tipo: 'cashback', saldo: 0, expiracao: null, cor: '#2d6a4f', logo: '🧾' },
+  { id: 4, nome: 'Nota Paraná', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#457b9d', logo: '📋' },
+  { id: 5, nome: 'Meu Posto', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#e9c46a', logo: '⛽' },
+  { id: 6, nome: 'KMV', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#f4a261', logo: '🚗' },
+  { id: 7, nome: 'Nespresso Dolce Gusto', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#6d4c41', logo: '☕' },
+  { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#1d3557', logo: '✈️' },
+];
+if (!DB.resgates) DB.resgates = [];
+
+function adicionarPrograma(programa) {
+  programa.id = gerarId();
+  DB.programas.push(programa);
+  agendarSync();
+}
+
+function atualizarSaldoPrograma(id, novoSaldo) {
+  const p = DB.programas.find(p => p.id === id);
+  if (p) { p.saldo = novoSaldo; agendarSync(); }
+}
+
+function registrarResgate(programaId, quantidade, descricao) {
+  const p = DB.programas.find(p => p.id === programaId);
+  if (!p) return;
+  p.saldo = Math.max(0, p.saldo - quantidade);
+  DB.resgates.push({
+    id: gerarId(),
+    programaId,
+    quantidade,
+    descricao,
+    data: new Date().toISOString().split('T')[0]
+  });
+  agendarSync();
+}
