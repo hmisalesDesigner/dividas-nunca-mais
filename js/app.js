@@ -58,6 +58,7 @@ function navigateTo(page, el) {
     calendario: 'Calendário Financeiro',
     orcamentos: 'Orçamentos',
     configuracoes: 'Configurações',
+    contas: 'Contas Recorrentes',
 
   };
   document.getElementById('page-title').textContent = titulos[page] || page;
@@ -74,6 +75,7 @@ function navigateTo(page, el) {
     case 'calendario': renderCalendario(); break;
     case 'orcamentos': renderOrcamentos(); break;
     case 'configuracoes': renderConfiguracoes(); break;
+    case 'contas': renderContas(); break;
 
   }
 }
