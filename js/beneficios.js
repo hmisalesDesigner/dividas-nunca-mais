@@ -261,7 +261,18 @@ function renderPorCategoria() {
   // Agrupa por categoria
   const grupos = {};
   DB.programas.forEach(p => {
-    const cat = p.categoria || 'outro';
+    // Atribui categoria padrão baseada no nome se não tiver
+    if (!p.categoria) {
+      const nome = (p.nome || '').toLowerCase();
+      if (nome.includes('azul') || nome.includes('smiles') || nome.includes('latam')) p.categoria = 'aerea';
+      else if (nome.includes('kmv') || nome.includes('posto') || nome.includes('shell')) p.categoria = 'combustivel';
+      else if (nome.includes('méliuz') || nome.includes('meliuz') || nome.includes('dinheiro na nota')) p.categoria = 'varejo';
+      else if (nome.includes('nota paraná') || nome.includes('nota parana') || nome.includes('governo')) p.categoria = 'governo';
+      else if (nome.includes('nescafé') || nome.includes('nescafe') || nome.includes('dolce') || nome.includes('café')) p.categoria = 'lifestyle';
+      else if (nome.includes('livelo') || nome.includes('esfera') || nome.includes('cartão') || nome.includes('cartao')) p.categoria = 'cartao';
+      else p.categoria = 'outro';
+    }
+    const cat = p.categoria;
     if (!grupos[cat]) grupos[cat] = [];
     grupos[cat].push(p);
   });
