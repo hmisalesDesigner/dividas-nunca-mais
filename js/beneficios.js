@@ -323,14 +323,7 @@ function cardBeneficio(p) {
       </div>
       ${p.tipo === 'pontos' && p.saldoCashback ? `<div style="font-size:14px;font-weight:600;color:#34a85a;margin-bottom:2px;">${formatarMoeda(p.saldoCashback)} cashback</div>` : ''}
       ${p.taxaConversao && p.tipo === 'pontos' ? `<div style="font-size:11px;color:#666;margin-bottom:4px;">≈ ${formatarMoeda((p.saldo || 0) * p.taxaConversao)}</div>` : ''}
-      ${p.lotes && p.lotes.length > 0 ? `
-        <div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">
-          ${p.lotes.map(l => {
-            const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
-            const cor = dias <= 7 ? '#ef4444' : dias <= 30 ? '#f59e0b' : '#217346';
-            return \`<div style="font-size:11px;color:\${cor};margin-bottom:2px;">⏰ \${l.quantidade.toLocaleString('pt-BR')} pts vencem em \${formatarData(l.expiracao)} (\${dias}d)</div>\`;
-          }).join('')}
-        </div>` : ''}
+      ${renderLotesCard(p)}
       <div style="font-size:11px;color:${expCor};margin-bottom:12px;">
         ${p.expiracao ? `⏰ Expira: ${formatarData(p.expiracao)} (${expDias}d)` : 'Não expira'}
       </div>
@@ -684,6 +677,16 @@ function renderGrafLinha() {
 }
 
 // ===== LOTES DE PONTOS =====
+function renderLotesCard(p) {
+  if (!p.lotes || p.lotes.length === 0) return '';
+  const items = p.lotes.map(l => {
+    const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
+    const cor = dias <= 7 ? '#ef4444' : dias <= 30 ? '#f59e0b' : '#217346';
+    return '<div style="font-size:11px;color:' + cor + ';margin-bottom:2px;">⏰ ' + l.quantidade.toLocaleString('pt-BR') + ' pts vencem em ' + formatarData(l.expiracao) + ' (' + dias + 'd)</div>';
+  }).join('');
+  return '<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">' + items + '</div>';
+}
+
 function abrirModalLotes(id) {
   const p = DB.programas.find(p => p.id === id);
   if (!p) return;
@@ -753,6 +756,26 @@ function removerLote(id, idx) {
 }
 
 // ===== CUPONS & TICKETS =====
+function renderCuponsList(cupons, id) {
+  if (!cupons || cupons.length === 0) return '<p style="color:var(--text-muted);font-size:13px;">Nenhum cupom salvo ainda.</p>';
+  return cupons.map(function(c, i) {
+    const vencido = c.validade && new Date(c.validade) < new Date();
+    const borderCor = c.usado ? 'var(--border)' : vencido ? 'var(--red)' : 'var(--green)';
+    const opacity = c.usado ? '0.6' : '1';
+    const codCor = c.usado ? 'var(--text-muted)' : 'var(--green)';
+    const usadoBtn = !c.usado
+      ? '<button onclick="marcarCupomUsado(' + id + ',' + i + ')" style="background:var(--green);border:none;color:#000;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Usado</button>'
+      : '<span style="font-size:11px;color:var(--text-muted);">✓ Usado</span>';
+    const descDiv = c.descricao ? '<div style="font-size:12px;color:var(--text-secondary);">' + c.descricao + '</div>' : '';
+    const valDiv = c.validade ? '<div style="font-size:11px;color:' + (vencido ? 'var(--red)' : 'var(--text-muted)') + ';margin-top:4px;">' + (vencido ? '⚠️ Vencido' : '⏰ Válido até') + ': ' + formatarData(c.validade) + '</div>' : '';
+    return '<div style="background:var(--bg-secondary);border:1px solid ' + borderCor + ';border-radius:10px;padding:14px;margin-bottom:10px;opacity:' + opacity + ';">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+      + '<code style="font-size:15px;font-weight:700;color:' + codCor + ';letter-spacing:2px;background:var(--bg-primary);padding:4px 10px;border-radius:6px;">' + c.codigo + '</code>'
+      + '<div style="display:flex;gap:6px;">' + usadoBtn
+      + '<button onclick="removerCupom(' + id + ',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button>'
+      + '</div></div>' + descDiv + valDiv + '</div>';
+  }).join('');
+}
 function abrirModalCupons(id) {
   const p = DB.programas.find(p => p.id === id);
   if (!p) return;
@@ -760,22 +783,7 @@ function abrirModalCupons(id) {
 
   abrirModal(`🎟️ Cupons & Tickets — ${p.nome}`, `
     <div style="margin-bottom:16px;">
-      ${p.cupons.length === 0
-        ? '<p style="color:var(--text-muted);font-size:13px;">Nenhum cupom salvo ainda.</p>'
-        : p.cupons.map((c, i) => {
-          const vencido = c.validade && new Date(c.validade) < new Date();
-          return \`<div style="background:var(--bg-secondary);border:1px solid \${c.usado ? 'var(--border)' : vencido ? 'var(--red)' : 'var(--green)'};border-radius:10px;padding:14px;margin-bottom:10px;opacity:\${c.usado ? '0.6' : '1'};">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-              <code style="font-size:15px;font-weight:700;color:\${c.usado ? 'var(--text-muted)' : 'var(--green)'};letter-spacing:2px;background:var(--bg-primary);padding:4px 10px;border-radius:6px;">\${c.codigo}</code>
-              <div style="display:flex;gap:6px;">
-                \${!c.usado ? \`<button onclick="marcarCupomUsado(\${id},\${i})" style="background:var(--green);border:none;color:#000;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Usado</button>\` : '<span style="font-size:11px;color:var(--text-muted);">✓ Usado</span>'}
-                <button onclick="removerCupom(\${id},\${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button>
-              </div>
-            </div>
-            \${c.descricao ? \`<div style="font-size:12px;color:var(--text-secondary);">\${c.descricao}</div>\` : ''}
-            \${c.validade ? \`<div style="font-size:11px;color:\${vencido ? 'var(--red)' : 'var(--text-muted)'};margin-top:4px;">\${vencido ? '⚠️ Vencido' : '⏰ Válido até'}: \${formatarData(c.validade)}</div>\` : ''}
-          </div>\`;
-        }).join('')}
+      ${renderCuponsList(p.cupons, id)}
     </div>
     <div style="border-top:1px solid var(--border);padding-top:16px;">
       <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar Cupom Manualmente</h4>
