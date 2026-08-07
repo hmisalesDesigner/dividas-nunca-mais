@@ -87,8 +87,7 @@ function navigateTo(page, el) {
   }
 }
 
-function toggleSubmenu(e, id) {
-  e.stopPropagation();
+function toggleSubmenu(id) {
   const submenu = document.getElementById(id);
   const arrow = document.getElementById('arrow-' + id.replace('submenu-', ''));
   if (!submenu) return;

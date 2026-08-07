@@ -82,14 +82,22 @@
       <a href="#" class="nav-item" onclick="navigateTo('orcamentos', this)">
         <span class="nav-icon">💡</span><span class="nav-label">Orçamentos</span>
       </a>
-      <a href="#" class="nav-item nav-beneficios" onclick="entrarBeneficios()" style="position:relative;">
-        <span class="nav-icon">🎁</span>
-        <span class="nav-label">Cashback e Pontos</span>
-        <span id="badge-beneficios" style="display:none;background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;">0</span>
-      </a>
-      <a href="#" class="nav-item" onclick="navigateTo('contas', this)">
-        <span class="nav-icon">🏠</span><span class="nav-label">Contas Recorrentes</span>
-      </a>
+      <!-- Contas Recorrentes com submenu -->
+      <div class="nav-group">
+        <a href="#" class="nav-item nav-group-header" onclick="navigateTo('contas', this)">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-label">Contas Recorrentes</span>
+          <span class="nav-arrow" id="arrow-contas" onclick="event.stopPropagation();toggleSubmenu('submenu-contas')">›</span>
+        </a>
+        <div class="nav-submenu" id="submenu-contas" style="display:none;">
+          <a href="#" class="nav-item nav-subitem" onclick="navigateTo('copel', this)">
+            <span class="nav-icon">⚡</span><span class="nav-label">Copel</span>
+          </a>
+          <a href="#" class="nav-item nav-subitem" onclick="navigateTo('sanepar', this)">
+            <span class="nav-icon">💧</span><span class="nav-label">Sanepar</span>
+          </a>
+        </div>
+      </div>
       <a href="#" class="nav-item" onclick="navigateTo('configuracoes', this)">
         <span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span>
       </a>
