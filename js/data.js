@@ -376,14 +376,14 @@ function exportarExcel() {
 
 // ===== CASHBACK & PONTOS =====
 if (!DB.programas) DB.programas = [
-  { id: 1, nome: 'Livelo', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#e63946', logo: '💎' },
-  { id: 2, nome: 'Méliuz', tipo: 'cashback', saldo: 0, expiracao: null, cor: '#00b4d8', logo: '💰' },
-  { id: 3, nome: 'Dinheiro na Nota', tipo: 'cashback', saldo: 0, expiracao: null, cor: '#2d6a4f', logo: '🧾' },
-  { id: 4, nome: 'Nota Paraná', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#457b9d', logo: '📋' },
-  { id: 5, nome: 'Meu Posto', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#e9c46a', logo: '⛽' },
-  { id: 6, nome: 'KMV', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#f4a261', logo: '🚗' },
-  { id: 7, nome: 'Nespresso Dolce Gusto', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#6d4c41', logo: '☕' },
-  { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', saldo: 0, expiracao: null, cor: '#1d3557', logo: '✈️' },
+  { id: 1, nome: 'Livelo', tipo: 'pontos', categoria: 'cartao', saldo: 0, expiracao: null, logo: '💎' },
+  { id: 2, nome: 'Méliuz', tipo: 'cashback', categoria: 'varejo', saldo: 0, expiracao: null, logo: '💰' },
+  { id: 3, nome: 'Dinheiro na Nota', tipo: 'cashback', categoria: 'governo', saldo: 0, expiracao: null, logo: '🧾' },
+  { id: 4, nome: 'Nota Paraná', tipo: 'pontos', categoria: 'governo', saldo: 0, expiracao: null, logo: '📋' },
+  { id: 5, nome: 'Meu Posto', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '⛽' },
+  { id: 6, nome: 'KMV', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '🚗' },
+  { id: 7, nome: 'Nescafé Dolce Gusto CLUB', tipo: 'pontos', categoria: 'lifestyle', saldo: 0, expiracao: null, logo: '☕' },
+  { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', categoria: 'aerea', saldo: 0, expiracao: null, logo: '✈️' },
 ];
 if (!DB.resgates) DB.resgates = [];
 

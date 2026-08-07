@@ -82,8 +82,10 @@
       <a href="#" class="nav-item" onclick="navigateTo('orcamentos', this)">
         <span class="nav-icon">💡</span><span class="nav-label">Orçamentos</span>
       </a>
-      <a href="#" class="nav-item nav-beneficios" onclick="entrarBeneficios()">
-        <span class="nav-icon">🎁</span><span class="nav-label">Cashback e Pontos</span>
+      <a href="#" class="nav-item nav-beneficios" onclick="entrarBeneficios()" style="position:relative;">
+        <span class="nav-icon">🎁</span>
+        <span class="nav-label">Cashback e Pontos</span>
+        <span id="badge-beneficios" style="display:none;background:#ef4444;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;font-weight:700;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;">0</span>
       </a>
       <a href="#" class="nav-item" onclick="navigateTo('configuracoes', this)">
         <span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span>

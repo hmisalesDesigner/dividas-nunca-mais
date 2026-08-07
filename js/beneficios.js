@@ -1,4 +1,13 @@
 // ===== CASHBACK & PONTOS =====
+const CATEGORIAS_BENEFICIOS = {
+  'aerea': { label: '✈️ Aéreas', cor: '#1d3557' },
+  'combustivel': { label: '⛽ Combustível', cor: '#f4a261' },
+  'varejo': { label: '🛒 Varejo', cor: '#2d6a4f' },
+  'governo': { label: '🏛️ Governo', cor: '#457b9d' },
+  'lifestyle': { label: '☕ Lifestyle', cor: '#6d4c41' },
+  'cartao': { label: '💳 Cartões', cor: '#9b2335' },
+  'outro': { label: '📦 Outros', cor: '#666' }
+};
 let popupFila = [];
 let popupAtual = 0;
 
@@ -81,6 +90,16 @@ function mostrarProximoPopup() {
         style="width:100%;padding:12px;border:2px solid #217346;border-radius:8px;font-size:16px;font-weight:600;text-align:center;outline:none;color:#333;"
         onkeydown="if(event.key==='Enter') salvarPopupSaldo(${p.id}, ${saldoAnterior})" />
     </div>
+    ${p.tipo === 'pontos' ? `
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;">
+        Saldo Cashback R$ (se houver)
+      </label>
+      <input id="popup-cashback" type="number" 
+        placeholder="0.00" min="0" step="0.01"
+        value="${p.saldoCashback || 0}"
+        style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;text-align:center;outline:none;color:#333;" />
+    </div>` : '<div id="popup-cashback-hidden"></div>'}
     ${p.expiracao ? `<div style="font-size:12px;color:#f59e0b;text-align:center;margin-bottom:12px;">⏰ Expira em ${formatarData(p.expiracao)}</div>` : ''}
     <div style="display:flex;gap:10px;">
       <button onclick="pularPopup()" style="flex:1;background:#fff;border:1px solid #ddd;color:#666;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Pular</button>
@@ -121,6 +140,8 @@ function salvarPopupSaldo(id, saldoAnterior) {
   }
 
   p.saldo = novoSaldo;
+  const cashbackInput = document.getElementById('popup-cashback');
+  if (cashbackInput) p.saldoCashback = parseFloat(cashbackInput.value) || 0;
   agendarSync();
   fecharBenModal();
   renderBeneficios();
@@ -148,7 +169,10 @@ function renderBeneficios() {
   if (!DB.programas) DB.programas = [];
   const cashbacks = DB.programas.filter(p => p.tipo === 'cashback');
   const pontos = DB.programas.filter(p => p.tipo === 'pontos');
-  const totalCashback = cashbacks.reduce((s, p) => s + (p.saldo || 0), 0);
+  const totalCashback = DB.programas.reduce((s, p) => {
+    if (p.tipo === 'cashback') return s + (p.saldo || 0);
+    return s + (p.saldoCashback || 0);
+  }, 0);
   const totalPontos = pontos.reduce((s, p) => s + (p.saldo || 0), 0);
   const totalEmReais = DB.programas.reduce((s, p) => {
     if (p.tipo === 'cashback') return s + (p.saldo || 0);
@@ -195,15 +219,8 @@ function renderBeneficios() {
       <button onclick="mostrarGraficos()" style="background:#fff;border:1px solid #217346;color:#217346;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">📊 Ver Gráficos</button>
     </div>
 
-    <!-- Grid programas -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
-      ${DB.programas.map(p => cardBeneficio(p)).join('')}
-      ${DB.programas.length === 0 ? `
-        <div style="grid-column:1/-1;text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;">
-          <div style="font-size:48px;margin-bottom:12px;">🎁</div>
-          <p>Nenhum programa cadastrado.<br>Clique em "+ Novo Programa".</p>
-        </div>` : ''}
-    </div>
+    <!-- Programas por categoria -->
+    ${renderPorCategoria()}
 
     <!-- Resgates recentes -->
     <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
@@ -233,6 +250,48 @@ function renderBeneficios() {
   `;
 }
 
+function renderPorCategoria() {
+  if (!DB.programas || DB.programas.length === 0) {
+    return `<div style="text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;margin-bottom:28px;">
+      <div style="font-size:48px;margin-bottom:12px;">🎁</div>
+      <p>Nenhum programa cadastrado.<br>Clique em "+ Novo Programa".</p>
+    </div>`;
+  }
+
+  // Agrupa por categoria
+  const grupos = {};
+  DB.programas.forEach(p => {
+    const cat = p.categoria || 'outro';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  // Renderiza cada grupo
+  return Object.entries(grupos).map(([cat, progs]) => {
+    const catInfo = CATEGORIAS_BENEFICIOS[cat] || CATEGORIAS_BENEFICIOS['outro'];
+    const totalPontos = progs.filter(p => p.tipo === 'pontos').reduce((s, p) => s + (p.saldo || 0), 0);
+    const totalCash = progs.reduce((s, p) => {
+      if (p.tipo === 'cashback') return s + (p.saldo || 0);
+      return s + (p.saldoCashback || 0);
+    }, 0);
+
+    return `
+      <div style="margin-bottom:24px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid ${catInfo.cor};box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+          <span style="font-size:14px;font-weight:700;color:#333;">${catInfo.label}</span>
+          <div style="display:flex;gap:16px;font-size:12px;color:#666;">
+            ${totalPontos > 0 ? `<span>🎯 <strong>${totalPontos.toLocaleString('pt-BR')} pts</strong></span>` : ''}
+            ${totalCash > 0 ? `<span>💰 <strong>${formatarMoeda(totalCash)}</strong></span>` : ''}
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
+          ${progs.map(p => cardBeneficio(p)).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function cardBeneficio(p) {
   const hoje = new Date();
   const expDias = p.expiracao ? Math.ceil((new Date(p.expiracao) - hoje) / (1000*60*60*24)) : null;
@@ -251,13 +310,26 @@ function cardBeneficio(p) {
       <div style="font-size:22px;font-weight:700;color:#217346;margin-bottom:4px;">
         ${p.tipo === 'cashback' ? formatarMoeda(p.saldo || 0) : (p.saldo || 0).toLocaleString('pt-BR') + ' pts'}
       </div>
+      ${p.tipo === 'pontos' && p.saldoCashback ? `<div style="font-size:14px;font-weight:600;color:#34a85a;margin-bottom:2px;">${formatarMoeda(p.saldoCashback)} cashback</div>` : ''}
       ${p.taxaConversao && p.tipo === 'pontos' ? `<div style="font-size:11px;color:#666;margin-bottom:4px;">≈ ${formatarMoeda((p.saldo || 0) * p.taxaConversao)}</div>` : ''}
+      ${p.lotes && p.lotes.length > 0 ? `
+        <div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">
+          ${p.lotes.map(l => {
+            const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
+            const cor = dias <= 7 ? '#ef4444' : dias <= 30 ? '#f59e0b' : '#217346';
+            return \`<div style="font-size:11px;color:\${cor};margin-bottom:2px;">⏰ \${l.quantidade.toLocaleString('pt-BR')} pts vencem em \${formatarData(l.expiracao)} (\${dias}d)</div>\`;
+          }).join('')}
+        </div>` : ''}
       <div style="font-size:11px;color:${expCor};margin-bottom:12px;">
         ${p.expiracao ? `⏰ Expira: ${formatarData(p.expiracao)} (${expDias}d)` : 'Não expira'}
       </div>
       <div style="display:flex;gap:8px;">
         <button onclick="abrirModalAtualizar(${p.id})" style="flex:1;background:#fff;border:1px solid #217346;color:#217346;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Atualizar</button>
         <button onclick="abrirModalResgatar(${p.id})" style="flex:1;background:#217346;border:none;color:#fff;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(33,115,70,0.3);">Resgatar</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px;">
+        ${p.tipo === 'pontos' ? `<button onclick="abrirModalLotes(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">📦 Lotes</button>` : ''}
+        <button onclick="abrirModalCupons(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">🎟️ Cupons${p.cupons && p.cupons.length > 0 ? ` (${p.cupons.length})` : ''}</button>
       </div>
     </div>
   `;
@@ -278,18 +350,30 @@ function abrirModalNovoPrograma() {
     </div>
     <div class="form-row">
       <div class="form-group">
+        <label>Categoria *</label>
+        <select id="np-categoria">
+          <option value="aerea">✈️ Aéreas</option>
+          <option value="combustivel">⛽ Combustível</option>
+          <option value="varejo">🛒 Varejo</option>
+          <option value="governo">🏛️ Governo</option>
+          <option value="lifestyle">☕ Lifestyle</option>
+          <option value="cartao">💳 Cartões</option>
+          <option value="outro">📦 Outros</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Tipo *</label>
         <select id="np-tipo">
           <option value="pontos">Pontos</option>
           <option value="cashback">Cashback (R$)</option>
         </select>
       </div>
+    </div>
+    <div class="form-row">
       <div class="form-group">
         <label>Saldo Atual</label>
         <input id="np-saldo" type="number" placeholder="0" min="0" step="0.01" />
       </div>
-    </div>
-    <div class="form-row">
       <div class="form-group">
         <label>Taxa de Conversão (R$ por ponto)</label>
         <input id="np-taxa" type="number" placeholder="Ex: 0.017" min="0" step="0.001" />
@@ -314,6 +398,7 @@ function salvarNovoPrograma() {
   const prog = {
     id: gerarId(), nome,
     logo: document.getElementById('np-logo').value || '🎁',
+    categoria: document.getElementById('np-categoria').value || 'outro',
     tipo: document.getElementById('np-tipo').value,
     saldo: parseFloat(document.getElementById('np-saldo').value) || 0,
     taxaConversao: parseFloat(document.getElementById('np-taxa').value) || null,
@@ -334,6 +419,11 @@ function abrirModalAtualizar(id) {
       <label>Novo saldo (${p.tipo === 'cashback' ? 'R$' : 'pontos'})</label>
       <input id="upd-saldo" type="number" value="${p.saldo || 0}" min="0" step="${p.tipo === 'cashback' ? '0.01' : '1'}" />
     </div>
+    ${p.tipo === 'pontos' ? `
+    <div class="form-group">
+      <label>Saldo Cashback (R$) <small style="color:#999;">— opcional, se o programa tiver cashback também</small></label>
+      <input id="upd-cashback" type="number" value="${p.saldoCashback || 0}" min="0" step="0.01" />
+    </div>` : '<input type="hidden" id="upd-cashback" value="0" />'}
     <div class="form-group">
       <label>Data de Expiração</label>
       <input id="upd-exp" type="date" value="${p.expiracao || ''}" />
@@ -342,7 +432,7 @@ function abrirModalAtualizar(id) {
       <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
       <button class="btn-primary" onclick="confirmarAtualizar(${id})">💾 Salvar</button>
     </div>
-  `, '400px');
+  `, '420px');
 }
 
 function confirmarAtualizar(id) {
@@ -361,6 +451,7 @@ function confirmarAtualizar(id) {
   }
 
   p.saldo = novoSaldo;
+  p.saldoCashback = parseFloat(document.getElementById('upd-cashback')?.value) || 0;
   p.expiracao = document.getElementById('upd-exp').value || null;
   agendarSync();
   fecharModal();
@@ -383,11 +474,22 @@ function abrirModalResgatar(id) {
       <label>Descrição</label>
       <input id="res-desc" type="text" placeholder="Ex: Passagem aérea, desconto..." />
     </div>
+    <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">🎟️ Cupom/Ticket gerado (opcional)</div>
+      <div class="form-group">
+        <label>Código do Cupom</label>
+        <input id="res-cupom" type="text" placeholder="Ex: DNM2026-ABC123" style="font-family:monospace;letter-spacing:1px;" />
+      </div>
+      <div class="form-group">
+        <label>Validade do Cupom</label>
+        <input id="res-cupom-val" type="date" />
+      </div>
+    </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
       <button class="btn-primary" onclick="confirmarResgate(${id})">✅ Confirmar</button>
     </div>
-  `, '400px');
+  `, '460px');
 }
 
 function confirmarResgate(id) {
@@ -395,6 +497,8 @@ function confirmarResgate(id) {
   if (!p) return;
   const qtd = parseFloat(document.getElementById('res-qtd').value);
   const desc = document.getElementById('res-desc').value;
+  const cupomCodigo = document.getElementById('res-cupom')?.value?.trim();
+  const cupomValidade = document.getElementById('res-cupom-val')?.value;
   if (!qtd || qtd <= 0) { showAlert('⚠️', 'Informe a quantidade.'); return; }
   if (qtd > p.saldo) { showAlert('⚠️', 'Saldo insuficiente.'); return; }
   p.saldo = Math.max(0, p.saldo - qtd);
@@ -403,10 +507,22 @@ function confirmarResgate(id) {
   DB.historicoSaldo[id].push({ data: new Date().toISOString().split('T')[0], saldo: p.saldo });
   if (!DB.resgates) DB.resgates = [];
   DB.resgates.push({ id: gerarId(), programaId: id, quantidade: qtd, descricao: desc, data: new Date().toISOString().split('T')[0] });
+  // Salva cupom se informado
+  if (cupomCodigo) {
+    if (!p.cupons) p.cupons = [];
+    p.cupons.push({
+      id: gerarId(),
+      codigo: cupomCodigo,
+      descricao: desc,
+      validade: cupomValidade || null,
+      usado: false,
+      criadoEm: new Date().toISOString().split('T')[0]
+    });
+  }
   agendarSync();
   fecharModal();
   renderBeneficios();
-  showAlert('✅', 'Resgate registrado!');
+  showAlert('✅', cupomCodigo ? 'Resgate e cupom salvos!' : 'Resgate registrado!');
 }
 
 function editarPrograma(id) {
@@ -422,6 +538,18 @@ function editarPrograma(id) {
         <label>Emoji</label>
         <input id="ed-logo" type="text" value="${p.logo}" maxlength="2" />
       </div>
+    </div>
+    <div class="form-group">
+      <label>Categoria</label>
+      <select id="ed-categoria">
+        <option value="aerea" ${p.categoria==='aerea'?'selected':''}>✈️ Aéreas</option>
+        <option value="combustivel" ${p.categoria==='combustivel'?'selected':''}>⛽ Combustível</option>
+        <option value="varejo" ${p.categoria==='varejo'?'selected':''}>🛒 Varejo</option>
+        <option value="governo" ${p.categoria==='governo'?'selected':''}>🏛️ Governo</option>
+        <option value="lifestyle" ${p.categoria==='lifestyle'?'selected':''}>☕ Lifestyle</option>
+        <option value="cartao" ${p.categoria==='cartao'?'selected':''}>💳 Cartões</option>
+        <option value="outro" ${(!p.categoria||p.categoria==='outro')?'selected':''}>📦 Outros</option>
+      </select>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -447,6 +575,7 @@ function salvarEdicaoPrograma(id) {
   if (!p) return;
   p.nome = document.getElementById('ed-nome').value.trim() || p.nome;
   p.logo = document.getElementById('ed-logo').value || p.logo;
+  p.categoria = document.getElementById('ed-categoria').value || 'outro';
   p.taxaConversao = parseFloat(document.getElementById('ed-taxa').value) || null;
   p.expiracao = document.getElementById('ed-exp').value || null;
   agendarSync();
@@ -541,4 +670,201 @@ function renderGrafLinha() {
     },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { ticks: { font: { size: 10 } } } } }
   });
+}
+
+// ===== LOTES DE PONTOS =====
+function abrirModalLotes(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  if (!p.lotes) p.lotes = [];
+
+  abrirModal(`📦 Lotes de Pontos — ${p.nome}`, `
+    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
+      Gerencie lotes de pontos com datas de vencimento diferentes.<br>
+      Total: <strong>${(p.saldo || 0).toLocaleString('pt-BR')} pts</strong>
+    </p>
+    <div id="lotes-lista" style="margin-bottom:16px;">
+      ${p.lotes.map((l, i) => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-secondary);border-radius:8px;margin-bottom:8px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${l.quantidade.toLocaleString('pt-BR')} pts</div>
+            <div style="font-size:11px;color:var(--text-secondary);">Vence: ${formatarData(l.expiracao)}</div>
+          </div>
+          <button onclick="removerLote(${id}, ${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
+        </div>
+      `).join('')}
+      ${p.lotes.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">Nenhum lote cadastrado.</p>' : ''}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar Lote</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Quantidade (pts)</label>
+          <input id="lote-qtd" type="number" placeholder="Ex: 1597" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Data de Vencimento</label>
+          <input id="lote-exp" type="date" />
+        </div>
+      </div>
+      <button class="btn-primary btn-sm" onclick="adicionarLote(${id})" style="width:100%;">+ Adicionar Lote</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+    </div>
+  `, '480px');
+}
+
+function adicionarLote(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  const qtd = parseInt(document.getElementById('lote-qtd').value);
+  const exp = document.getElementById('lote-exp').value;
+  if (!qtd || qtd <= 0) { showAlert('⚠️', 'Informe a quantidade.'); return; }
+  if (!exp) { showAlert('⚠️', 'Informe a data de vencimento.'); return; }
+  if (!p.lotes) p.lotes = [];
+  p.lotes.push({ quantidade: qtd, expiracao: exp });
+  p.lotes.sort((a, b) => new Date(a.expiracao) - new Date(b.expiracao));
+  agendarSync();
+  fecharModal();
+  abrirModalLotes(id);
+  renderBeneficios();
+}
+
+function removerLote(id, idx) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p || !p.lotes) return;
+  p.lotes.splice(idx, 1);
+  agendarSync();
+  fecharModal();
+  abrirModalLotes(id);
+  renderBeneficios();
+}
+
+// ===== CUPONS & TICKETS =====
+function abrirModalCupons(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  if (!p.cupons) p.cupons = [];
+
+  abrirModal(`🎟️ Cupons & Tickets — ${p.nome}`, `
+    <div style="margin-bottom:16px;">
+      ${p.cupons.length === 0
+        ? '<p style="color:var(--text-muted);font-size:13px;">Nenhum cupom salvo ainda.</p>'
+        : p.cupons.map((c, i) => {
+          const vencido = c.validade && new Date(c.validade) < new Date();
+          return \`<div style="background:var(--bg-secondary);border:1px solid \${c.usado ? 'var(--border)' : vencido ? 'var(--red)' : 'var(--green)'};border-radius:10px;padding:14px;margin-bottom:10px;opacity:\${c.usado ? '0.6' : '1'};">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <code style="font-size:15px;font-weight:700;color:\${c.usado ? 'var(--text-muted)' : 'var(--green)'};letter-spacing:2px;background:var(--bg-primary);padding:4px 10px;border-radius:6px;">\${c.codigo}</code>
+              <div style="display:flex;gap:6px;">
+                \${!c.usado ? \`<button onclick="marcarCupomUsado(\${id},\${i})" style="background:var(--green);border:none;color:#000;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">✓ Usado</button>\` : '<span style="font-size:11px;color:var(--text-muted);">✓ Usado</span>'}
+                <button onclick="removerCupom(\${id},\${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;">✕</button>
+              </div>
+            </div>
+            \${c.descricao ? \`<div style="font-size:12px;color:var(--text-secondary);">\${c.descricao}</div>\` : ''}
+            \${c.validade ? \`<div style="font-size:11px;color:\${vencido ? 'var(--red)' : 'var(--text-muted)'};margin-top:4px;">\${vencido ? '⚠️ Vencido' : '⏰ Válido até'}: \${formatarData(c.validade)}</div>\` : ''}
+          </div>\`;
+        }).join('')}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar Cupom Manualmente</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Código *</label>
+          <input id="novo-cupom-cod" type="text" placeholder="Ex: PROMO2026" style="font-family:monospace;" />
+        </div>
+        <div class="form-group">
+          <label>Validade</label>
+          <input id="novo-cupom-val" type="date" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input id="novo-cupom-desc" type="text" placeholder="Ex: Desconto passagem aérea" />
+      </div>
+      <button class="btn-primary btn-sm" onclick="adicionarCupomManual(${id})" style="width:100%;">+ Salvar Cupom</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+    </div>
+  `, '520px');
+}
+
+function adicionarCupomManual(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  const codigo = document.getElementById('novo-cupom-cod')?.value?.trim();
+  if (!codigo) { showAlert('⚠️', 'Informe o código do cupom.'); return; }
+  if (!p.cupons) p.cupons = [];
+  p.cupons.push({
+    id: gerarId(),
+    codigo,
+    descricao: document.getElementById('novo-cupom-desc')?.value || '',
+    validade: document.getElementById('novo-cupom-val')?.value || null,
+    usado: false,
+    criadoEm: new Date().toISOString().split('T')[0]
+  });
+  agendarSync();
+  fecharModal();
+  abrirModalCupons(id);
+  renderBeneficios();
+}
+
+function marcarCupomUsado(programaId, idx) {
+  const p = DB.programas.find(p => p.id === programaId);
+  if (!p || !p.cupons) return;
+  p.cupons[idx].usado = true;
+  agendarSync();
+  fecharModal();
+  abrirModalCupons(programaId);
+}
+
+function removerCupom(programaId, idx) {
+  const p = DB.programas.find(p => p.id === programaId);
+  if (!p || !p.cupons) return;
+  if (confirm('Remover este cupom?')) {
+    p.cupons.splice(idx, 1);
+    agendarSync();
+    fecharModal();
+    abrirModalCupons(programaId);
+    renderBeneficios();
+  }
+}
+
+// ===== BADGE NO SIDEBAR =====
+function atualizarBadgeBeneficios() {
+  const hoje = new Date();
+  let alertas = 0;
+
+  if (!DB.programas) return;
+
+  DB.programas.forEach(p => {
+    // Pontos expirando em 30 dias
+    if (p.expiracao) {
+      const dias = Math.ceil((new Date(p.expiracao) - hoje) / (1000*60*60*24));
+      if (dias <= 30 && dias >= 0) alertas++;
+    }
+    // Lotes expirando
+    if (p.lotes) {
+      p.lotes.forEach(l => {
+        const dias = Math.ceil((new Date(l.expiracao) - hoje) / (1000*60*60*24));
+        if (dias <= 30 && dias >= 0) alertas++;
+      });
+    }
+    // Cupons vencendo
+    if (p.cupons) {
+      p.cupons.forEach(c => {
+        if (!c.usado && c.validade) {
+          const dias = Math.ceil((new Date(c.validade) - hoje) / (1000*60*60*24));
+          if (dias <= 7 && dias >= 0) alertas++;
+        }
+      });
+    }
+  });
+
+  const badge = document.getElementById('badge-beneficios');
+  if (badge) {
+    badge.style.display = alertas > 0 ? 'inline-flex' : 'none';
+    badge.textContent = alertas;
+  }
 }

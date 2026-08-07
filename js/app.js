@@ -12,6 +12,11 @@ function iniciarApp() {
   // Agenda sync periódico no localStorage
   setInterval(() => salvarLocalStorage(), 30000);
 
+  // Atualiza badge de benefícios uma vez ao iniciar
+  setTimeout(() => {
+    if (typeof atualizarBadgeBeneficios === 'function') atualizarBadgeBeneficios();
+  }, 1000);
+
   // Atualiza header
   document.getElementById('user-photo').src = DB.usuario.foto || '';
   const benPhoto = document.getElementById('user-photo-ben');
