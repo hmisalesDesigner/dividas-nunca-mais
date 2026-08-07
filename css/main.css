@@ -388,3 +388,23 @@ select.filter { width: auto; padding: 8px 12px; font-size: 12px; }
 .nav-beneficios { color: #4ade80 !important; }
 .nav-beneficios.active { background: rgba(34,197,94,0.15) !important; color: #4ade80 !important; }
 .nav-beneficios:hover { background: rgba(34,197,94,0.1) !important; }
+
+/* ===== SUBMENU SIDEBAR ===== */
+.nav-group { position: relative; }
+.nav-group-header { justify-content: flex-start; }
+.nav-arrow {
+  margin-left: auto;
+  font-size: 16px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.nav-arrow.open { transform: rotate(90deg); color: var(--green); }
+.nav-submenu { overflow: hidden; }
+.nav-subitem {
+  padding-left: 36px !important;
+  font-size: 12px !important;
+}
+.nav-subitem .nav-icon { font-size: 15px !important; }
+.sidebar.collapsed .nav-arrow { display: none; }
+.sidebar.collapsed .nav-submenu { display: none !important; }

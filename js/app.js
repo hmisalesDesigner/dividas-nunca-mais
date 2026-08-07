@@ -65,6 +65,9 @@ function navigateTo(page, el) {
   };
   document.getElementById('page-title').textContent = titulos[page] || page;
 
+  // Abre submenu se necessário
+  abrirSubmenuSeNecessario(page);
+
   // Fecha alertas se abertos
   document.getElementById('alertas-panel').style.display = 'none';
 
@@ -81,6 +84,26 @@ function navigateTo(page, el) {
     case 'copel': renderCopel(); break;
     case 'sanepar': renderSanepar(); break;
 
+  }
+}
+
+function toggleSubmenu(e, id) {
+  e.stopPropagation();
+  const submenu = document.getElementById(id);
+  const arrow = document.getElementById('arrow-' + id.replace('submenu-', ''));
+  if (!submenu) return;
+  const isOpen = submenu.style.display !== 'none';
+  submenu.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+// Abre submenu automaticamente ao navegar para subpáginas
+function abrirSubmenuSeNecessario(page) {
+  if (['copel','sanepar'].includes(page)) {
+    const submenu = document.getElementById('submenu-contas');
+    const arrow = document.getElementById('arrow-contas');
+    if (submenu) submenu.style.display = 'block';
+    if (arrow) arrow.classList.add('open');
   }
 }
 
