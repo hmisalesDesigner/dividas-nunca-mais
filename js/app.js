@@ -59,6 +59,8 @@ function navigateTo(page, el) {
     orcamentos: 'Orçamentos',
     configuracoes: 'Configurações',
     contas: 'Contas Recorrentes',
+    copel: 'Copel — Energia Elétrica',
+    sanepar: 'Sanepar — Água e Esgoto',
 
   };
   document.getElementById('page-title').textContent = titulos[page] || page;
@@ -76,6 +78,8 @@ function navigateTo(page, el) {
     case 'orcamentos': renderOrcamentos(); break;
     case 'configuracoes': renderConfiguracoes(); break;
     case 'contas': renderContas(); break;
+    case 'copel': renderCopel(); break;
+    case 'sanepar': renderSanepar(); break;
 
   }
 }
