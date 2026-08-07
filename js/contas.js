@@ -49,10 +49,10 @@ function renderContas() {
     </div>
 
     <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-      <button class="btn-primary" onclick="abrirModalNovaFatura('copel')" style="background:#003399;">⚡ Nova Fatura Copel</button>
-      <button class="btn-primary" onclick="abrirModalNovaFatura('sanepar')" style="background:#0077b6;">💧 Nova Fatura Sanepar</button>
-      <button class="btn-primary" onclick="abrirModalNovaFatura('inova')" style="background:#e63946;">🌐 Nova Fatura Inova</button>
-      <button class="btn-secondary" onclick="abrirModalNovaFatura('sercomtel')">📞 Sercomtel</button>
+      <button onclick="abrirModalNovaFatura('copel')" style="background:linear-gradient(135deg,#003399,#0044cc);color:#FFD700;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,51,153,0.4);">⚡ Nova Fatura Copel</button>
+      <button onclick="abrirModalNovaFatura('sanepar')" style="background:linear-gradient(135deg,#005CA9,#0077cc);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,92,169,0.4);">💧 Nova Fatura Sanepar</button>
+      <button onclick="abrirModalNovaFatura('inova')" style="background:linear-gradient(135deg,#E8420D,#ff5722);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(232,66,13,0.4);">🌐 Nova Fatura Inova</button>
+      <button onclick="abrirModalNovaFatura('sercomtel')" style="background:linear-gradient(135deg,#0066CC,#0080ff);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,102,204,0.4);">📞 Sercomtel</button>
       <button class="btn-secondary" onclick="abrirModalNovaFatura('outro')">📄 Outra</button>
       <button class="btn-secondary" onclick="abrirModalUnidades()">🏠 Unidades Consumidoras</button>
     </div>
@@ -823,7 +823,12 @@ function abrirModalUnidades() {
   abrirModal('🏠 Unidades Consumidoras', `
     <div style="margin-bottom:16px;">
       ${DB.unidadesConsumidoras.map(u => '<div style="background:var(--bg-secondary);border:1px solid ' + (u.ativa ? 'var(--green)' : 'var(--border)') + ';border-radius:8px;padding:14px;margin-bottom:10px;">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;"><strong>' + u.apelido + '</strong><span class="badge ' + (u.ativa ? 'pago' : 'pendente') + '">' + (u.ativa ? 'Ativa' : 'Inativa') + '</span></div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        + '<strong>' + u.apelido + '</strong>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+        + '<span class="badge ' + (u.ativa ? 'pago' : 'pendente') + '">' + (u.ativa ? 'Ativa' : 'Inativa') + '</span>'
+        + '<button onclick="editarUC(' + u.id + ')" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;">✏️ Editar</button>'
+        + '</div></div>'
         + '<div style="font-size:12px;color:var(--text-secondary);">UC ANEEL: <strong>' + (u.ucAneel || '-') + '</strong>' + (u.ucAntiga ? ' | UC Antiga: ' + u.ucAntiga : '') + '</div>'
         + (u.titular ? '<div style="font-size:12px;color:var(--text-secondary);">Titular: ' + u.titular + '</div>' : '')
         + (u.obs ? '<div style="font-size:11px;color:var(--text-muted);margin-top:4px;">📝 ' + u.obs + '</div>' : '')
@@ -833,6 +838,66 @@ function abrirModalUnidades() {
     <button class="btn-secondary btn-sm" onclick="fecharModal();setTimeout(()=>abrirModalNovaUC(),200)">+ Nova Unidade</button>
     <div class="modal-actions"><button class="btn-secondary" onclick="fecharModal()">Fechar</button></div>
   `, '500px');
+}
+
+function editarUC(id) {
+  const u = DB.unidadesConsumidoras.find(u => u.id === id);
+  if (!u) return;
+  fecharModal();
+  setTimeout(() => {
+    abrirModal('✏️ Editar Unidade — ' + u.apelido, `
+      <div class="form-row">
+        <div class="form-group"><label>Apelido *</label><input id="uc-apelido" type="text" value="${u.apelido}" /></div>
+        <div class="form-group"><label>Tipo</label><select id="uc-tipo">
+          <option value="copel" ${u.tipo==='copel'?'selected':''}>⚡ Copel</option>
+          <option value="sanepar" ${u.tipo==='sanepar'?'selected':''}>💧 Sanepar</option>
+        </select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>UC ANEEL</label><input id="uc-aneel" type="text" value="${u.ucAneel||''}" /></div>
+        <div class="form-group"><label>UC Antiga</label><input id="uc-antiga" type="text" value="${u.ucAntiga||''}" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Titular</label><input id="uc-titular" type="text" value="${u.titular||''}" /></div>
+        <div class="form-group"><label>Status</label><select id="uc-ativa">
+          <option value="true" ${u.ativa?'selected':''}>Ativa</option>
+          <option value="false" ${!u.ativa?'selected':''}>Inativa</option>
+        </select></div>
+      </div>
+      <div class="form-group"><label>Observações</label><input id="uc-obs" type="text" value="${u.obs||''}" /></div>
+      <div class="modal-actions">
+        <button class="btn-danger" onclick="excluirUC(${id})">🗑️ Excluir</button>
+        <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+        <button class="btn-primary" onclick="salvarEdicaoUC(${id})">💾 Salvar</button>
+      </div>
+    `, '480px');
+  }, 200);
+}
+
+function salvarEdicaoUC(id) {
+  const u = DB.unidadesConsumidoras.find(u => u.id === id);
+  if (!u) return;
+  u.apelido = document.getElementById('uc-apelido')?.value.trim() || u.apelido;
+  u.tipo = document.getElementById('uc-tipo')?.value;
+  u.ucAneel = document.getElementById('uc-aneel')?.value;
+  u.ucAntiga = document.getElementById('uc-antiga')?.value;
+  u.titular = document.getElementById('uc-titular')?.value;
+  u.ativa = document.getElementById('uc-ativa')?.value === 'true';
+  u.obs = document.getElementById('uc-obs')?.value;
+  agendarSync();
+  fecharModal();
+  renderContas();
+  showAlert('✅', 'Unidade atualizada!');
+}
+
+function excluirUC(id) {
+  if (confirm('Excluir esta unidade consumidora?')) {
+    DB.unidadesConsumidoras = DB.unidadesConsumidoras.filter(u => u.id !== id);
+    agendarSync();
+    fecharModal();
+    renderContas();
+    showAlert('🗑️', 'Unidade excluída.');
+  }
 }
 
 function abrirModalNovaUC() {
