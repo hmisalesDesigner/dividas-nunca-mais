@@ -219,8 +219,17 @@ function renderBeneficios() {
       <button onclick="mostrarGraficos()" style="background:#fff;border:1px solid #217346;color:#217346;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">📊 Ver Gráficos</button>
     </div>
 
-    <!-- Programas por categoria -->
-    ${renderPorCategoria()}
+    <!-- Totais por categoria -->
+    ${renderTotaisPorCategoria()}
+
+    <!-- Grid de todos os programas -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+      ${DB.programas.length === 0 ? `
+        <div style="grid-column:1/-1;text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;">
+          <div style="font-size:48px;margin-bottom:12px;">🎁</div>
+          <p>Nenhum programa cadastrado.<br>Clique em "+ Novo Programa".</p>
+        </div>` : DB.programas.map(p => cardBeneficio(p)).join('')}
+    </div>
 
     <!-- Resgates recentes -->
     <div style="background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.08);">
@@ -250,26 +259,19 @@ function renderBeneficios() {
   `;
 }
 
-function renderPorCategoria() {
-  if (!DB.programas || DB.programas.length === 0) {
-    return `<div style="text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;margin-bottom:28px;">
-      <div style="font-size:48px;margin-bottom:12px;">🎁</div>
-      <p>Nenhum programa cadastrado.<br>Clique em "+ Novo Programa".</p>
-    </div>`;
-  }
+function renderTotaisPorCategoria() {
+  if (!DB.programas || DB.programas.length === 0) return '';
 
-  // Agrupa por categoria
   const grupos = {};
   DB.programas.forEach(p => {
-    // Atribui categoria padrão baseada no nome se não tiver
     if (!p.categoria) {
       const nome = (p.nome || '').toLowerCase();
       if (nome.includes('azul') || nome.includes('smiles') || nome.includes('latam')) p.categoria = 'aerea';
       else if (nome.includes('kmv') || nome.includes('posto') || nome.includes('shell')) p.categoria = 'combustivel';
       else if (nome.includes('méliuz') || nome.includes('meliuz') || nome.includes('dinheiro na nota')) p.categoria = 'varejo';
-      else if (nome.includes('nota paraná') || nome.includes('nota parana') || nome.includes('governo')) p.categoria = 'governo';
-      else if (nome.includes('nescafé') || nome.includes('nescafe') || nome.includes('dolce') || nome.includes('café')) p.categoria = 'lifestyle';
-      else if (nome.includes('livelo') || nome.includes('esfera') || nome.includes('cartão') || nome.includes('cartao')) p.categoria = 'cartao';
+      else if (nome.includes('nota paraná') || nome.includes('nota parana')) p.categoria = 'governo';
+      else if (nome.includes('nescafé') || nome.includes('nescafe') || nome.includes('dolce')) p.categoria = 'lifestyle';
+      else if (nome.includes('livelo') || nome.includes('esfera')) p.categoria = 'cartao';
       else p.categoria = 'outro';
     }
     const cat = p.categoria;
@@ -277,31 +279,24 @@ function renderPorCategoria() {
     grupos[cat].push(p);
   });
 
-  // Renderiza cada grupo
-  return Object.entries(grupos).map(([cat, progs]) => {
+  const items = Object.entries(grupos).map(([cat, progs]) => {
     const catInfo = CATEGORIAS_BENEFICIOS[cat] || CATEGORIAS_BENEFICIOS['outro'];
     const totalPontos = progs.filter(p => p.tipo === 'pontos').reduce((s, p) => s + (p.saldo || 0), 0);
     const totalCash = progs.reduce((s, p) => {
       if (p.tipo === 'cashback') return s + (p.saldo || 0);
       return s + (p.saldoCashback || 0);
     }, 0);
-
-    return `
-      <div style="margin-bottom:24px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:10px 14px;background:#fff;border-radius:8px;border-left:4px solid ${catInfo.cor};box-shadow:0 1px 3px rgba(0,0,0,0.06);">
-          <span style="font-size:14px;font-weight:700;color:#333;">${catInfo.label}</span>
-          <div style="display:flex;gap:16px;font-size:12px;color:#666;">
-            ${totalPontos > 0 ? `<span>🎯 <strong>${totalPontos.toLocaleString('pt-BR')} pts</strong></span>` : ''}
-            ${totalCash > 0 ? `<span>💰 <strong>${formatarMoeda(totalCash)}</strong></span>` : ''}
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;">
-          ${progs.map(p => cardBeneficio(p)).join('')}
-        </div>
-      </div>
-    `;
+    return '<div style="background:#fff;border-radius:8px;padding:12px 16px;border-left:4px solid ' + catInfo.cor + ';box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between;">'
+      + '<span style="font-size:13px;font-weight:700;color:#333;">' + catInfo.label + '</span>'
+      + '<div style="display:flex;gap:16px;font-size:12px;color:#666;">'
+      + (totalPontos > 0 ? '<span>🎯 <strong>' + totalPontos.toLocaleString('pt-BR') + ' pts</strong></span>' : '')
+      + (totalCash > 0 ? '<span>💰 <strong>' + formatarMoeda(totalCash) + '</strong></span>' : '')
+      + '</div></div>';
   }).join('');
+
+  return '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;">' + items + '</div>';
 }
+
 
 function cardBeneficio(p) {
   const hoje = new Date();
