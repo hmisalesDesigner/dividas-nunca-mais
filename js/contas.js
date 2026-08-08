@@ -1,7 +1,7 @@
 // ===== CONTAS RECORRENTES =====
 const CONCESSIONARIAS = {
-  copel:     { nome: 'Copel',       logo: '⚡', cor: '#003399', unidade: 'KWh' },
-  sanepar:   { nome: 'Sanepar',     logo: '💧', cor: '#0077b6', unidade: 'm³'  },
+  copel:     { nome: 'Copel',       logo: '⚡', cor: '#f5821e', unidade: 'KWh' },
+  sanepar:   { nome: 'Sanepar',     logo: '💧', cor: '#0066CC', unidade: 'm³'  },
   inova:     { nome: 'Inova Fibra', logo: '🌐', cor: '#e63946', unidade: null  },
   sercomtel: { nome: 'Sercomtel',   logo: '📞', cor: '#2d6a4f', unidade: null  },
   outro:     { nome: 'Outro',       logo: '📄', cor: '#666',    unidade: null  }
@@ -49,10 +49,10 @@ function renderContas() {
     </div>
 
     <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
-      <button onclick="abrirModalNovaFatura('copel')" style="background:linear-gradient(135deg,#003399,#0044cc);color:#FFD700;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,51,153,0.4);">⚡ Nova Fatura Copel</button>
-      <button onclick="abrirModalNovaFatura('sanepar')" style="background:linear-gradient(135deg,#005CA9,#0077cc);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,92,169,0.4);">💧 Nova Fatura Sanepar</button>
-      <button onclick="abrirModalNovaFatura('inova')" style="background:linear-gradient(135deg,#E8420D,#ff5722);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(232,66,13,0.4);">🌐 Nova Fatura Inova</button>
-      <button onclick="abrirModalNovaFatura('sercomtel')" style="background:linear-gradient(135deg,#0066CC,#0080ff);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,102,204,0.4);">📞 Sercomtel</button>
+      <button onclick="abrirModalNovaFatura('copel')" style="background:linear-gradient(135deg,#f5821e,#e06b08);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(245,130,30,0.4);">⚡ Nova Fatura Copel</button>
+      <button onclick="abrirModalNovaFatura('sanepar')" style="background:linear-gradient(135deg,#0066CC,#0052a3);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,102,204,0.4);">💧 Nova Fatura Sanepar</button>
+      <button onclick="abrirModalNovaFatura('inova')" style="background:linear-gradient(135deg,#E8420D,#c73500);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(232,66,13,0.4);">🌐 Nova Fatura Inova</button>
+      <button onclick="abrirModalNovaFatura('sercomtel')" style="background:linear-gradient(135deg,#1a5276,#154360);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,82,118,0.4);">📞 Sercomtel</button>
       <button class="btn-secondary" onclick="abrirModalNovaFatura('outro')">📄 Outra</button>
       <button class="btn-secondary" onclick="abrirModalUnidades()">🏠 Unidades Consumidoras</button>
     </div>
