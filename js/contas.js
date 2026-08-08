@@ -25,11 +25,21 @@ function renderContas() {
   const totalMes = faturasMes.reduce((s, f) => s + (f.valorPagar || f.valor || 0), 0);
   const atrasadas = DB.faturas.filter(f => !f.pago && new Date(f.vencimento) < hoje);
 
+  // Define cor do card total baseado no status
+  const corTotal = atrasadas.length > 0
+    ? 'linear-gradient(135deg,#7f1d1d,#991b1b)'
+    : faturasMes.filter(f => !f.pago).length > 0
+      ? 'linear-gradient(135deg,#713f12,#92400e)'
+      : 'linear-gradient(135deg,#166534,#15803d)';
+
+  const corBorda = atrasadas.length > 0 ? '#ef444444' : faturasMes.filter(f => !f.pago).length > 0 ? '#eab30844' : '#22c55e44';
+
   page.innerHTML = `
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px;">
-      <div class="saldo-card">
-        <div class="label">📅 Total este Mês</div>
-        <div class="value">${formatarMoeda(totalMes)}</div>
+      <div style="background:${corTotal};border:1px solid ${corBorda};border-radius:10px;padding:20px;">
+        <div style="font-size:12px;color:#fff;opacity:0.8;margin-bottom:4px;">📅 Total este Mês</div>
+        <div style="font-size:26px;font-weight:700;color:#fff;">${formatarMoeda(totalMes)}</div>
+        <div style="font-size:11px;color:#fff;opacity:0.7;margin-top:4px;">${atrasadas.length > 0 ? '⚠️ ' + atrasadas.length + ' atrasada(s)' : faturasMes.filter(f => !f.pago).length > 0 ? '⏳ Pendentes' : '✅ Tudo pago'}</div>
       </div>
       <div class="indicator-card">
         <div class="ic-icon">📋</div>
@@ -51,7 +61,7 @@ function renderContas() {
     <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
       <button onclick="abrirModalNovaFatura('copel')" style="background:linear-gradient(135deg,#f5821e,#e06b08);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(245,130,30,0.4);">⚡ Nova Fatura Copel</button>
       <button onclick="abrirModalNovaFatura('sanepar')" style="background:linear-gradient(135deg,#0066CC,#0052a3);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,102,204,0.4);">💧 Nova Fatura Sanepar</button>
-      <button onclick="abrirModalNovaFatura('inova')" style="background:linear-gradient(135deg,#E8420D,#c73500);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(232,66,13,0.4);">🌐 Nova Fatura Inova</button>
+      <button onclick="abrirModalNovaFatura('inova')" style="background:linear-gradient(135deg,#F5A623,#00B4D8);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,180,216,0.4);">🌐 Nova Fatura Inova</button>
       <button onclick="abrirModalNovaFatura('sercomtel')" style="background:linear-gradient(135deg,#1a5276,#154360);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,82,118,0.4);">📞 Sercomtel</button>
       <button class="btn-secondary" onclick="abrirModalNovaFatura('outro')">📄 Outra</button>
       <button class="btn-secondary" onclick="abrirModalUnidades()">🏠 Unidades Consumidoras</button>
@@ -87,7 +97,23 @@ function renderContas() {
         </table>
       </div>
     </div>
+    <!-- Gráfico + Próximos Vencimentos -->
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:16px;">
+      <div class="chart-card">
+        <h3>Gastos por Concessionária</h3>
+        <canvas id="chart-gastos-conc" height="160"></canvas>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;">📅 Próximos Vencimentos</h3>
+        <div id="proximos-vencimentos-list"></div>
+      </div>
+    </div>
   `;
+
+  setTimeout(() => {
+    renderGastosConc();
+    renderProximosVencimentos();
+  }, 100);
 }
 
 let filtroContaTipo = '', filtroContaStatus = '';
@@ -95,6 +121,73 @@ function filtrarFaturas(tipo, valor) {
   if (tipo === 'tipo') filtroContaTipo = valor;
   if (tipo === 'status') filtroContaStatus = valor;
   document.getElementById('tabela-faturas').innerHTML = renderTabelaFaturas();
+}
+
+function renderGastosConc() {
+  const el = document.getElementById('chart-gastos-conc');
+  if (!el) return;
+
+  const totais = {};
+  DB.faturas.forEach(f => {
+    const conc = CONCESSIONARIAS[f.tipo] || CONCESSIONARIAS.outro;
+    if (!totais[conc.nome]) totais[conc.nome] = { valor: 0, cor: conc.cor };
+    totais[conc.nome].valor += f.valorPagar || f.valor || 0;
+  });
+
+  if (Object.keys(totais).length === 0) return;
+
+  new Chart(el, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(totais),
+      datasets: [{
+        data: Object.values(totais).map(t => t.valor),
+        backgroundColor: Object.values(totais).map(t => t.cor),
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#666', font: { size: 11 } }, grid: { color: '#2e2f33' } },
+        y: { ticks: { color: '#666', callback: v => 'R$' + v }, grid: { color: '#2e2f33' } }
+      }
+    }
+  });
+}
+
+function renderProximosVencimentos() {
+  const el = document.getElementById('proximos-vencimentos-list');
+  if (!el) return;
+
+  const hoje = new Date();
+  const proximas = DB.faturas
+    .filter(f => !f.pago)
+    .sort((a, b) => new Date(a.vencimento) - new Date(b.vencimento))
+    .slice(0, 5);
+
+  if (proximas.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted);font-size:13px;">Nenhum vencimento próximo.</div>';
+    return;
+  }
+
+  el.innerHTML = proximas.map(f => {
+    const conc = CONCESSIONARIAS[f.tipo] || CONCESSIONARIAS.outro;
+    const dias = Math.ceil((new Date(f.vencimento) - hoje) / (1000*60*60*24));
+    const atrasado = dias < 0;
+    const cor = atrasado ? 'var(--red)' : dias <= 3 ? '#f97316' : 'var(--border)';
+    return '<div style="background:var(--bg-secondary);border:1px solid ' + cor + ';border-radius:8px;padding:10px 14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">'
+      + '<div>'
+      + '<div style="font-weight:600;font-size:13px;">' + conc.logo + ' ' + conc.nome + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + formatarData(f.vencimento) + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;">'
+      + '<div style="font-weight:700;font-size:13px;">' + formatarMoeda(f.valorPagar || f.valor) + '</div>'
+      + '<div style="font-size:10px;color:' + (atrasado ? 'var(--red)' : dias <= 3 ? '#f97316' : 'var(--text-muted)') + ';">' + (atrasado ? '⚠️ ' + Math.abs(dias) + 'd atraso' : dias === 0 ? '⏰ Hoje!' : dias + 'd') + '</div>'
+      + '</div>'
+      + '</div>';
+  }).join('');
 }
 
 function getStatusFatura(f) {
@@ -186,9 +279,9 @@ function formBasico(tipo) {
         <input id="fatura-desconto" type="text" value="R$ 20,00" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" />
       </div>` : '<div class="form-group"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" placeholder="R$ 0,00" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" /></div>'}
     </div>
-    <div style="background:rgba(34,197,94,0.1);border:1px solid var(--green);border-radius:8px;padding:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:13px;color:var(--green);">💰 Valor a pagar:</span>
-      <span id="valor-pagar-preview" style="font-size:20px;font-weight:700;color:var(--green);">R$ 0,00</span>
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:13px;color:var(--text-secondary);">💰 Valor a pagar:</span>
+      <span id="valor-pagar-preview" style="font-size:20px;font-weight:700;color:var(--text-primary);">R$ 0,00</span>
     </div>
     ${conc.unidade ? `
     <div class="form-row">
@@ -579,10 +672,9 @@ function renderCopel() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <span style="font-size:32px;">⚡</span>
       <div>
-        <h2 style="font-size:18px;font-weight:700;">Copel — Energia Elétrica</h2>
         <p style="font-size:13px;color:var(--text-secondary);">Histórico e índices de consumo</p>
       </div>
-      <button class="btn-primary" style="margin-left:auto;background:#003399;" onclick="abrirModalNovaFatura('copel')">+ Nova Fatura</button>
+      <button class="btn-primary" style="margin-left:auto;background:#f5821e;" onclick="abrirModalNovaFatura('copel')">+ Nova Fatura Copel</button>
     </div>
 
     ${ultimaFatura ? `
@@ -674,10 +766,9 @@ function renderSanepar() {
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
       <span style="font-size:32px;">💧</span>
       <div>
-        <h2 style="font-size:18px;font-weight:700;">Sanepar — Água e Esgoto</h2>
         <p style="font-size:13px;color:var(--text-secondary);">Histórico e índices de consumo</p>
       </div>
-      <button class="btn-primary" style="margin-left:auto;background:#0077b6;" onclick="abrirModalNovaFatura('sanepar')">+ Nova Fatura</button>
+      <button class="btn-primary" style="margin-left:auto;background:#0066CC;" onclick="abrirModalNovaFatura('sanepar')">+ Nova Fatura Sanepar</button>
     </div>
 
     ${ultimaFatura ? `
