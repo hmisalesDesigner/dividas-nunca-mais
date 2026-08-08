@@ -286,7 +286,12 @@ function renderTotaisPorCategoria() {
       if (p.tipo === 'cashback') return s + (p.saldo || 0);
       return s + (p.saldoCashback || 0);
     }, 0);
-    return '<div style="background:#fff;border-radius:8px;padding:12px 16px;border-left:4px solid ' + catInfo.cor + ';box-shadow:0 1px 3px rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:space-between;">'
+    // Converte hex para rgba com baixa opacidade
+    const hex = catInfo.cor.replace('#','');
+    const r = parseInt(hex.substring(0,2),16);
+    const g = parseInt(hex.substring(2,4),16);
+    const b = parseInt(hex.substring(4,6),16);
+    return '<div style="background:rgba(' + r + ',' + g + ',' + b + ',0.06);border-radius:8px;padding:12px 16px;border-left:3px solid rgba(' + r + ',' + g + ',' + b + ',0.5);box-shadow:0 1px 3px rgba(0,0,0,0.04);display:flex;align-items:center;justify-content:space-between;">'
       + '<span style="font-size:13px;font-weight:700;color:#333;">' + catInfo.label + '</span>'
       + '<div style="display:flex;gap:16px;font-size:12px;color:#666;">'
       + (totalPontos > 0 ? '<span>🎯 <strong>' + totalPontos.toLocaleString('pt-BR') + ' pts</strong></span>' : '')
