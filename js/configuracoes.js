@@ -85,6 +85,34 @@ function renderConfiguracoes() {
       </div>
     </div>
 
+    <!-- Origens de Pagamento -->
+    <div class="config-section">
+      <h3>💸 Origens de Pagamento</h3>
+      <div id="origens-lista" style="margin-bottom:12px;">
+        ${(DB.origensPagamento || []).map(o => `
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+            <span style="font-size:13px;">${o.emoji} <strong>${o.tipo}</strong> — ${o.titular}</span>
+            <button onclick="removerOrigem(${o.id})" class="btn-danger btn-sm">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:60px 1fr 1fr auto;gap:8px;align-items:end;">
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:11px;">Emoji</label>
+          <input id="nova-origem-emoji" type="text" placeholder="🏦" maxlength="2" />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:11px;">Tipo</label>
+          <input id="nova-origem-tipo" type="text" placeholder="Ex: Banco, Cashback..." />
+        </div>
+        <div class="form-group" style="margin:0;">
+          <label style="font-size:11px;">Titular</label>
+          <input id="nova-origem-titular" type="text" placeholder="Ex: Henrique" />
+        </div>
+        <button class="btn-primary btn-sm" onclick="adicionarOrigem()" style="margin-bottom:0;">+ Adicionar</button>
+      </div>
+    </div>
+
     <!-- Salvar -->
     <div style="display:flex;justify-content:flex-end;margin-top:8px;">
       <button class="btn-primary" onclick="salvarConfiguracoes()">💾 Salvar Configurações</button>
@@ -137,4 +165,24 @@ function importarBackup(input) {
     showAlert('❌', 'Erro ao importar: ' + e.message);
   });
   input.value = '';
+}
+
+function adicionarOrigem() {
+  const emoji = document.getElementById('nova-origem-emoji')?.value.trim() || '💰';
+  const tipo = document.getElementById('nova-origem-tipo')?.value.trim();
+  const titular = document.getElementById('nova-origem-titular')?.value.trim();
+  if (!tipo || !titular) { showAlert('⚠️', 'Informe o tipo e o titular.'); return; }
+  if (!DB.origensPagamento) DB.origensPagamento = [];
+  DB.origensPagamento.push({ id: gerarId(), emoji, tipo, titular });
+  agendarSync();
+  renderConfiguracoes();
+  showAlert('✅', 'Origem adicionada!');
+}
+
+function removerOrigem(id) {
+  if (confirm('Remover esta origem?')) {
+    DB.origensPagamento = DB.origensPagamento.filter(o => o.id !== id);
+    agendarSync();
+    renderConfiguracoes();
+  }
 }

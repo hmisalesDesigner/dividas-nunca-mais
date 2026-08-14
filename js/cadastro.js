@@ -331,6 +331,21 @@ function abrirModalPagamento(dividaId) {
       </div>
     </div>
     <div class="form-group">
+      <label>Origem do Pagamento</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+        ${(DB.origensPagamento || []).map(o => `
+          <button type="button" 
+            onclick="selecionarOrigem(this, '${o.emoji} ${o.tipo} — ${o.titular}')"
+            title="${o.tooltip || o.tipo}"
+            style="background:var(--bg-primary);border:1px solid var(--border);color:var(--text-secondary);padding:7px 14px;border-radius:20px;font-size:12px;cursor:pointer;transition:all 0.2s;">
+            ${o.emoji} ${o.tipo} — ${o.titular}
+          </button>
+        `).join('')}
+      </div>
+      <input id="pag-origem" type="hidden" value="" />
+      <div id="origem-selecionada" style="font-size:12px;color:var(--green);min-height:16px;"></div>
+    </div>
+    <div class="form-group">
       <label>Observação</label>
       <input id="pag-obs" type="text" placeholder="Ex: Pago via PIX" />
     </div>
@@ -340,6 +355,21 @@ function abrirModalPagamento(dividaId) {
     </div>
   `;
   abrirModal('💳 Registrar Pagamento', html);
+}
+
+function selecionarOrigem(btn, valor) {
+  // Remove seleção anterior
+  document.querySelectorAll('[onclick^="selecionarOrigem"]').forEach(b => {
+    b.style.background = 'var(--bg-primary)';
+    b.style.borderColor = 'var(--border)';
+    b.style.color = 'var(--text-secondary)';
+  });
+  // Seleciona atual
+  btn.style.background = 'rgba(34,197,94,0.15)';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = 'var(--green)';
+  document.getElementById('pag-origem').value = valor;
+  document.getElementById('origem-selecionada').textContent = '✅ ' + valor;
 }
 
 function confirmarPagamento(dividaId) {
@@ -352,7 +382,8 @@ function confirmarPagamento(dividaId) {
   const checkboxes = document.querySelectorAll('[data-parcela]:checked');
   const parcelasIds = Array.from(checkboxes).map(c => parseInt(c.value));
 
-  registrarPagamento(dividaId, parcelasIds.length > 0 ? parcelasIds : null, valorPago, dataPagamento, obs);
+  const origem = document.getElementById('pag-origem')?.value || '';
+  registrarPagamento(dividaId, parcelasIds.length > 0 ? parcelasIds : null, valorPago, dataPagamento, obs, origem);
   fecharModal();
   renderTabelaDividas();
   showAlert('✅', 'Pagamento registrado com sucesso!');

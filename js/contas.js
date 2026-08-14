@@ -228,6 +228,10 @@ function abrirModalNovaFatura(tipo) {
   const conc = CONCESSIONARIAS[tipo];
   abrirModal(conc.logo + ' Nova Fatura — ' + conc.nome, `
     <input type="hidden" id="fatura-tipo" value="${tipo}" />
+    <div style="margin-bottom:16px;padding:12px;background:var(--bg-primary);border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-size:13px;color:var(--text-secondary);">📎 Importar dados automaticamente do PDF</span>
+      <button onclick="importarPDF('${tipo}')" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">📎 Selecionar PDF</button>
+    </div>
     ${formBasico(tipo)}
     <details style="margin-bottom:16px;">
       <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);padding:10px;background:var(--bg-primary);border-radius:8px;">
@@ -1029,4 +1033,342 @@ function salvarNovaUC() {
   fecharModal();
   renderContas();
   showAlert('✅', 'Unidade cadastrada!');
+}
+
+// ===== LEITOR DE PDF =====
+function importarPDF(tipo) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.pdf';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    showAlert('⏳', 'Lendo PDF... aguarde.');
+    setTimeout(async () => {
+      try {
+        const texto = await extrairTextoPDF(file);
+        const dados = parsearFatura(texto, tipo);
+        fecharAlert();
+        abrirModalNovaFatura(tipo);
+        setTimeout(() => preencherFormulario(dados, tipo), 300);
+      } catch(err) {
+        fecharAlert();
+        showAlert('❌', 'Erro ao ler PDF. Verifique se é um PDF digital (não escaneado).');
+        console.error(err);
+      }
+    }, 500);
+  };
+  input.click();
+}
+
+async function extrairTextoPDF(file) {
+  // Usa PDF.js via CDN para extrair texto
+  if (!window.pdfjsLib) {
+    await carregarPDFjs();
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let textoCompleto = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const texto = content.items.map(item => item.str).join(' ');
+    textoCompleto += texto + '\n';
+  }
+  return textoCompleto;
+}
+
+function carregarPDFjs() {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.onload = () => {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve();
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+// ===== PARSEAR FATURAS =====
+function parsearFatura(texto, tipo) {
+  switch(tipo) {
+    case 'copel':    return parsearCopel(texto);
+    case 'sanepar':  return parsearSanepar(texto);
+    case 'inova':    return parsearInova(texto);
+    default:         return parsearGenerico(texto);
+  }
+}
+
+function parsearCopel(texto) {
+  const dados = {};
+  const t = texto.replace(/\s+/g, ' ');
+
+  // Vencimento
+  const venc = t.match(/VENCIMENTO\s+(\d{2}\/\d{2}\/\d{4})/i) ||
+               t.match(/(\d{2}\/\d{2}\/\d{4})/);
+  if (venc) dados.vencimento = converterData(venc[1]);
+
+  // Valor total
+  const valor = t.match(/TOTAL A PAGAR\s+R\$\s*([\d.,]+)/i) ||
+                t.match(/R\$([\d.,]+)/);
+  if (valor) dados.valor = valor[1].replace('.','').replace(',','.');
+
+  // Referência mês/ano
+  const ref = t.match(/REF[:\s]*MÊS\s*\/\s*ANO\s+(\d{2}\/\d{4})/i) ||
+              t.match(/(\d{2}\/\d{4})/);
+  if (ref) {
+    const [mes, ano] = ref[1].split('/');
+    dados.referencia = ano + '-' + mes;
+  }
+
+  // Nota Fiscal
+  const nf = t.match(/NOTA FISCAL\s+N[oº°]\.?\s*([\d]+)/i) ||
+             t.match(/NF[:\s]*([\d]+)/i);
+  if (nf) dados.nf = nf[1];
+
+  // Consumo KWh
+  const consumo = t.match(/CONSUMO\s+kWh\s+[\w]+\s+([\d]+)\s/i) ||
+                  t.match(/(\d{2,4})\s+kWh/i);
+  if (consumo) dados.consumo = consumo[1];
+
+  // Leitura anterior e atual
+  const leituras = t.match(/(\d{4,6})\s+(\d{4,6})\s+\d+\s+(\d{2,4})/);
+  if (leituras) {
+    dados.leituraAnterior = leituras[1];
+    dados.leituraAtual = leituras[2];
+  }
+
+  // Chave de acesso
+  const chave = t.match(/Chave de Acesso\s+([\d\s]{44,60})/i);
+  if (chave) dados.chaveAcesso = chave[1].trim();
+
+  // Série NF
+  const serie = t.match(/SÉRIE\s+(\d+)/i);
+  if (serie) dados.serie = serie[1];
+
+  // Data emissão
+  const emissao = t.match(/DATA DE EMISSÃO[:\s]+(\d{2}\/\d{2}\/\d{4})/i);
+  if (emissao) dados.emissao = converterData(emissao[1]);
+
+  // Banda tarifária
+  if (t.includes('Amarela')) dados.banda = 'Amarela';
+  else if (t.includes('Vermelha 2')) dados.banda = 'Vermelha 2';
+  else if (t.includes('Vermelha 1')) dados.banda = 'Vermelha 1';
+  else if (t.includes('Verde')) dados.banda = 'Verde';
+
+  // Multa
+  const multa = t.match(/MULTA POR ATRASO[^R]*R\$\s*([\d.,]+)/i);
+  if (multa) dados.multaAtraso = multa[1].replace(',','.');
+
+  // NF para cashback
+  if (dados.nf) dados.nfCashback = dados.nf;
+
+  return dados;
+}
+
+function parsearSanepar(texto) {
+  const dados = {};
+  const t = texto.replace(/\s+/g, ' ');
+
+  // Vencimento
+  const venc = t.match(/VENCIMENTO\s+(\d{2}\/\d{2}\/\d{4})/i) ||
+               t.match(/(\d{2}\/\d{2}\/\d{4})/);
+  if (venc) dados.vencimento = converterData(venc[1]);
+
+  // Valor
+  const valor = t.match(/TOTAL\s+R?\$?\s*([\d.,]+)/i);
+  if (valor) dados.valor = valor[1].replace('.','').replace(',','.');
+
+  // Referência
+  const ref = t.match(/(\d{2}\/\d{4})/);
+  if (ref) {
+    const [mes, ano] = ref[1].split('/');
+    dados.referencia = ano + '-' + mes;
+  }
+
+  // Matrícula
+  const mat = t.match(/MATRÍCULA\s+([\d.]+)/i) ||
+              t.match(/(\d{4}\.\d{4})/);
+  if (mat) dados.matricula = mat[1];
+
+  // Consumo m³
+  const consumo = t.match(/CONSUMO[\/m³\s]+([\d]+)/i) ||
+                  t.match(/(\d{1,3})\s+m[³3]/i);
+  if (consumo) dados.consumo = consumo[1];
+
+  // Leitura anterior e atual
+  const lant = t.match(/LEITURA ANTERIOR\s+([\d]+)/i);
+  const latual = t.match(/LEITURA ATUAL\s+([\d]+)/i);
+  if (lant) dados.leituraAnterior = lant[1];
+  if (latual) dados.leituraAtual = latual[1];
+
+  // Próxima leitura
+  const prox = t.match(/PRÓXIMA LEITURA\s+(\d{2}\/\d{2}\/\d{4})/i);
+  if (prox) dados.proximaLeitura = converterData(prox[1]);
+
+  // Hidrômetro
+  const hidro = t.match(/HIDRÔMETRO\s+([\w-]+)/i);
+  if (hidro) dados.hidrometro = hidro[1];
+
+  // Multas
+  const multaAgua = t.match(/MULTA ÁGUA\s+([\d.,]+)/i);
+  const multaEsgoto = t.match(/MULTA ESGOTO\s+([\d.,]+)/i);
+  const juros = t.match(/JUROS MORATÓRIOS\s+([\d.,]+)/i);
+  if (multaAgua) dados.multaAgua = multaAgua[1].replace(',','.');
+  if (multaEsgoto) dados.multaEsgoto = multaEsgoto[1].replace(',','.');
+  if (juros) dados.jurosMoratorios = juros[1].replace(',','.');
+
+  // CTRL
+  const ctrl = t.match(/CTRL[:\s]+([\d.]+)/i);
+  if (ctrl) dados.ctrl = ctrl[1];
+
+  return dados;
+}
+
+function parsearInova(texto) {
+  const dados = {};
+  const t = texto.replace(/\s+/g, ' ');
+
+  // Vencimento
+  const venc = t.match(/Vencimento\s+(\d{2}\/\d{2}\/\d{4})/i);
+  if (venc) dados.vencimento = converterData(venc[1]);
+
+  // Valor
+  const valor = t.match(/R\$\s*([\d.,]+)/);
+  if (valor) dados.valor = valor[1].replace('.','').replace(',','.');
+
+  // Referência
+  const ref = t.match(/fatura do mês de (\w+)/i);
+  if (ref) {
+    const meses = {janeiro:'01',fevereiro:'02',março:'03',abril:'04',maio:'05',junho:'06',julho:'07',agosto:'08',setembro:'09',outubro:'10',novembro:'11',dezembro:'12'};
+    const anoRef = t.match(/(\d{4})/);
+    const mes = meses[ref[1].toLowerCase()];
+    if (mes && anoRef) dados.referencia = anoRef[1] + '-' + mes;
+  }
+
+  // Desconto
+  const desc = t.match(/Descontos[:\s]+R\$\s*([\d.,]+)/i);
+  if (desc) dados.desconto = desc[1].replace('.','').replace(',','.');
+
+  // Período
+  const periodo = t.match(/de (\d{2}\/\d{2}\/\d{4}) a (\d{2}\/\d{2}\/\d{4})/i);
+  if (periodo) dados.periodo = periodo[1] + ' a ' + periodo[2];
+
+  // Contrato
+  const contrato = t.match(/Contrato[:\s]+([\d]+)/i);
+  if (contrato) dados.contrato = contrato[1];
+
+  // Nr documento
+  const nrDoc = t.match(/Nr\. do Documento[:\s]+([\d]+)/i) ||
+                t.match(/(\d{6,})/);
+  if (nrDoc) dados.nrDocumento = nrDoc[1];
+
+  // PIX
+  const pix = t.match(/(00020126[\w]+)/i);
+  if (pix) dados.pix = pix[1];
+
+  // Data emissão
+  const emissao = t.match(/Data[:\s]+(\d{2}\/\d{2}\/\d{4})/i);
+  if (emissao) dados.emissao = converterData(emissao[1]);
+
+  return dados;
+}
+
+function parsearGenerico(texto) {
+  const dados = {};
+  const t = texto.replace(/\s+/g, ' ');
+  const venc = t.match(/(\d{2}\/\d{2}\/\d{4})/);
+  if (venc) dados.vencimento = converterData(venc[1]);
+  const valor = t.match(/R\$\s*([\d.,]+)/);
+  if (valor) dados.valor = valor[1].replace('.','').replace(',','.');
+  return dados;
+}
+
+function converterData(data) {
+  // Converte DD/MM/YYYY para YYYY-MM-DD
+  if (!data) return '';
+  const partes = data.split('/');
+  if (partes.length === 3) return partes[2] + '-' + partes[1] + '-' + partes[0];
+  return data;
+}
+
+// ===== PREENCHER FORMULÁRIO =====
+function preencherFormulario(dados, tipo) {
+  const set = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val !== undefined && val !== '') el.value = val;
+  };
+  const setMoney = (id, val) => {
+    const el = document.getElementById(id);
+    if (el && val) {
+      el.value = 'R$ ' + parseFloat(val).toFixed(2).replace('.', ',');
+    }
+  };
+
+  // Campos comuns
+  set('fatura-vencimento', dados.vencimento);
+  set('fatura-referencia', dados.referencia);
+  if (dados.valor) setMoney('fatura-valor', dados.valor);
+  if (dados.consumo) set('fatura-consumo', dados.consumo);
+  set('fatura-nf-cashback', dados.nfCashback);
+
+  // Recalcula valor a pagar
+  if (dados.desconto) {
+    setMoney('fatura-desconto', dados.desconto);
+  }
+  calcularValorPagar();
+
+  // Campos Copel
+  if (tipo === 'copel') {
+    set('cop-leit-ant', dados.leituraAnterior);
+    set('cop-leit-atual', dados.leituraAtual);
+    set('cop-nf', dados.nf);
+    set('cop-serie', dados.serie);
+    set('cop-chave', dados.chaveAcesso);
+    if (dados.banda) {
+      const sel = document.getElementById('cop-banda');
+      if (sel) sel.value = dados.banda;
+    }
+    if (dados.emissao) set('cop-emissao', dados.emissao);
+    if (dados.multaAtraso) setMoney('cop-extra-0', dados.multaAtraso);
+
+    // Abre detalhes automaticamente se tiver dados extras
+    if (dados.leituraAnterior || dados.nf) {
+      const det = document.querySelector('details');
+      if (det) det.open = true;
+    }
+  }
+
+  // Campos Sanepar
+  if (tipo === 'sanepar') {
+    set('san-matricula', dados.matricula);
+    set('san-hidrometro', dados.hidrometro);
+    set('san-leit-ant', dados.leituraAnterior);
+    set('san-leit-atual', dados.leituraAtual);
+    set('san-prox-leit', dados.proximaLeitura);
+    set('san-ctrl', dados.ctrl);
+    if (dados.multaAgua) setMoney('san-extra-1', dados.multaAgua);
+    if (dados.multaEsgoto) setMoney('san-extra-2', dados.multaEsgoto);
+    if (dados.jurosMoratorios) setMoney('san-extra-3', dados.jurosMoratorios);
+
+    if (dados.matricula || dados.leituraAnterior) {
+      const det = document.querySelector('details');
+      if (det) det.open = true;
+    }
+  }
+
+  // Campos Inova
+  if (tipo === 'inova') {
+    set('inova-periodo', dados.periodo);
+    set('inova-contrato', dados.contrato);
+    set('inova-pix', dados.pix);
+    set('inova-nr-doc', dados.nrDocumento);
+    if (dados.emissao) set('inova-emissao', dados.emissao);
+    calcularPrazoInova();
+  }
+
+  // Feedback visual
+  showAlert('✅', 'PDF lido com sucesso! Revise os campos antes de salvar.');
 }

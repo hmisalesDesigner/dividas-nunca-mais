@@ -174,7 +174,7 @@ function calcularValorParcela(divida) {
 }
 
 // ===== PAGAMENTOS =====
-function registrarPagamento(dividaId, parcelasIds, valorPago, dataPagamento, observacao) {
+function registrarPagamento(dividaId, parcelasIds, valorPago, dataPagamento, observacao, origem) {
   const divida = DB.dividas.find(d => d.id === dividaId);
   if (!divida) return;
 
@@ -185,6 +185,7 @@ function registrarPagamento(dividaId, parcelasIds, valorPago, dataPagamento, obs
     valorPago,
     dataPagamento: dataPagamento || new Date().toISOString().split('T')[0],
     observacao,
+    origem: origem || '',
     criadoEm: new Date().toISOString()
   };
 
@@ -386,6 +387,11 @@ if (!DB.programas) DB.programas = [
   { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', categoria: 'aerea', saldo: 0, expiracao: null, logo: '✈️' },
 ];
 if (!DB.resgates) DB.resgates = [];
+if (!DB.origensPagamento) DB.origensPagamento = [
+  { id: 1, emoji: '🏦', tipo: 'Banco', titular: 'Margarida' },
+  { id: 2, emoji: '📈', tipo: 'Resgate de Dividendos', titular: 'Henrique' },
+  { id: 3, emoji: '🧾', tipo: 'Cashback NFe', titular: 'Henrique', tooltip: 'Nota Fiscal Eletrônica' },
+];
 
 function adicionarPrograma(programa) {
   programa.id = gerarId();
