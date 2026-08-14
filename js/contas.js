@@ -1047,7 +1047,10 @@ function importarPDF(tipo) {
     setTimeout(async () => {
       try {
         const texto = await extrairTextoPDF(file);
+        window._textoPDF = texto; // debug
+        console.log('PDF texto extraído:', texto.substring(0, 500));
         const dados = parsearFatura(texto, tipo);
+        console.log('Dados extraídos:', dados);
         fecharAlert();
         abrirModalNovaFatura(tipo);
         setTimeout(() => preencherFormulario(dados, tipo), 300);
@@ -1105,65 +1108,85 @@ function parsearCopel(texto) {
   const dados = {};
   const t = texto.replace(/\s+/g, ' ');
 
-  // Vencimento
+  // REF MES/ANO — ex: "07/2026"
+  const ref = t.match(/REF[:\s]*MÊS\s*\/\s*ANO\s+(\d{2})\/(\d{4})/i) ||
+              t.match(/\b(0[1-9]|1[0-2])\/(20\d{2})\b/);
+  if (ref) {
+    dados.referencia = ref[2] + '-' + ref[1].padStart(2,'0');
+  }
+
+  // VENCIMENTO — ex: "27/07/2026"
   const venc = t.match(/VENCIMENTO\s+(\d{2}\/\d{2}\/\d{4})/i) ||
-               t.match(/(\d{2}\/\d{2}\/\d{4})/);
+               t.match(/DATA VENCIMENTO\s+(\d{2}\/\d{2}\/\d{4})/i) ||
+               t.match(/(\d{2}\/\d{2}\/20\d{2})/);
   if (venc) dados.vencimento = converterData(venc[1]);
 
-  // Valor total
+  // TOTAL A PAGAR — ex: "R$333,94"
   const valor = t.match(/TOTAL A PAGAR\s+R\$\s*([\d.,]+)/i) ||
-                t.match(/R\$([\d.,]+)/);
-  if (valor) dados.valor = valor[1].replace('.','').replace(',','.');
+                t.match(/VALOR DO DOCUMENTO\s+R\$([\d.,]+)/i) ||
+                t.match(/R\$\s*([\d]{2,4},[\d]{2})/);
+  if (valor) dados.valor = valor[1].replace(/\./g,'').replace(',','.');
 
-  // Referência mês/ano
-  const ref = t.match(/REF[:\s]*MÊS\s*\/\s*ANO\s+(\d{2}\/\d{4})/i) ||
-              t.match(/(\d{2}\/\d{4})/);
-  if (ref) {
-    const [mes, ano] = ref[1].split('/');
-    dados.referencia = ano + '-' + mes;
-  }
+  // NOTA FISCAL — ex: "242425413 - SÉRIE 3"
+  const nf = t.match(/NOTA FISCAL\s+No\.?\s*([\d]+)/i) ||
+             t.match(/([\d]{9})/);
+  if (nf) { dados.nf = nf[1]; dados.nfCashback = nf[1]; }
 
-  // Nota Fiscal
-  const nf = t.match(/NOTA FISCAL\s+N[oº°]\.?\s*([\d]+)/i) ||
-             t.match(/NF[:\s]*([\d]+)/i);
-  if (nf) dados.nf = nf[1];
-
-  // Consumo KWh
-  const consumo = t.match(/CONSUMO\s+kWh\s+[\w]+\s+([\d]+)\s/i) ||
-                  t.match(/(\d{2,4})\s+kWh/i);
-  if (consumo) dados.consumo = consumo[1];
-
-  // Leitura anterior e atual
-  const leituras = t.match(/(\d{4,6})\s+(\d{4,6})\s+\d+\s+(\d{2,4})/);
-  if (leituras) {
-    dados.leituraAnterior = leituras[1];
-    dados.leituraAtual = leituras[2];
-  }
-
-  // Chave de acesso
-  const chave = t.match(/Chave de Acesso\s+([\d\s]{44,60})/i);
-  if (chave) dados.chaveAcesso = chave[1].trim();
-
-  // Série NF
+  // SÉRIE
   const serie = t.match(/SÉRIE\s+(\d+)/i);
   if (serie) dados.serie = serie[1];
 
-  // Data emissão
-  const emissao = t.match(/DATA DE EMISSÃO[:\s]+(\d{2}\/\d{2}\/\d{4})/i);
+  // DATA EMISSÃO — ex: "09/07/2026"
+  const emissao = t.match(/DATA DE EMISSÃO[:\s]+(\d{2}\/\d{2}\/\d{4})/i) ||
+                  t.match(/DATA DO EMISSÃO[:\s]+(\d{2}\/\d{2}\/\d{4})/i);
   if (emissao) dados.emissao = converterData(emissao[1]);
 
-  // Banda tarifária
-  if (t.includes('Amarela')) dados.banda = 'Amarela';
-  else if (t.includes('Vermelha 2')) dados.banda = 'Vermelha 2';
-  else if (t.includes('Vermelha 1')) dados.banda = 'Vermelha 1';
-  else if (t.includes('Verde')) dados.banda = 'Verde';
+  // CHAVE DE ACESSO — 44 dígitos
+  const chave = t.match(/Chave de Acesso\s+([\d\s]{40,60})(?=Protocolo|https)/i) ||
+                t.match(/([\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4}\s[\d]{4})/);
+  if (chave) dados.chaveAcesso = chave[1].trim();
 
-  // Multa
-  const multa = t.match(/MULTA POR ATRASO[^R]*R\$\s*([\d.,]+)/i);
+  // LEITURAS — padrão linha medidor Copel:
+  // "0760801802 CONSUMO kWh TP 9494 9790 1 296"
+  const medLeitura = t.match(/([\d]{7,12})\s+CONSUMO kWh\s+TP\s+([\d]{4,6})\s+([\d]{4,6})\s+\d+\s+([\d]{2,4})/i);
+  if (medLeitura) {
+    dados.medidor = medLeitura[1];
+    dados.leituraAnterior = medLeitura[2];
+    dados.leituraAtual = medLeitura[3];
+    dados.consumo = medLeitura[4];
+  }
+
+  // Nº DIAS
+  const dias = t.match(/Nº de dias\s+(\d+)/i) ||
+               t.match(/\b(28|29|30|31|32)\s+dias/i) ||
+               t.match(/\b(28|29|30|31|32)\b(?=\s+[\d]{2}\/[\d]{2}\/20)/);
+  if (dias) dados.dias = dias[1];
+
+  // BANDA TARIFÁRIA
+  if (t.match(/Amarela/i)) dados.banda = 'Amarela';
+  else if (t.match(/Vermelha 2/i)) dados.banda = 'Vermelha 2';
+  else if (t.match(/Vermelha 1/i)) dados.banda = 'Vermelha 1';
+  else if (t.match(/Verde/i)) dados.banda = 'Verde';
+
+  // MULTA POR ATRASO NO PAGAMENTO — ex: "5,91"
+  const multa = t.match(/MULTA POR ATRASO NO PAGAMENTO\s+UN[^\d]+([\d.,]+)/i);
   if (multa) dados.multaAtraso = multa[1].replace(',','.');
 
-  // NF para cashback
-  if (dados.nf) dados.nfCashback = dados.nf;
+  // JUROS CONTA ANTERIOR
+  const juros = t.match(/JUROS CONTA ANTERIOR\s+UN[^\d]+([\d.,]+)/i);
+  if (juros) dados.jurosConta = juros[1].replace(',','.');
+
+  // ACRÉSCIMO MORATÓRIO
+  const acrescimo = t.match(/ACRESCIMO MORATORIO\s+UN[^\d]+([\d.,]+)/i);
+  if (acrescimo) dados.acrescimoMoratorio = acrescimo[1].replace(',','.');
+
+  // CONT ILUM PÚBLICA
+  const ilum = t.match(/CONT ILUMIN PUBLICA[^\d]+([\d.,]+)/i);
+  if (ilum) dados.contIlumin = ilum[1].replace(',','.');
+
+  // LINHA DIGITÁVEL
+  const linha = t.match(/([\d]{5}\.[\d]{5}\s[\d]{5}\.[\d]{6}\s[\d]{5}\.[\d]{6}\s[\d]\s[\d]{14})/);
+  if (linha) dados.linhaDigitavel = linha[1];
 
   return dados;
 }
@@ -1322,23 +1345,27 @@ function preencherFormulario(dados, tipo) {
 
   // Campos Copel
   if (tipo === 'copel') {
+    set('cop-medidor', dados.medidor);
     set('cop-leit-ant', dados.leituraAnterior);
     set('cop-leit-atual', dados.leituraAtual);
+    set('fatura-dias', dados.dias);
     set('cop-nf', dados.nf);
     set('cop-serie', dados.serie);
     set('cop-chave', dados.chaveAcesso);
+    set('cop-linha-dig', dados.linhaDigitavel);
+    if (dados.emissao) set('cop-emissao', dados.emissao);
     if (dados.banda) {
       const sel = document.getElementById('cop-banda');
       if (sel) sel.value = dados.banda;
     }
-    if (dados.emissao) set('cop-emissao', dados.emissao);
     if (dados.multaAtraso) setMoney('cop-extra-0', dados.multaAtraso);
+    if (dados.jurosConta) setMoney('cop-extra-1', dados.jurosConta);
+    if (dados.acrescimoMoratorio) setMoney('cop-extra-2', dados.acrescimoMoratorio);
+    if (dados.contIlumin) setMoney('cop-extra-3', dados.contIlumin);
 
-    // Abre detalhes automaticamente se tiver dados extras
-    if (dados.leituraAnterior || dados.nf) {
-      const det = document.querySelector('details');
-      if (det) det.open = true;
-    }
+    // Abre detalhes automaticamente
+    const det = document.querySelector('details');
+    if (det) det.open = true;
   }
 
   // Campos Sanepar
