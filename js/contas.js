@@ -1168,21 +1168,28 @@ function parsearCopel(texto) {
   else if (t.match(/Vermelha 1/i)) dados.banda = 'Vermelha 1';
   else if (t.match(/Verde/i)) dados.banda = 'Verde';
 
-  // Itens extras — padrão: "NOME UN [preco_unit] [valor_final]"
-  // O valor final é o último número da linha (ex: 5,91)
-  const multaMatch = t.match(/MULTA POR ATRASO[\w\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
-  if (multaMatch) dados.multaAtraso = multaMatch[1].replace(',','.');
+  // Itens extras da Copel
+  // Padrão do PDF: "NOME UN [qtd] [preco_unitario] [valor_final] [pis] [icms]"
+  // Exemplo: "MULTA POR ATRASO NO PAGAMENTO UN 5,910000 5,91"
+  // Valor final sempre tem 2 casas decimais: XX,XX ou XXX,XX
 
-  const jurosMatch = t.match(/JUROS CONTA ANTERIOR[\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
-  if (jurosMatch) dados.jurosConta = jurosMatch[1].replace(',','.');
+  function extrairValorItem(texto, nomeItem) {
+    const regex = new RegExp(nomeItem + '[\\w\\s,./]+?([\\d]+,[\\d]{2})(?=\\s+[\\d]|\\s*$)', 'i');
+    const m = texto.match(regex);
+    return m ? m[1].replace(',', '.') : null;
+  }
 
-  const acrescimoMatch = t.match(/ACRESCIMO MORATORIO[\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
-  if (acrescimoMatch) dados.acrescimoMoratorio = acrescimoMatch[1].replace(',','.');
+  const multaVal = extrairValorItem(t, 'MULTA POR ATRASO NO PAGAMENTO');
+  if (multaVal) dados.multaAtraso = multaVal;
 
-  // CONT ILUM PÚBLICA — ex: "CONT ILUMIN PUBLICA MUNICIPIO UN 36,610000 36,61"
-  const ilum = t.match(/CONT ILUMIN PUBLICA[\w\s]+UN[^\d]+[\d.,]+\s+([\d.,]+)/i) ||
-               t.match(/CONT ILUMIN PUBLICA[\w\s]+([\d]{2,3},[\d]{2})(?!\d)/i);
-  if (ilum) dados.contIlumin = ilum[1].replace(',','.');
+  const jurosVal = extrairValorItem(t, 'JUROS CONTA ANTERIOR');
+  if (jurosVal) dados.jurosConta = jurosVal;
+
+  const acrescimoVal = extrairValorItem(t, 'ACRESCIMO MORATORIO');
+  if (acrescimoVal) dados.acrescimoMoratorio = acrescimoVal;
+
+  const ilumVal = extrairValorItem(t, 'CONT ILUMIN PUBLICA');
+  if (ilumVal) dados.contIlumin = ilumVal;
 
   // LINHA DIGITÁVEL
   const linha = t.match(/([\d]{5}\.[\d]{5}\s[\d]{5}\.[\d]{6}\s[\d]{5}\.[\d]{6}\s[\d]\s[\d]{14})/);
