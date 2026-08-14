@@ -1168,20 +1168,20 @@ function parsearCopel(texto) {
   else if (t.match(/Vermelha 1/i)) dados.banda = 'Vermelha 1';
   else if (t.match(/Verde/i)) dados.banda = 'Verde';
 
-  // MULTA POR ATRASO NO PAGAMENTO — ex: "5,91"
-  const multa = t.match(/MULTA POR ATRASO NO PAGAMENTO\s+UN[^\d]+([\d.,]+)/i);
-  if (multa) dados.multaAtraso = multa[1].replace(',','.');
+  // Itens extras — padrão: "NOME UN [preco_unit] [valor_final]"
+  // O valor final é o último número da linha (ex: 5,91)
+  const multaMatch = t.match(/MULTA POR ATRASO[\w\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
+  if (multaMatch) dados.multaAtraso = multaMatch[1].replace(',','.');
 
-  // JUROS CONTA ANTERIOR
-  const juros = t.match(/JUROS CONTA ANTERIOR\s+UN[^\d]+([\d.,]+)/i);
-  if (juros) dados.jurosConta = juros[1].replace(',','.');
+  const jurosMatch = t.match(/JUROS CONTA ANTERIOR[\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
+  if (jurosMatch) dados.jurosConta = jurosMatch[1].replace(',','.');
 
-  // ACRÉSCIMO MORATÓRIO
-  const acrescimo = t.match(/ACRESCIMO MORATORIO\s+UN[^\d]+([\d.,]+)/i);
-  if (acrescimo) dados.acrescimoMoratorio = acrescimo[1].replace(',','.');
+  const acrescimoMatch = t.match(/ACRESCIMO MORATORIO[\s]+UN[\s]+[\d.,]+[\s]+([\d.,]+)/i);
+  if (acrescimoMatch) dados.acrescimoMoratorio = acrescimoMatch[1].replace(',','.');
 
-  // CONT ILUM PÚBLICA
-  const ilum = t.match(/CONT ILUMIN PUBLICA[^\d]+([\d.,]+)/i);
+  // CONT ILUM PÚBLICA — ex: "CONT ILUMIN PUBLICA MUNICIPIO UN 36,610000 36,61"
+  const ilum = t.match(/CONT ILUMIN PUBLICA[\w\s]+UN[^\d]+[\d.,]+\s+([\d.,]+)/i) ||
+               t.match(/CONT ILUMIN PUBLICA[\w\s]+([\d]{2,3},[\d]{2})(?!\d)/i);
   if (ilum) dados.contIlumin = ilum[1].replace(',','.');
 
   // LINHA DIGITÁVEL
