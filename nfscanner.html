@@ -216,7 +216,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.3</p>
+  <p>Notas Fiscais do PR · v25.4</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -802,15 +802,17 @@ function classificarLoja(nome, cnpj){
     ['Petshop', /\bpet\b|petshop|pet shop|racoes|agropecuar|veterin|cobasi|petz/],
     ['Automotivo', /auto ?pecas|autopecas|pecas|oficina|pneu|mecanica|funilaria|baterias/],
     ['Posto', /posto|combustiv|petroleo|ipiranga|\bshell\b/],
+    ['Gás e Água', /flamagas|gas ltda|comercio de gas|distribuidora de gas|agua mineral/],
+    ['Digital', /multimidia|ebook|e-book|livraria|livros/],
     ['Padaria', /padaria|panificadora|confeitaria/],
     ['Açougue', /acougue|frigorific|casa de carnes|carnes/],
     ['Alimentação', /rotisseria|sorveteria|restaurante|lanchonete|pizzaria|churrasc|acai|cafeteria|hamburg|marmit|alimentos ltda/],
     ['Construção', /mater\.? ?(de )?constr|material|constr|madeireira|ferragen|tintas|cimento/],
     ['Móveis', /moveis|colchoes|eletrodomest/],
-    ['Vestuário', /confec|vestuario|calcad|boutique|roupas|acessorios|moda /],
-    ['Loja de departamento', /americanas|riachuelo|renner|\bc&a\b|magazine|casas bahia|havan|marisa|leroy|utilidades|presentes|variedades|armarinho|bazar|papelaria|amazon|servicos de varejo/],
+    ['Vestuário', /confec|vestuario|calcad|boutique|roupas|acessorios|moda |loja \d+ - sh|shopping|sh avenida/],
+    ['Loja de departamento', /americanas|riachuelo|renner|\bc&a\b|magazine|casas bahia|havan|marisa|leroy|utilidades|presentes|variedades|force group|armarinho|bazar|papelaria|amazon|servicos de varejo/],
     ['Atacado', /atacad|assai|makro|atacarejo/],
-    ['Supermercado', /supermerc|mercado|mercantil|hiper|generos alimenticios|produtos naturais|emporio|hortifruti|sacolao|quitanda|muffato|condor|carrefour|angeloni|bistek|sulamericana|pao de acucar|brilhante|molicenter|distribuidora/]
+    ['Supermercado', /armazem|nutri|supermerc|mercado|mercantil|hiper|generos alimenticios|produtos naturais|emporio|hortifruti|sacolao|quitanda|muffato|condor|carrefour|angeloni|bistek|sulamericana|pao de acucar|brilhante|molicenter|distribuidora/]
   ];
   for(var i=0;i<R.length;i++){ if(R[i][1].test(n)) return R[i][0]; }
   return 'Outro';
@@ -1322,7 +1324,37 @@ function migrarQualidade(){
     else { var np=normPagto(f); if(np!=='Outros') nf=np; }
     if(nf!==f){ n.forma_pagamento=nf; r.pagamentos++; }
   });
+  // 2b) notas ainda "Outro": reavalia pelo nome e, se preciso, pelo que foi comprado
+  var tipoPorItens=function(its){
+    var tot=0, por={}; its.forEach(function(i){ var v=Number(i.valor_total)||0; tot+=v; var c=gCat(i.descricao); por[c]=(por[c]||0)+v; });
+    var txt=its.map(function(i){return i.descricao;}).join(' ').toLowerCase();
+    if(/frango assado|yakisoba|marmit|lanche|pizza|pastel|coxinha|refei/.test(txt)) return 'Alimentação';
+    var cnt=function(re){ return its.filter(function(i){return re.test(String(i.descricao||'').toLowerCase());}).length; };
+    if((por['Farmácia e Medicamentos']||0)>=tot*0.5 || cnt(/colirio|solucao fisiologica|bepantol|stomaliv|pomada|xarope|comprimid|dipirona|paracetamol|\bsoro\b|vitamina|pastilha|spray nasal/)>=its.length/2) return 'Farmácia';
+    if((por['Pets']||0)>=tot*0.5 || cnt(/\bdog\b|\bcat\b|racao|quidog|sache special|petisco|coleira/)>=its.length/2) return 'Petshop';
+    if(/vest|rasteira|\btop\b|cotton|calcinha|camis|bermuda|short|sandalia|chinelo/.test(txt)) return 'Vestuário';
+    return 'Outro';
+  };
+  var porNota2={}; itens.forEach(function(i){ (porNota2[i.nota_id]=porNota2[i.nota_id]||[]).push(i); });
+  var tipoCnpj={};
+  notas.forEach(function(n){
+    if(n.tipo_loja!=='Outro') return;
+    var t=classificarLoja(n.estabelecimento,n.cnpj);
+    if(t==='Outro') t=tipoPorItens(porNota2[n.id]||[]);
+    if(t!=='Outro'){ n.tipo_loja=t; r.tipoLoja++; tipoCnpj[String(n.cnpj||'').replace(/\D/g,'')]=t; }
+  });
+  (DB.estabelecimentos||[]).forEach(function(e){
+    var t=tipoCnpj[String(e.cnpj||'').replace(/\D/g,'')];
+    if(t && (!e.categoria||e.categoria==='Outro')){ e.categoria=t; r.tipoLoja++; }
+  });
   var tipoNota={}; notas.forEach(function(n){tipoNota[n.id]=n.tipo_loja;});
+  itens.forEach(function(it){
+    var tipo=tipoNota[it.nota_id]; if(!tipoCnpj[String((notas.filter(function(n){return n.id===it.nota_id;})[0]||{}).cnpj||'').replace(/\D/g,'')]) return;
+    if(['Outro','Utensílios','',null,undefined].indexOf(it.categoria)>=0){
+      var c=LOJAS_ALIMENTO.indexOf(tipo)>=0?gCat(it.descricao):tipo;
+      if(c!==it.categoria){ it.categoria=c; it.local=gLocal(c); r.itensSemCat++; }
+    }
+  });
   // 3) itens: unidade, descrição, categoria ausente
   itens.forEach(function(it){
     var u=normUnidade(it.unidade); if(u!==it.unidade){ it.unidade=u; r.unidades++; }
@@ -1382,12 +1414,14 @@ function pgAuditoria(){
     bloco('🧩','Itens com valor zerado',a.itensZerados,'Pode ser brinde ou erro de leitura.',function(i){return '<tr><td colspan="4">'+esc(i.descricao)+'</td></tr>';})+
     bloco('🔗','Itens ou estoque sem nota correspondente',a.itensOrfaos.concat(a.estoqueOrfao),'Registros que apontam para uma nota que não existe mais.',function(i){return '<tr><td colspan="4">'+esc(i.descricao||'')+'</td></tr>';}));
 }
-function ticketPorTipo(notas){
-  var m={}; (notas||[]).forEach(function(n){ var t=n.tipo_loja||'Outro'; var o=m[t]=m[t]||{t:t,q:0,v:0}; o.q++; o.v+=Number(n.valor_total)||0; });
+function ticketPorTipo(notas){ return ''; }
+function cardTicketTipos(notas){
+  var m={}, tot=0; (notas||[]).forEach(function(n){ var t=n.tipo_loja||'Outro'; var v=Number(n.valor_total)||0; var o=m[t]=m[t]||{t:t,q:0,v:0,min:1e12,max:0}; o.q++; o.v+=v; tot+=v; if(v<o.min)o.min=v; if(v>o.max)o.max=v; });
   var arr=Object.values(m).sort(function(a,b){return b.v-a.v;});
-  var top=arr.slice(0,4), resto=arr.slice(4);
-  if(resto.length){ var o={t:'Demais',q:0,v:0}; resto.forEach(function(x){o.q+=x.q;o.v+=x.v;}); top.push(o); }
-  return '<div class="tk-tipos">'+top.map(function(x){ return '<div class="tk-row"><span>'+esc(x.t)+' <small>('+x.q+')</small></span><b>'+brl(x.q?x.v/x.q:0)+'</b></div>'; }).join('')+'</div>';
+  var tq=(notas||[]).length;
+  return '<div class="card" style="margin-bottom:14px"><div class="card-hd"><span>🧾 Ticket médio por tipo de loja</span><span>'+tq+' notas · '+brl(tot)+'</span></div><div class="scr"><table><thead><tr><th>Tipo de loja</th><th style="text-align:center">Notas</th><th style="text-align:right">Total gasto</th><th style="width:22%">% do gasto</th><th style="text-align:right">Ticket médio</th><th style="text-align:right">Menor nota</th><th style="text-align:right">Maior nota</th></tr></thead><tbody>'+
+    arr.map(function(x){ var p=tot?x.v/tot*100:0; return '<tr><td style="font-weight:600">'+esc(x.t)+'</td><td style="text-align:center">'+x.q+'</td><td style="text-align:right">'+brl(x.v)+'</td><td>'+nfsBarra(p)+'<span class="pct">'+p.toFixed(1).replace('.',',')+'%</span></td><td style="text-align:right;font-weight:700">'+brl(x.q?x.v/x.q:0)+'</td><td style="text-align:right;color:var(--text-2)">'+brl(x.min===1e12?0:x.min)+'</td><td style="text-align:right;color:var(--text-2)">'+brl(x.max)+'</td></tr>'; }).join('')+
+    '</tbody></table></div></div>';
 }
 
 function go(tab){
@@ -1528,6 +1562,7 @@ async function pgDash(){
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-b">'+ICONS.receipt+'</div><div class="l2">Ticket Médio</div></div><div class="v2">'+brl(ticketMedio)+'</div>'+trendHtml(trendTicket,false)+ticketPorTipo(notas)+'</div>'+
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-r">'+ICONS.filetxt+'</div><div class="l2">Tributos</div></div><div class="v2" style="color:#EA4335">'+brl(totalTribut)+'</div>'+trendHtml(trendTribut,false)+'</div>'+
       '</div>'+
+      cardTicketTipos(notas)+
       '<div class="g2">'+
       '<div class="ch ch-h" style="height:280px"><h4>Gastos mensais</h4><canvas id="ch-g"></canvas></div>'+
       '<div class="card"><div class="card-hd">Top Marcas</div><div>'+
@@ -2722,7 +2757,7 @@ function formCad(e){
     '<div class="fg"><label>Razão Social</label><input id="crs" value="'+esc(e.razao_social||'')+'"></div>'+
     '<div class="fr"><div class="fg"><label>Rua</label><input id="crua" value="'+esc(e.rua||'')+'"></div><div class="fg"><label>Número</label><input id="cnum" value="'+esc(e.numero||'')+'"></div></div>'+
     '<div class="fr"><div class="fg"><label>Bairro</label><input id="cbairro" value="'+esc(e.bairro||'')+'"></div><div class="fg"><label>Cidade</label><input id="ccid" value="'+esc(e.cidade||'')+'"></div><div class="fg"><label>UF</label><input id="cuf" value="'+esc(e.estado||'PR')+'" style="max-width:60px"></div></div>'+
-    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Petshop','Padaria','Atacado','Açougue','Posto','Loja de departamento','Construção','Móveis','Vestuário','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
+    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Petshop','Padaria','Atacado','Açougue','Posto','Loja de departamento','Construção','Móveis','Vestuário','Alimentação','Gás e Água','Digital','Automotivo','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
     '<button class="btn bg" onclick="closeMo()">Cancelar</button><button class="btn bs" onclick="salvCad('+(e.id||0)+')">💾 Salvar</button>'
   );
 }
