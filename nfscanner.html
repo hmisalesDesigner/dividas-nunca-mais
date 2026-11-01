@@ -231,7 +231,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.5</p>
+  <p>Notas Fiscais do PR · v25.6</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1577,12 +1577,12 @@ async function pgDash(){
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-b">'+ICONS.receipt+'</div><div class="l2">Ticket Médio</div></div><div class="v2">'+brl(ticketMedio)+'</div>'+trendHtml(trendTicket,false)+ticketPorTipo(notas)+'</div>'+
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-r">'+ICONS.filetxt+'</div><div class="l2">Tributos</div></div><div class="v2" style="color:#EA4335">'+brl(totalTribut)+'</div>'+trendHtml(trendTribut,false)+'</div>'+
       '</div>'+
-      cardTicketTipos(notas)+
       '<div class="g2">'+
       '<div class="ch ch-h" style="height:280px"><h4>Gastos mensais</h4><canvas id="ch-g"></canvas></div>'+
       '<div class="card"><div class="card-hd">Top Marcas</div><div>'+
       topMarcas.map(function(m){return '<div class="tm-row"><span>'+esc(m.marca)+'</span><span class="tm-badge">'+m.qtd+' un.</span></div>';}).join('')+
       '</div><a class="ver-todas" onclick="go(\'marcas\')">Ver todas</a></div></div>'+
+      cardTicketTipos(notas)+
       '<div class="g2">'+
       '<div class="card"><div class="card-hd">Produtos mais comprados</div><table><thead><tr><th>Produto</th><th>Categoria</th><th>Qtd.</th><th>Preço Médio</th><th>Valor Total</th><th>Última Compra</th></tr></thead><tbody>'+
       topItens.map(function(i){return '<tr><td>'+esc(i.descricao)+'</td><td>'+catPill(i.categoria)+'</td><td style="text-align:center">'+i.vezes+'</td><td>'+brl(i.precoMedio)+'</td><td style="font-weight:600">'+brl(i.valorTotal)+'</td><td style="color:var(--text-2)">'+fmt(i.ultimaData)+'</td></tr>';}).join('')+
