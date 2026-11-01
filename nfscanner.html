@@ -212,7 +212,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.1</p>
+  <p>Notas Fiscais do PR · v25.2</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -234,6 +234,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
   <div class="ng">Cadastros</div>
   <button class="nb" onclick="go('cadastros')">🏢 Estabelecimentos</button>
   <button class="nb" onclick="go('marcas')">🏷️ Marcas</button>
+  <button class="nb" onclick="go('auditoria')">🩺 Qualidade dos Dados</button>
   <div class="sep"></div>
   <button class="nb" onclick="go('backup')">💾 Backup</button>
 </nav>
@@ -446,8 +447,10 @@ function migrarCategoriasV1(){
   DB._migr.cat_v1=Date.now();
   return {notas:mudNotas, itens:mudItens, estabelecimentos:mudEst, produtos:mudProd};
 }
+/*QUAL*/
 function onDbReady(){
   try{ var r=migrarCategoriasV1(); if(r){ console.log('Migração categorias v1:',r); scheduleDriveSave(); } }catch(e){ console.warn('Migração falhou',e); }
+  try{ var q=migrarQualidade(); if(q.total){ console.log('Correções de qualidade:',q); scheduleDriveSave(); } }catch(e){ console.warn('Qualidade falhou',e); }
   DB_READY=true;
   DB_READY_CBS.forEach(function(cb){cb();});
   DB_READY_CBS=[];
@@ -778,7 +781,7 @@ function closeMo(){ g('modal').style.display='none'; }
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -1252,6 +1255,130 @@ async function bnRun(){
     ok.slice(0,100).map(function(n){return '<tr><td>'+esc(fmt(n.data_emissao))+'</td><td>'+esc(n.hora_emissao||'—')+'</td><td style="font-weight:600">'+esc(n.estabelecimento||'')+'</td><td style="text-align:right;font-weight:600">'+brl(n.valor_total)+'</td><td style="text-align:center">'+(qi[n.id]||0)+'</td><td style="font-family:monospace;font-size:11px;white-space:normal;word-break:break-all">'+esc(n.chave_acesso||'')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
 }
 
+// ══════════════════════════════════════════════════════════════════
+// QUALIDADE DOS DADOS (idempotente: roda a cada abertura, só grava se mudar algo)
+// ══════════════════════════════════════════════════════════════════
+function normUnidade(u){
+  var s=String(u==null?'':u).trim(); if(!s) return s;
+  var k=s.toUpperCase().replace(/[.\s]/g,'');
+  if(/^(UN|UND|UNID|UNIDADE|UNI|U)$/.test(k)) return 'Un';
+  if(/^(KG|KGS|QUILO|QUILOS|KILO)$/.test(k)) return 'Kg';
+  if(/^(L|LT|LTS|LITRO|LITROS)$/.test(k)) return 'L';
+  if(/^(PC|PCS|PÇ|PCE|PEC|PEÇ|PECA|PEÇA)$/.test(k)) return 'Pç';
+  if(/^(FR|FRASCO)$/.test(k)) return 'Frasco';
+  if(/^(PO|POTE)$/.test(k)) return 'Pote';
+  if(/^(PT|PCT|PACOTE)$/.test(k)) return 'Pacote';
+  if(/^(CX|CAIXA)$/.test(k)) return 'Cx';
+  if(/^(SC|SACO)$/.test(k)) return 'Sc';
+  return s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+}
+function normCidade(c){
+  var s=String(c||'').trim(); if(!s) return s;
+  var k=s.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  if(/^maring/.test(k)) return 'Maringá';
+  if(k==='sao jose dos pinhais') return 'São José dos Pinhais';
+  var small={'de':1,'da':1,'do':1,'dos':1,'das':1,'e':1};
+  return s.toLowerCase().split(/\s+/).map(function(w,i){return (i>0&&small[w])?w:w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
+}
+function nomeFantasiaDe(razao){
+  var s=String(razao||'').replace(/\s+/g,' ').trim();
+  s=s.replace(/[\s,.-]+(LTDA|S\/?A|EIRELI|ME|EPP|S\.A\.?|CIA)\.?$/i,'').trim();
+  if(s===s.toUpperCase()||s===s.toLowerCase()){
+    var small={'de':1,'da':1,'do':1,'dos':1,'das':1,'e':1};
+    s=s.toLowerCase().split(' ').map(function(w,i){return (i>0&&small[w])?w:w.charAt(0).toUpperCase()+w.slice(1);}).join(' ');
+  }
+  return s;
+}
+function modeloChave(c){ return String(c||'').substring(20,22); }
+function migrarQualidade(){
+  var r={unidades:0,cidades:0,fantasia:0,pagamentos:0,tipoLoja:0,itensSemCat:0,descricoes:0,duplicatas:0,estoqueAjustado:0};
+  var notas=DB.notas_fiscais||[], itens=DB.itens||[];
+  // 1) duplicatas estritas: mesmo CNPJ + data + valor + mesmos itens (ex.: NFC-e e NF-e da mesma compra)
+  var porNota={}; itens.forEach(function(i){ (porNota[i.nota_id]=porNota[i.nota_id]||[]).push(i); });
+  var assin=function(n){ return (porNota[n.id]||[]).map(function(i){return String(i.descricao||'').toLowerCase().replace(/\s+(preto|branco|110v|220v|bivolt)\b/g,'').replace(/\s+/g,' ').trim()+'|'+Number(i.valor_total).toFixed(2);}).sort().join(';'); };
+  var vistos={}, remover={};
+  notas.slice().sort(function(a,b){ return (modeloChave(a.chave_acesso)==='65'?0:1)-(modeloChave(b.chave_acesso)==='65'?0:1)||a.id-b.id; }).forEach(function(n){
+    if(!n.valor_total||!(porNota[n.id]||[]).length) return;
+    var k=[String(n.cnpj||'').replace(/\D/g,''),n.data_emissao,Number(n.valor_total).toFixed(2),assin(n)].join('#');
+    if(vistos[k]!==undefined){ remover[n.id]=vistos[k]; } else vistos[k]=n.id;
+  });
+  var remIds=Object.keys(remover).map(Number);
+  if(remIds.length){
+    var chaveDe={}; notas.forEach(function(n){chaveDe[n.id]=n.chave_acesso;});
+    (DB.estoque||[]).forEach(function(e){ remIds.forEach(function(id){ if(e.nota_chave===chaveDe[id]){ e.nota_chave=chaveDe[remover[id]]; r.estoqueAjustado++; } }); });
+    DB.notas_fiscais=notas=notas.filter(function(n){return !remover[n.id];});
+    DB.itens=itens=itens.filter(function(i){return !remover[i.nota_id];});
+    r.duplicatas=remIds.length;
+  }
+  // 2) notas: tipo de loja e forma de pagamento
+  notas.forEach(function(n){
+    if(!n.tipo_loja){ n.tipo_loja=classificarLoja(n.estabelecimento,n.cnpj); r.tipoLoja++; }
+    var f=n.forma_pagamento, nf=f;
+    if(/^\d+$/.test(String(f||'').trim())) nf='Não informado';
+    else { var np=normPagto(f); if(np!=='Outros') nf=np; }
+    if(nf!==f){ n.forma_pagamento=nf; r.pagamentos++; }
+  });
+  var tipoNota={}; notas.forEach(function(n){tipoNota[n.id]=n.tipo_loja;});
+  // 3) itens: unidade, descrição, categoria ausente
+  itens.forEach(function(it){
+    var u=normUnidade(it.unidade); if(u!==it.unidade){ it.unidade=u; r.unidades++; }
+    var d=String(it.descricao||'').replace(/\s+/g,' ').trim(); if(d!==it.descricao){ it.descricao=d; r.descricoes++; }
+    if(!it.categoria){
+      var tipo=tipoNota[it.nota_id];
+      var c=(tipo&&LOJAS_ALIMENTO.indexOf(tipo)<0&&tipo!=='Outro')?tipo:gCat(it.descricao);
+      it.categoria=c; if(!it.local) it.local=gLocal(c); r.itensSemCat++;
+    }
+  });
+  (DB.estoque||[]).forEach(function(e){ var u=normUnidade(e.unidade); if(u!==e.unidade){ e.unidade=u; r.unidades++; } });
+  // 4) cadastro de estabelecimentos
+  (DB.estabelecimentos||[]).forEach(function(e){
+    var c=normCidade(e.cidade); if(c!==e.cidade){ e.cidade=c; r.cidades++; }
+    if(!String(e.nome_fantasia||'').trim() && e.razao_social){ e.nome_fantasia=nomeFantasiaDe(e.razao_social); r.fantasia++; }
+  });
+  var total=0; Object.keys(r).forEach(function(k){total+=r[k];});
+  r.total=total;
+  if(total){ DB._migr=DB._migr||{}; DB._migr.qual_log=(DB._migr.qual_log||[]).concat([{em:new Date().toISOString().substring(0,16),r:r}]).slice(-10); }
+  return r;
+}
+
+// ── Auditoria (somente leitura): o que ainda merece conferência ──
+function auditarDados(){
+  var notas=DB.notas_fiscais||[], itens=DB.itens||[], out={};
+  var soma={}, qtd={}; itens.forEach(function(i){ soma[i.nota_id]=(soma[i.nota_id]||0)+(Number(i.valor_total)||0); qtd[i.nota_id]=(qtd[i.nota_id]||0)+1; });
+  out.divergentes=notas.filter(function(n){ return qtd[n.id] && Math.abs((soma[n.id]||0)-(Number(n.desconto_total)||0)-(Number(n.valor_total)||0))>0.05; }).map(function(n){ return {n:n,itens:soma[n.id]||0}; });
+  out.semItens=notas.filter(function(n){return !qtd[n.id];});
+  out.valorZero=notas.filter(function(n){return !Number(n.valor_total);});
+  var ids={}; notas.forEach(function(n){ids[n.id]=1;});
+  out.itensOrfaos=itens.filter(function(i){return !ids[i.nota_id];});
+  out.itensZerados=itens.filter(function(i){return !Number(i.valor_total);});
+  var g1={}; notas.forEach(function(n){ var k=[String(n.cnpj||'').replace(/\D/g,''),n.data_emissao,Number(n.valor_total).toFixed(2)].join('#'); (g1[k]=g1[k]||[]).push(n); });
+  out.suspeitas=Object.values(g1).filter(function(a){return a.length>1;});
+  var cn={}; (DB.estabelecimentos||[]).forEach(function(e){ cn[String(e.cnpj||'').replace(/\D/g,'')]=1; });
+  out.semCadastro=notas.filter(function(n){return !cn[String(n.cnpj||'').replace(/\D/g,'')];});
+  var ch={}; notas.forEach(function(n){ch[n.chave_acesso]=1;});
+  out.estoqueOrfao=(DB.estoque||[]).filter(function(e){return e.nota_chave && !ch[e.nota_chave];});
+  out.outros=notas.filter(function(n){return n.tipo_loja==='Outro';});
+  return out;
+}
+function pgAuditoria(){
+  setActs('');
+  var a=auditarDados(), L=DB._migr&&DB._migr.qual_log||[];
+  var bloco=function(ic,tit,arr,desc,linha){
+    return '<div class="card" style="margin-bottom:12px"><div class="card-hd"><span>'+ic+' '+tit+'</span><span class="tag '+(arr.length?'taw':'tgn')+'">'+(arr.length?arr.length+' para conferir':'tudo certo')+'</span></div>'+
+      (arr.length?'<div style="padding:8px 16px;font-size:12px;color:var(--text-2)">'+desc+'</div><div class="scr" style="max-height:220px"><table><tbody>'+arr.slice(0,40).map(linha).join('')+'</tbody></table></div>':'')+'</div>';
+  };
+  var ln=function(n,extra){ return '<tr><td>'+esc(fmt(n.data_emissao))+'</td><td style="font-weight:600">'+esc(String(n.estabelecimento||'').substring(0,34))+'</td><td style="text-align:right">'+brl(n.valor_total)+'</td><td style="color:var(--text-2)">'+(extra||'')+'</td></tr>'; };
+  var ult=L.length?L[L.length-1]:null;
+  setPage('<div class="alert ai">🩺 O sistema corrige sozinho, ao abrir, o que é seguro (unidades, cidades, nomes, formas de pagamento, categorias vazias e duplicatas idênticas). Abaixo está o que ainda precisa do seu olho.'+(ult?'<br><small>Última correção automática: '+esc(ult.em.replace('T',' '))+' — '+ult.r.total+' ajuste(s) ('+ult.r.duplicatas+' duplicata(s) removida(s)).</small>':'')+'</div>'+
+    bloco('⚖️','Total da nota ≠ soma dos itens',a.divergentes,'Diferença maior que R$ 0,05 depois do desconto: pode haver item não lido na importação.',function(x){return ln(x.n,'itens: '+brl(x.itens)+' · desc.: '+brl(x.n.desconto_total));})+
+    bloco('👯','Possíveis duplicatas (mesma loja, data e valor)',a.suspeitas,'Itens diferentes entre si, então não foram removidas automaticamente.',function(g){return ln(g[0],g.length+' notas · chaves …'+g.map(function(n){return String(n.chave_acesso).slice(-6);}).join(' / '));})+
+    bloco('📭','Notas sem itens ou com valor zero',a.semItens.concat(a.valorZero.filter(function(n){return a.semItens.indexOf(n)<0;})),'Confira se a nota foi lida por completo.',function(n){return ln(n,'');})+
+    bloco('🏷️','Notas ainda classificadas como "Outro"',a.outros,'Abra Estabelecimentos e ajuste a categoria da loja.',function(n){return ln(n,'');})+
+    bloco('🏢','Notas sem cadastro de estabelecimento',a.semCadastro,'Importe novamente a nota ou cadastre o CNPJ.',function(n){return ln(n,esc(n.cnpj||''));})+
+    bloco('🧩','Itens com valor zerado',a.itensZerados,'Pode ser brinde ou erro de leitura.',function(i){return '<tr><td colspan="4">'+esc(i.descricao)+'</td></tr>';})+
+    bloco('🔗','Itens ou estoque sem nota correspondente',a.itensOrfaos.concat(a.estoqueOrfao),'Registros que apontam para uma nota que não existe mais.',function(i){return '<tr><td colspan="4">'+esc(i.descricao||'')+'</td></tr>';}));
+}
+
 function go(tab){
   window._tabAtual = tab;
   killCharts();
@@ -1263,7 +1390,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,periodos:pgPeriodos,onde:pgOnde,itens:pgItens}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,itens:pgItens}[tab];
   npAtualizarBanner();
   if(fn) fn();
 }
