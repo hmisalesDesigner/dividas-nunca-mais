@@ -210,13 +210,28 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 .tk-row{display:flex;justify-content:space-between;font-size:calc(11.5px * var(--fs,1));color:var(--text-2)}
 .tk-row b{color:var(--text-1);font-weight:600}
 .tk-row small{opacity:.8}
+.ecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-bottom:16px}
+.ecard{background:var(--bg-card);border-radius:12px;box-shadow:0 1px 8px rgba(0,0,0,.07);padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:6px;min-height:118px;border:1px solid transparent;transition:border-color .15s,transform .15s}
+.ecard:hover{border-color:#1A73E8;transform:translateY(-1px)}
+.ecard.off{opacity:.55}
+.ec-top{display:flex;gap:8px;align-items:flex-start}
+.ec-cat{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.ec-nome{font-weight:700;font-size:calc(12.5px * var(--fs,1));line-height:1.3;word-break:break-word}
+.ec-marca{font-size:calc(11px * var(--fs,1));color:var(--text-2)}
+.ec-bottom{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;gap:6px}
+.ec-qtd b{font-size:calc(24px * var(--fs,1));font-weight:800;line-height:1}
+.ec-qtd small{font-size:calc(11px * var(--fs,1));color:var(--text-2);margin-left:4px}
+.ec-tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.eg-h{font-size:calc(13px * var(--fs,1));margin:6px 0 8px;color:var(--text-2);font-weight:700}
+.eg-h span{background:var(--bg-stripe);border-radius:20px;padding:1px 8px;font-size:11px;margin-left:4px}
+.qrow{display:flex;gap:8px;align-items:center}.qrow input{flex:1}.qrow .btn{font-size:20px;padding:6px 16px}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.4</p>
+  <p>Notas Fiscais do PR · v25.5</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -2540,64 +2555,88 @@ async function pgSup(){
 // ESTOQUE
 // ══════════════════════════════════════════════════════════════════
 var _est=[];
+var _estF={q:'',c:'',s:'disponivel',l:'',g:'local'};
+function estTitulo(s){ return String(s||'').toLowerCase().replace(/(^|\s)(\S)/g,function(m,a,b){return a+b.toUpperCase();}); }
+function estQtd(q){ return String(Math.round((Number(q)||0)*100)/100).replace('.',','); }
 async function pgEst(){
   setActs('<button class="btn bp bsm" onclick="formEst(null)">+ Adicionar</button> <button class="btn bg bsm" onclick="pgEst()">↺</button>');
   try{
-    var {data,error} = await sb.from('estoque').select('*').order('id',{ascending:false});
-    if(error) throw error;
-    _est=data||[];
-    var hoje=new Date();
-    function rEst(items){
-      g('tb-est').innerHTML=items.map(function(it){
-        var val=it.validade?new Date(String(it.validade).substring(0,10)):null;
-        var dias=val?Math.ceil((val-hoje)/86400000):null;
-        var dtx=dias===null?'—':dias<0?'Vencido':dias+'d';
-        var dcl=dias===null?'tgy':dias<=0?'trd':dias<=5?'tyw':'tgn';
-        var de=it.data_entrada?new Date(String(it.data_entrada).substring(0,10)):null;
-        var rec=de&&!Number(it.revisado)&&Math.ceil((hoje-de)/86400000)<=7;
-        var nomeExib=String(it.descricao||'').toUpperCase();
-        return '<tr class="'+(rec?'rec':'')+'" ondblclick="formEst('+JSON.stringify(it).replace(/"/g,'&quot;')+')" style="cursor:pointer">'+
-          '<td><input type="checkbox" class="se" value="'+it.id+'"></td>'+
-          '<td><strong>'+esc(nomeExib)+'</strong>'+(rec?'<span class="rbadge">novo</span>':'')+'</td>'+
-          '<td><span class="tag tbl">'+esc(it.marca||'—')+'</span></td>'+
-          '<td><span class="bcat" style="background:'+(COR[it.categoria]||'#9e9e9e')+'">'+esc(it.categoria||'—')+'</span></td>'+
-          '<td style="color:var(--text-2);font-size:11px">'+esc(it.local||'—')+'</td>'+
-          '<td style="text-align:center;font-weight:700">'+it.quantidade+'</td>'+
-          '<td>'+esc(it.unidade||'un')+'</td>'+
-          '<td style="font-size:11px">'+fmt(it.validade)+'</td>'+
-          '<td><span class="tag '+dcl+'">'+dtx+'</span></td>'+
-          '<td><span class="tag '+(it.status==='disponivel'?'tgn':'tgy')+'">'+esc(it.status||'disponivel')+'</span></td>'+
-          '<td><button class="btn bg bsm" onclick="formEst('+JSON.stringify(it).replace(/"/g,'&quot;')+')">✏️</button></td>'+
-        '</tr>';
-      }).join('');
-    }
-    setPage(
+    var r=await sb.from('estoque').select('*').order('id',{ascending:false});
+    if(r.error) throw r.error;
+    _est=r.data||[];
+    var opt=function(a,sel){return a.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===sel?' selected':'')+'>'+o[1]+'</option>';}).join('');};
+    var locais=Array.from(new Set(_est.map(function(i){return i.local||'';}).filter(Boolean))).sort();
+    setPage('<div id="est-kpis" class="kpis" style="margin-bottom:12px"></div>'+
       '<div class="tbar">'+
-      '<input type="text" id="q-est" placeholder="🔍 Buscar..." oninput="filtEst()" style="width:200px">'+
-      '<select id="c-est" onchange="filtEst()" style="min-width:140px"><option value="">Todas categorias</option>'+CATS.map(function(c){return '<option>'+c+'</option>';}).join('')+'</select>'+
-      '<select id="s-est" onchange="filtEst()"><option value="">Todos status</option><option>disponivel</option><option>acabou</option></select>'+
-      '<button class="btn bd bsm" onclick="acaoEst(\'excluir\')">🗑️ Excluir</button>'+
-      '<button class="btn bsm" style="background:#FBBC04;color:#202124" onclick="acaoEst(\'acabou\')">📦 Acabou</button>'+
-      '</div>'+
-      '<div class="card"><table><thead><tr>'+
-      '<th style="width:28px"><input type="checkbox" onchange="document.querySelectorAll(\'.se\').forEach(function(c){c.checked=this.checked;},this)"></th>'+
-      '<th>Produto</th><th>Marca</th><th>Categoria</th><th>Local</th><th>Qtd</th><th>Un</th><th>Validade</th><th>Dias</th><th>Status</th><th></th>'+
-      '</tr></thead><tbody id="tb-est"></tbody></table></div>'+
-      '<p style="font-size:11px;color:var(--text-2);margin-top:6px">🟢 Verde = importado nos últimos 7 dias | Duplo clique para editar</p>'
-    );
-    rEst(data||[]);
-    window.filtEst=function(){
-      var q=(v('q-est')||'').toLowerCase(),c=v('c-est'),s=v('s-est');
-      rEst(_est.filter(function(i){return(!q||String(i.descricao||'').toLowerCase().includes(q)||String(i.marca||'').toLowerCase().includes(q))&&(!c||i.categoria===c)&&(!s||i.status===s);}));
-    };
-    window.acaoEst=async function(a){
-      var ids=[...document.querySelectorAll('.se:checked')].map(function(c){return Number(c.value);});
-      if(!ids.length){alert('Selecione ao menos um item.');return;}
-      if(a==='excluir'){ if(!confirm('Excluir '+ids.length+' item(ns)?'))return; await sb.from('estoque').delete().in('id',ids); }
-      else { await sb.from('estoque').update({status:'acabou'}).in('id',ids); }
-      pgEst();
-    };
+      '<input type="text" id="q-est" placeholder="🔍 Buscar produto ou marca..." value="'+esc(_estF.q)+'" oninput="filtEst()" style="width:240px">'+
+      '<select id="c-est" onchange="filtEst()"><option value="">Todas categorias</option>'+CATS.map(function(c){return '<option'+(c===_estF.c?' selected':'')+'>'+c+'</option>';}).join('')+'</select>'+
+      '<select id="l-est" onchange="filtEst()"><option value="">Todos os locais</option>'+opt(locais.map(function(l){return [l,l];}),_estF.l)+'</select>'+
+      '<select id="s-est" onchange="filtEst()">'+opt([['','Todos'],['disponivel','Disponíveis'],['acabou','Acabaram']],_estF.s)+'</select>'+
+      '<select id="g-est" onchange="filtEst()">'+opt([['local','Agrupar por local'],['categoria','Agrupar por categoria'],['nenhum','Sem agrupar']],_estF.g)+'</select>'+
+      '</div><div id="est-cards"></div>'+
+      '<p style="font-size:11px;color:var(--text-2);margin-top:8px">👆 Clique em um item para informar a quantidade que você tem. Quando a quantidade chega a 0, ele passa para "Acabaram".</p>');
+    window.filtEst=function(){ _estF.q=v('q-est'); _estF.c=v('c-est'); _estF.l=v('l-est'); _estF.s=v('s-est'); _estF.g=v('g-est'); rEstCards(); };
+    rEstCards();
   }catch(e){ err(e); }
+}
+function rEstCards(){
+  var hoje=new Date(), q=(_estF.q||'').toLowerCase();
+  var diasDe=function(it){ var val=it.validade?new Date(String(it.validade).substring(0,10)):null; return val&&!isNaN(val)?Math.ceil((val-hoje)/86400000):null; };
+  var lista=_est.filter(function(i){
+    return (!q||String(i.descricao||'').toLowerCase().includes(q)||String(i.marca||'').toLowerCase().includes(q))&&(!_estF.c||i.categoria===_estF.c)&&(!_estF.l||i.local===_estF.l)&&(!_estF.s||(i.status||'disponivel')===_estF.s);
+  });
+  var disp=_est.filter(function(i){return (i.status||'disponivel')==='disponivel';});
+  var venc=disp.filter(function(i){var d=diasDe(i);return d!==null&&d<=5;}).length;
+  var k=g('est-kpis');
+  if(k) k.innerHTML=nfsKpi('ic-b','Itens no estoque',disp.length,'produtos diferentes')+nfsKpi('ic-r','Vencendo / vencidos',venc,'validade em até 5 dias',venc?'#EA4335':'')+nfsKpi('ic-g','Acabaram',_est.length-disp.length,'para repor na próxima compra')+nfsKpi('ic-b','Mostrando',lista.length,'com os filtros atuais');
+  var card=function(it){
+    var d=diasDe(it), acabou=(it.status||'disponivel')!=='disponivel';
+    var de=it.data_entrada?new Date(String(it.data_entrada).substring(0,10)):null;
+    var rec=de&&!Number(it.revisado)&&Math.ceil((hoje-de)/86400000)<=7;
+    var val=d===null?'':(d<0?'<span class="tag trd">Vencido</span>':'<span class="tag '+(d<=5?'tyw':'tgn')+'">vence em '+d+'d</span>');
+    return '<div class="ecard'+(acabou?' off':'')+'" onclick="abrirEst('+it.id+')">'+
+      '<div class="ec-top"><span class="ec-cat" style="background:'+(COR[it.categoria]||'#9e9e9e')+'"></span><span class="ec-nome">'+esc(estTitulo(it.descricao))+'</span></div>'+
+      '<div class="ec-marca">'+esc(it.marca||'—')+(it.local&&_estF.g!=='local'?' · '+esc(it.local):'')+'</div>'+
+      '<div class="ec-bottom"><div class="ec-qtd"><b>'+(acabou?0:estQtd(it.quantidade))+'</b><small>'+esc(it.unidade||'Un')+'</small></div><div class="ec-tags">'+(rec?'<span class="tag tgn">novo</span>':'')+val+(acabou?'<span class="tag tgy">acabou</span>':'')+'</div></div></div>';
+  };
+  var html='';
+  if(!lista.length) html='<div class="empty"><div class="empty-i">📦</div><p>Nenhum item com esses filtros.</p></div>';
+  else if(_estF.g==='nenhum') html='<div class="ecards">'+lista.map(card).join('')+'</div>';
+  else {
+    var grupos={}; lista.forEach(function(i){ var key=(_estF.g==='local'?i.local:i.categoria)||'Sem '+(_estF.g==='local'?'local':'categoria'); (grupos[key]=grupos[key]||[]).push(i); });
+    html=Object.keys(grupos).sort().map(function(key){
+      var arr=grupos[key].sort(function(a,b){return String(a.descricao).localeCompare(String(b.descricao),'pt-BR');});
+      return '<h4 class="eg-h">'+esc(key)+' <span>'+arr.length+'</span></h4><div class="ecards">'+arr.map(card).join('')+'</div>';
+    }).join('');
+  }
+  var c=g('est-cards'); if(c) c.innerHTML=html;
+}
+function abrirEst(id){
+  var it=_est.filter(function(x){return x.id===id;})[0]; if(!it) return;
+  var qtd=(it.status||'disponivel')==='disponivel'?Number(it.quantidade)||0:0;
+  openMo('📦 '+esc(estTitulo(it.descricao)),
+    '<div style="color:var(--text-2);font-size:12px;margin-bottom:12px">'+esc(it.marca||'')+(it.local?' · '+esc(it.local):'')+(it.categoria?' · '+esc(it.categoria):'')+'</div>'+
+    '<div class="fg"><label>Quantidade que tenho ('+esc(it.unidade||'Un')+')</label>'+
+    '<div class="qrow"><button class="btn bg" onclick="estAjusta(-1)">−</button><input id="eq-q" type="number" step="any" min="0" value="'+qtd+'" style="text-align:center;font-size:22px;font-weight:700"><button class="btn bg" onclick="estAjusta(1)">+</button></div></div>'+
+    '<div class="fr"><div class="fg"><label>Validade (opcional)</label><input id="eq-v" type="date" value="'+esc(String(it.validade||'').substring(0,10))+'"></div></div>',
+    '<button class="btn bd bsm" onclick="estExcluir('+id+')" style="margin-right:auto">🗑️ Excluir</button>'+
+    '<button class="btn bg bsm" onclick="closeMo();formEst(_est.filter(function(x){return x.id==='+id+'})[0])">✏️ Mais detalhes</button>'+
+    '<button class="btn bg" onclick="closeMo()">Cancelar</button>'+
+    '<button class="btn bs" onclick="estSalvaQtd('+id+')">💾 Salvar</button>');
+  setTimeout(function(){ var i=g('eq-q'); if(i){ i.focus(); i.select(); } },50);
+}
+function estAjusta(d){ var i=g('eq-q'); i.value=Math.max(0,Math.round(((parseFloat(i.value)||0)+d)*100)/100); }
+async function estSalvaQtd(id){
+  var q=parseFloat(String(v('eq-q')).replace(',','.')); if(isNaN(q)||q<0){ alert('Informe uma quantidade válida.'); return; }
+  var d={quantidade:q,status:q>0?'disponivel':'acabou',validade:v('eq-v')||null,revisado:1};
+  closeMo(); await sb.from('estoque').update(d).eq('id',id);
+  var it=_est.filter(function(x){return x.id===id;})[0]; if(it) Object.assign(it,d);
+  rEstCards();
+}
+async function estExcluir(id){
+  if(!confirm('Excluir este item do estoque?')) return;
+  closeMo(); await sb.from('estoque').delete().eq('id',id);
+  _est=_est.filter(function(x){return x.id!==id;}); rEstCards();
 }
 function formEst(it){
   it=it||{};

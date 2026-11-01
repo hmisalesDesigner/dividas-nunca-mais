@@ -159,7 +159,7 @@ function entrarNFScanner() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('nfscanner-app').style.display = 'flex';
   const f = document.getElementById('nfscanner-frame');
-  if (!f.getAttribute('src')) f.setAttribute('src', 'nfscanner.html?v=25.4');
+  if (!f.getAttribute('src')) f.setAttribute('src', 'nfscanner.html?v=25.5');
 }
 function sairNFScanner() {
   document.getElementById('nfscanner-app').style.display = 'none';
@@ -171,5 +171,5 @@ function atualizarNFScanner() {
   const b = document.getElementById('nfs-refresh');
   if (b) { b.textContent = '⏳ Atualizando...'; b.disabled = true; }
   f.onload = () => { if (b) { b.textContent = '🔄 Atualizar'; b.disabled = false; } };
-  f.setAttribute('src', 'nfscanner.html?v=25.4&t=' + Date.now());
+  f.setAttribute('src', 'nfscanner.html?v=25.5&t=' + Date.now());
 }
