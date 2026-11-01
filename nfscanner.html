@@ -359,7 +359,44 @@ function mostrarErroSync(){
 function fecharErroSync(){ var el=document.getElementById('sync-toast'); if(el) el.remove(); }
 async function tentarSincronizarNovamente(){ fecharErroSync(); setSyncStatus('syncing'); await saveToDrive(); }
 
+
+// ══════════════════════════════════════════════════════════════════
+// MIGRAÇÃO: recategoriza itens e reclassifica lojas dos dados já importados
+// ══════════════════════════════════════════════════════════════════
+function migrarCategoriasV1(){
+  DB._migr = DB._migr || {};
+  if(DB._migr.cat_v1) return null;
+  var SEM_CAT=['','Utensílios','Outro',null,undefined];
+  var nfs={}, mudNotas=0, mudItens=0, mudEst=0, mudProd=0;
+  (DB.notas_fiscais||[]).forEach(function(n){
+    var novo=classificarLoja(n.estabelecimento, n.cnpj);
+    if(n.tipo_loja!==novo){ n.tipo_loja=novo; mudNotas++; }
+    nfs[n.id]=novo;
+  });
+  (DB.estabelecimentos||[]).forEach(function(e){
+    if(e.categoria==='Outro'||!e.categoria){
+      var novo=classificarLoja(e.razao_social||e.nome_fantasia, e.cnpj);
+      if(novo!=='Outro'){ e.categoria=novo; mudEst++; }
+    }
+  });
+  var tiposNaoAlimento=['Posto','Construção','Móveis','Vestuário','Loja de departamento','Automotivo','Alimentação','Outro'];
+  (DB.itens||[]).forEach(function(it){
+    var tipo=nfs[it.nota_id]; if(!tipo) return;
+    var antes=it.categoria, nova=antes;
+    if(LOJAS_ALIMENTO.indexOf(tipo)>=0){
+      if(SEM_CAT.indexOf(antes)>=0 || tiposNaoAlimento.indexOf(antes)>=0){ var c=gCat(it.descricao); if(c!=='Utensílios' || SEM_CAT.indexOf(antes)>=0) nova=c; }
+      else if(antes==='Pães e Panificados' && /bisc|negresco|oreo|cracker|bolacha/i.test(it.descricao)) nova='Snacks e Biscoitos';
+    } else if(SEM_CAT.indexOf(antes)>=0 || tiposNaoAlimento.indexOf(antes)>=0){ nova=tipo; }
+    if(nova!==antes){ it.categoria=nova; it.local=gLocal(nova); mudItens++; }
+  });
+  (DB.produtos||[]).forEach(function(p){
+    if(SEM_CAT.indexOf(p.categoria)>=0){ var c=gCat(p.nome); if(c!=='Utensílios'){ p.categoria=c; mudProd++; } }
+  });
+  DB._migr.cat_v1=Date.now();
+  return {notas:mudNotas, itens:mudItens, estabelecimentos:mudEst, produtos:mudProd};
+}
 function onDbReady(){
+  try{ var r=migrarCategoriasV1(); if(r){ console.log('Migração categorias v1:',r); scheduleDriveSave(); } }catch(e){ console.warn('Migração falhou',e); }
   DB_READY=true;
   DB_READY_CBS.forEach(function(cb){cb();});
   DB_READY_CBS=[];
@@ -680,17 +717,19 @@ function classificarLoja(nome, cnpj){
   var c=String(cnpj||'').replace(/\D/g,'').substring(0,8);
   if(c==='00776574') return 'Loja de departamento';
   var R=[
-    ['Farmácia', /farmac|drog|raia|pague menos|panvel|nissei|onofre|ultrafarma/],
+    ['Farmácia', /farmac|drog|raia|pague menos|panvel|nissei|onofre|ultrafarma|medicament|dimed/],
     ['Petshop', /\bpet\b|petshop|pet shop|racoes|agropecuar|veterin|cobasi|petz/],
+    ['Automotivo', /auto ?pecas|autopecas|pecas|oficina|pneu|mecanica|funilaria|baterias/],
     ['Posto', /posto|combustiv|petroleo|ipiranga|\bshell\b/],
     ['Padaria', /padaria|panificadora|confeitaria/],
-    ['Açougue', /acougue|frigorific/],
+    ['Açougue', /acougue|frigorific|casa de carnes|carnes/],
+    ['Alimentação', /rotisseria|sorveteria|restaurante|lanchonete|pizzaria|churrasc|acai|cafeteria|hamburg|marmit|alimentos ltda/],
     ['Construção', /mater\.? ?(de )?constr|material|constr|madeireira|ferragen|tintas|cimento/],
     ['Móveis', /moveis|colchoes|eletrodomest/],
     ['Vestuário', /confec|vestuario|calcad|boutique|roupas|acessorios|moda /],
-    ['Loja de departamento', /americanas|riachuelo|renner|\bc&a\b|magazine|casas bahia|havan|marisa|leroy/],
+    ['Loja de departamento', /americanas|riachuelo|renner|\bc&a\b|magazine|casas bahia|havan|marisa|leroy|utilidades|presentes|variedades|armarinho|bazar|papelaria|amazon|servicos de varejo/],
     ['Atacado', /atacad|assai|makro|atacarejo/],
-    ['Supermercado', /supermerc|mercado|mercantil|hiper|muffato|condor|carrefour|angeloni|bistek|sulamericana|pao de acucar|brilhante|molicenter|distribuidora/]
+    ['Supermercado', /supermerc|mercado|mercantil|hiper|generos alimenticios|produtos naturais|emporio|hortifruti|sacolao|quitanda|muffato|condor|carrefour|angeloni|bistek|sulamericana|pao de acucar|brilhante|molicenter|distribuidora/]
   ];
   for(var i=0;i<R.length;i++){ if(R[i][1].test(n)) return R[i][0]; }
   return 'Outro';
@@ -930,8 +969,8 @@ async function pgDash(){
       porMesAgg[m].tributos+=Number(n.tributos_total)||0;
       porMesAgg[m].qtd++;
     });
-    var mesesOrd=Object.keys(porMesAgg).sort();
-    var meses=mesesOrd.slice(-12).map(function(m){return{mes:m,total:porMesAgg[m].total};});
+    var mesesOrd=Object.keys(porMesAgg).sort(cmpMes);
+    var meses=mesesOrd.slice(-24).map(function(m){return{mes:m,total:porMesAgg[m].total};});
     var pctChange=function(atual,ant){ return ant?((atual-ant)/ant*100):null; };
     var mAtual = mesesOrd.length? porMesAgg[mesesOrd[mesesOrd.length-1]] : null;
     var mAnt   = mesesOrd.length>1? porMesAgg[mesesOrd[mesesOrd.length-2]] : null;
@@ -967,7 +1006,7 @@ async function pgDash(){
       .sort(function(a,b){return b.vezes-a.vezes;}).slice(0,30);
 
     var marcaFreq={};
-    itens.forEach(function(it){ if(it.marca) marcaFreq[it.marca]=(marcaFreq[it.marca]||0)+(Number(it.quantidade)||1); });
+    itens.forEach(function(it){ if(!it.marca || /^combust/i.test(it.marca)) return; var porPeso=/^(kg|g|l|lt|litro|ml)/i.test(String(it.unidade||'').trim()); marcaFreq[it.marca]=(marcaFreq[it.marca]||0)+(porPeso?1:Math.round(Number(it.quantidade)||1)); });
     var topMarcasAll=Object.entries(marcaFreq).sort(function(a,b){return b[1]-a[1];}).map(function(e){return{marca:e[0],qtd:e[1]};});
     var topMarcas=topMarcasAll.slice(0,5);
 
@@ -1000,6 +1039,8 @@ async function pgDash(){
     }
   }catch(e){ err(e); }
 }
+function mesKey(m){ m=String(m||''); return /^\d{2}\/\d{4}$/.test(m)? m.substring(3)+'-'+m.substring(0,2) : m; }
+function cmpMes(a,b){ var x=mesKey(a), y=mesKey(b); return x>y?1:(x<y?-1:0); }
 function mesStr(d){ if(!d)return'N/A'; d=String(d); if(d.includes('/'))return d.substring(3,5)+'/'+d.substring(6,10); return d.length>=7?d.substring(0,7):'N/A'; }
 function anoStr(d){ if(!d)return'N/A'; d=String(d); if(d.includes('/'))return d.substring(6,10); return d.length>=4?d.substring(0,4):'N/A'; }
 function normPagto(f){
@@ -1335,28 +1376,35 @@ function parseNF(html){
     formaPagamento:forma,itens:itens};
 }
 function gCat(d){
-  d=(d||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if(/arroz|feijao|aveia|cereal|grao|lentilha|ervilha|quinoa/.test(d))return'Grãos e Cereais';
-  if(/batata|mandioca|inhame|aipim|cará/.test(d))return'Carboidratos';
-  if(/macarr|farinha|amido|fuba|fermento|talhar|lasanh|penne|paraf/.test(d))return'Massas e Farinhas';
-  if(/pao|torrada|biscoito|bolacha|bolo|rosca|croiss|wafer/.test(d))return'Pães e Panificados';
-  if(/carne|frango|peixe|atum|ovo|file|coxa|sobrecox|peito|hambur|almond|bacon|salsich|camar|pizza|nugget|empanad/.test(d))return'Proteínas';
-  if(/presunto|linguic|mortadel|salsicha|frios|embutid/.test(d))return'Frios e Embutidos';
-  if(/leite|queijo|iogurte|requeijao|manteiga|mussarela|ricota|nata|creme de leite/.test(d))return'Laticínios';
-  if(/maca|banana|laranja|limao|uva|morango|fruta|manga|abacaxi|melao|melancia|pera|pessego|mamao|goiaba|coco|abacate/.test(d))return'Frutas';
-  if(/salgad|snack|chips|amendoim|castanha|pipoca/.test(d))return'Snacks e Biscoitos';
-  if(/alface|tomate|cenoura|cebola|alho|brocolis|pepino|pimentao|abobrinha|espinafrre|rucula|salsinha|couve|beterraba/.test(d))return'Legumes e Vegetais';
-  if(/azeite|oleo|gordura/.test(d))return'Óleos e Azeites';
-  if(/chocolate|sorvete|doce|mel|acucar|bala|bombom|chicle|pirul/.test(d))return'Doces e Sobremesas';
-  if(/suco|refrig|agua|cerveja|bebida|isoton|energ/.test(d))return'Bebidas e Sucos';
-  if(/cafe|cha|nescafe|achocolat|capucc/.test(d))return'Café, Chá e Achocolatados';
-  if(/shampoo|sabonete|dental|desodor|absorv|hidrat|creme|loção|lamin|barbe|escova|fio dental/.test(d))return'Higiene Pessoal';
-  if(/sabao|sabão|detergente|desinfet|limpador|amaciante|alvejante|multiuso|esponj|inset|pano de chao/.test(d))return'Limpeza';
-  if(/racao|petisco|coleira/.test(d))return'Pets';
-  if(/pilha|carregad|lampada|rayovac|bateria/.test(d))return'Eletrônicos e Acessórios';
-  if(/aditivo|oleo lubrif|automotiv/.test(d))return'Automotivo';
-  if(/margarina|marg/.test(d))return'Óleos e Azeites';
-  return'Utensílios';
+  d=(d||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ');
+  var R=[
+    ['Posto', /etanol|gasolina|diesel|combustiv/],
+    ['Automotivo', /aditivo|aromatizante automotivo|free ?way|automotiv|oleo lubrif/],
+    ['Farmácia e Medicamentos', /ivermectin|ibupril|dipirona|neopiridin|luftal|enterogermina|nistatina|colirio|maxicam|comprimid|capsulas? gelatin|caps gel|pastilha para garganta|sol fisio|sering|teste de gravidez|generico|pomada derm|paracetamol|dorflex|vitamina|\bsoro\b|pastilhas?\b|pomada|sol oral|hidroxizina|dexclorfen|ciflogex|\bseki\b|hemofiss|maleato|antialerg|xarope/],
+    ['Snacks e Biscoitos', /salg|bisc|negresco|oreo|marilan|cracker|bolacha|wafer|amendoim|batata palha|aneis ceb|cheetos|fandangos|guritos|yokitos|bar cer|barra de cereal|polvilho|pipoca|\bchips\b/],
+    ['Laticínios', /\b(l|lte|lt)\.? ?cond|beb(ida)?\.? ?lac|\blte\b|leite|\bqjo\b|queijo|requeij|manteiga|iogurt|\biog\b|iog\.|mussarela|\bmuss\b|ricota|\bnata\b|creme de leite|ninho/],
+    ['Doces e Sobremesas', /dce lte|doce de leite|chocolate|\bchoc\b|bombom|\bbomb\b|tic tac|\bbala\b|gelatina|gelati|sorv|\bdce\b|\bdoce\b|pacoca|acucar|ac cristal|\bmel\b/],
+    ['Pães e Panificados', /\bpao\b|\bpan[ei]\b|panettone|panetone|colomb|torrada|wrap|\bbolo\b|rosca|croiss|pane italia|chipa/],
+    ['Enlatados e Conservas', /sardin|\batum\b|milho verde|milho vda|milho predilec|milho (stella|d )|ervilha em|palmito|azeiton|azeitona|\baz (ver|vsle|la)\b|seleta|\bpate\b|conserva/],
+    ['Condimentos e Temperos', /molho|mol\.?tom|mol(ho)?\.? ?tom|ketchup|catchup|katchup|maionese|shoyu|vinag|pimenta|\bsal\b|colorau|colorif|acafrao|tempero|oregano|mostarda|pomarola/],
+    ['Óleos e Azeites', /azeite|\boleo\b|margarina/],
+    ['Café, Chá e Achocolatados', /capsula|\bcaps?\b|cap dolce|dolce gus|d gusto|nescau|achocolat|\bcafe\b|\bcha\b/],
+    ['Pets', /\balim (pedigree|dog)|dog chow|special dog|\brac\b|racao|bifinho|keldog|petisco|pedigree/],
+    ['Proteínas', /\bfgo\b|frango|coxinha|\bcoxa\b|sobrecoxa|\bacem\b|\bosso\b|musculo|\bmuscu\b|costela|patinho|carne|peixe|\bovos?\b|figado|\bcost\b|bovin|galinh|linguic|salsich|pizza|hambur|bacon|file de|peito de|car moi|strogon/],
+    ['Massas e Farinhas', /macarr|\bmac\.?\b|\bmassa\b|\bmas\b|m\.p\/pastel|\bm past|\btrigo|kibe kin|farinha|\bfar\b|espaguete|lasanha|fermento|amido|tapioca|farofa|fuba|canjica|\bcanj|canjiquin|talharim/],
+    ['Grãos e Cereais', /arroz|feij|aveia|granola|\bcer\b|cereal|lentilha|quinoa/],
+    ['Carboidratos', /batata|mandioc|mandioq|\bmand\b|inhame|aipim/],
+    ['Frutas', /banana|laranja|limao|\buva\b|morango|\bmaca\b|kiwi|mirtilo|maracuja|manga\b|abacaxi|melao|melancia|\bpera\b|pessego|mamao|goiaba|abacate|tangerina|bergamota/],
+    ['Legumes e Vegetais', /tomate|cebol|cenoura|abob|repolho|alface|pimentao|pepino|rucula|salsinha|hortela|coentro|acelga|brocolis|couve|beterraba|mourgot|morgote|mix br|vagem|chuchu|abobrinha/],
+    ['Bebidas e Sucos', /suco|refrig|agua |cerveja|bebida|isoton|energ|refrigerante/],
+    ['Descartáveis', /descartav|plasutil|plasvale|\bcopo\b|prato desc|guardanap|papel toal|papel al|film pvc|canudo/],
+    ['Higiene Pessoal', /fralda|pampers|huggies|babysec|lenco|toalhinha|toalha um|hastes|\babs\b|absorv|s\.? ?livre|sempre l|nene dent|talco|desod|desodor|\bdes\b|\bdent|colgat|toal um|preservativ|jontex|cr dent|cr pent|escova|sabonet|sab\.(francis|granado|pom)|shampoo|\bsh\b|condicionador|tresemme|gel fixador|gel ny|gillette|esmalte|\btint|koleston|papel h|pap\.?hig|hig[ei]en|fio dental|creme dental|\bgel\b|kit darling|kit sorriso|barbe/],
+    ['Limpeza', /detergente|deterg|limpol|\bype\b|ypê|lava[ -](roup|lou|r\b)|lava ?roupa|\bomo\b|amac|comfort|downy|sabao|sab\.omo|sacos? de lixo|s\.?(p\/)?lixo|multiuso|vassoura|esponj|filtro|aroma|desinfet|inset|alvejante|\bveja\b|pano|toalha p|toalha tropolino|toalha u|toalha pa|toalha\b|port sabao|\brodo\b|estopa|\bpa de metal/],
+    ['Papelaria', /caneta|lousa|livro|caderno|lapis/],
+    ['Eletrônicos e Acessórios', /pilha|carregad|lampada|rayovac|bateria/]
+  ];
+  for(var i=0;i<R.length;i++){ if(R[i][1].test(d)) return R[i][0]; }
+  return 'Utensílios';
 }
 function gLocal(c){
   var m={'Proteínas':'Geladeira','Frios e Embutidos':'Geladeira','Laticínios':'Geladeira',
@@ -1789,7 +1837,7 @@ async function pgRes(){
     var pMap={};
     notas.forEach(function(n){ var c=normPagto(n.forma_pagamento); if(!pMap[c])pMap[c]={forma:c,qtd:0,total:0}; pMap[c].qtd++; pMap[c].total+=Number(n.valor_total)||0; });
 
-    var mesesOrd=Object.keys(mMap).sort();
+    var mesesOrd=Object.keys(mMap).sort(cmpMes);
     var mAtual = mesesOrd.length? mMap[mesesOrd[mesesOrd.length-1]] : null;
     var mAnt   = mesesOrd.length>1? mMap[mesesOrd[mesesOrd.length-2]] : null;
     var pctChange=function(atual,ant){ return ant?((atual-ant)/ant*100):null; };
@@ -1799,7 +1847,7 @@ async function pgRes(){
     var trendTribI  = (mAtual&&mAnt)? pctChange(mAtual.tribImpresso,mAnt.tribImpresso) : null;
 
     _res={totais:totais,tribSefaz:tribSefaz,tribImpresso:tribImpresso,porNota:porNota,
-      porMes:Object.values(mMap).sort(function(a,b){return a.mes>b.mes?1:-1;}).slice(-24),
+      porMes:Object.values(mMap).sort(function(a,b){return cmpMes(a.mes,b.mes);}).slice(-24),
       porAno:Object.values(aMap).sort(function(a,b){return a.ano>b.ano?1:-1;}),
       pagamentos:Object.values(pMap).sort(function(a,b){return b.qtd-a.qtd;})};
 
@@ -1875,7 +1923,7 @@ async function pgComp(){
       por[k].d[m]=(por[k].d[m]||0)+(Number(n.valor_total)||0);
       por[k].tot+=Number(n.valor_total)||0;
     });
-    var meses=[...new Set(notas.map(function(n){return mesStr(n.data_emissao);}))].sort().slice(-10);
+    var meses=[...new Set(notas.map(function(n){return mesStr(n.data_emissao);}))].sort(cmpMes).slice(-10);
     var estabs=Object.values(por).sort(function(a,b){return b.tot-a.tot;}).slice(0,5);
     var tots=estabs.map(function(e){return e.tot;});
     var totalAll=tots.reduce(function(a,b){return a+b;},0);
