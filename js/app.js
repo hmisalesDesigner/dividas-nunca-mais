@@ -159,7 +159,7 @@ function entrarNFScanner() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('nfscanner-app').style.display = 'flex';
   const f = document.getElementById('nfscanner-frame');
-  if (!f.getAttribute('src')) f.setAttribute('src', 'nfscanner.html?v=24.1');
+  if (!f.getAttribute('src')) f.setAttribute('src', 'nfscanner.html?v=24.2');
 }
 function sairNFScanner() {
   document.getElementById('nfscanner-app').style.display = 'none';

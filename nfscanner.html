@@ -159,13 +159,38 @@ tr:hover td{background:var(--bg-hover)}
 .rbadge{font-size:9px;background:#34A853;color:#fff;padding:1px 5px;border-radius:8px;margin-left:5px;vertical-align:middle}
 .dz{border:2px dashed #E0E0E0;border-radius:10px;padding:36px;text-align:center;cursor:pointer}
 .dz:hover{border-color:#1A73E8;background:#EAF2FF}
+
+/* ===== MODO ESCURO: ajustes de componentes ===== */
+[data-theme="dark"] .tm-row:nth-child(even){background:var(--bg-stripe)}
+[data-theme="dark"] .ver-todas:hover{background:var(--bg-stripe)}
+[data-theme="dark"] .tm-badge,[data-theme="dark"] .tbl{background:rgba(66,133,244,.22);color:#8AB4F8}
+[data-theme="dark"] .tgn{background:rgba(52,168,83,.22);color:#81C995}
+[data-theme="dark"] .trd{background:rgba(234,67,53,.22);color:#F28B82}
+[data-theme="dark"] .tyw{background:rgba(251,188,4,.20);color:#FDD663}
+[data-theme="dark"] .tgy{background:rgba(255,255,255,.08);color:#BDC1C6}
+[data-theme="dark"] .ai{background:rgba(66,133,244,.16);color:#8AB4F8}
+[data-theme="dark"] .as{background:rgba(52,168,83,.16);color:#81C995}
+[data-theme="dark"] .ae{background:rgba(234,67,53,.16);color:#F28B82}
+[data-theme="dark"] .aw{background:rgba(251,188,4,.14);color:#FDD663}
+[data-theme="dark"] .aw a.btn,[data-theme="dark"] .aw .btn.bg{color:var(--text-1)}
+[data-theme="dark"] .kpi-ic.ic-b{background:rgba(66,133,244,.20);color:#8AB4F8}
+[data-theme="dark"] .kpi-ic.ic-g{background:rgba(52,168,83,.20);color:#81C995}
+[data-theme="dark"] .kpi-ic.ic-r{background:rgba(234,67,53,.20);color:#F28B82}
+[data-theme="dark"] .rec td{background:rgba(52,168,83,.14)!important}
+[data-theme="dark"] .pill-cat,[data-theme="dark"] .tag-pagto{filter:invert(.9) hue-rotate(180deg) saturate(1.15)}
+[data-theme="dark"] .bell-btn{color:var(--text-1)}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:var(--bg-stripe);color:var(--text-1);border-color:var(--border-c)}
+[data-theme="dark"] ::placeholder{color:var(--text-2);opacity:.8}
+[data-theme="dark"] .card-hd,[data-theme="dark"] h3,[data-theme="dark"] h4{color:var(--text-1)}
+[data-theme="dark"] a{color:#8AB4F8}
+[data-theme="dark"] .btn.bp,[data-theme="dark"] a.btn.bp{color:#fff}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v24.1</p>
+  <p>Notas Fiscais do PR · v24.2</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
@@ -685,12 +710,14 @@ try{
 }catch(e){}
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme', t);
+  try{ if(window.Chart){ Chart.defaults.color = t==='dark' ? '#B8BDC9' : '#5F6368'; Chart.defaults.borderColor = t==='dark' ? 'rgba(255,255,255,.09)' : 'rgba(0,0,0,.08)'; } }catch(e){}
   var btn=g('theme-btn'); if(btn) btn.textContent = t==='dark' ? '☀️' : '🌙';
   localStorage.setItem('nfscanner_theme', t);
 }
 function toggleTheme(){
   var cur = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
   applyTheme(cur);
+  try{ if(window._tabAtual) go(window._tabAtual); }catch(e){}
 }
 
 // ── Modal ────────────────────────────────────────────────────────────
@@ -883,6 +910,7 @@ async function npImportar(){
 }
 
 function go(tab){
+  window._tabAtual = tab;
   killCharts();
   document.querySelectorAll('.nb').forEach(function(b){ b.classList.remove('on'); });
   var nb = document.querySelector('.nb[onclick="go(\''+tab+'\')"]');
@@ -1065,7 +1093,7 @@ var PAGTO_CORES={
 };
 function tagPagto(forma){
   var c=PAGTO_CORES[forma]||{bg:'#ECECEC',txt:'#555'};
-  return '<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;background:'+c.bg+';color:'+c.txt+'">'+esc(forma)+'</span>';
+  return '<span class="tag-pagto" style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;background:'+c.bg+';color:'+c.txt+'">'+esc(forma)+'</span>';
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1074,7 +1102,7 @@ function tagPagto(forma){
 var _notaAtual=null;
 var _bkpRevisao=null;
 function pgImp(){
-  setPage('<div style="max-width:600px"><div class="card" style="padding:22px"><h3 style="margin-bottom:6px">📥 Importar Nota Fiscal</h3><p style="color:#5F6368;font-size:12px;margin-bottom:18px">Salve o HTML da nota do portal sped.fazenda.pr.gov.br e carregue aqui.</p><div class="dz" id="dz" onclick="g(\'fi\').click()" ondragover="event.preventDefault()" ondrop="doDrop(event)"><div style="font-size:40px;margin-bottom:10px">📄</div><div style="font-weight:600;margin-bottom:4px">Clique ou arraste o arquivo HTML</div><div style="color:#5F6368;font-size:12px">Nota do portal SEFAZ-PR</div><input type="file" id="fi" accept=".html" style="display:none" onchange="doFile(this.files[0])"></div><div id="imp-st" style="margin-top:12px"></div></div><div id="imp-rev" style="margin-top:12px"></div></div>');
+  setPage('<div style="max-width:600px"><div class="card" style="padding:22px"><h3 style="margin-bottom:6px">📥 Importar Nota Fiscal</h3><p style="color:var(--text-2);font-size:12px;margin-bottom:18px">Salve o HTML da nota do portal sped.fazenda.pr.gov.br e carregue aqui.</p><div class="dz" id="dz" onclick="g(\'fi\').click()" ondragover="event.preventDefault()" ondrop="doDrop(event)"><div style="font-size:40px;margin-bottom:10px">📄</div><div style="font-weight:600;margin-bottom:4px">Clique ou arraste o arquivo HTML</div><div style="color:var(--text-2);font-size:12px">Nota do portal SEFAZ-PR</div><input type="file" id="fi" accept=".html" style="display:none" onchange="doFile(this.files[0])"></div><div id="imp-st" style="margin-top:12px"></div></div><div id="imp-rev" style="margin-top:12px"></div></div>');
 }
 function doDrop(e){ e.preventDefault(); doFile(e.dataTransfer.files[0]); }
 function doFile(f){
@@ -2039,7 +2067,7 @@ async function pgEst(){
       '<th style="width:28px"><input type="checkbox" onchange="document.querySelectorAll(\'.se\').forEach(function(c){c.checked=this.checked;},this)"></th>'+
       '<th>Produto</th><th>Marca</th><th>Categoria</th><th>Local</th><th>Qtd</th><th>Un</th><th>Validade</th><th>Dias</th><th>Status</th><th></th>'+
       '</tr></thead><tbody id="tb-est"></tbody></table></div>'+
-      '<p style="font-size:11px;color:#5F6368;margin-top:6px">🟢 Verde = importado nos últimos 7 dias | Duplo clique para editar</p>'
+      '<p style="font-size:11px;color:var(--text-2);margin-top:6px">🟢 Verde = importado nos últimos 7 dias | Duplo clique para editar</p>'
     );
     rEst(data||[]);
     window.filtEst=function(){
@@ -2126,7 +2154,7 @@ async function pgDev(){
         var p=d.data_limite?Math.ceil((new Date(String(d.data_limite))-hoje)/86400000):null;
         var ptx=p===null?'—':p<=0?'Vencido':p+'d';
         var pcl=p===null?'tgy':p<=0?'trd':p<=5?'tyw':'tgn';
-        return '<tr><td><strong>'+esc(String(d.estabelecimento||'').substring(0,22))+'</strong></td><td>'+esc(String(d.descricao_item||'').substring(0,28))+'</td><td style="font-weight:600">'+brl(d.valor_item)+'</td><td style="color:#5F6368">'+fmt(d.data_compra)+'</td><td><span class="tag '+pcl+'">'+ptx+'</span></td><td><span class="tag '+(d.status==='Resolvida'?'tgn':'tyw')+'">'+esc(d.status||'Pendente')+'</span></td><td><button class="btn bg bsm" onclick="formDev('+JSON.stringify(d).replace(/"/g,'&quot;')+')">✏️</button></td></tr>';
+        return '<tr><td><strong>'+esc(String(d.estabelecimento||'').substring(0,22))+'</strong></td><td>'+esc(String(d.descricao_item||'').substring(0,28))+'</td><td style="font-weight:600">'+brl(d.valor_item)+'</td><td style="color:var(--text-2)">'+fmt(d.data_compra)+'</td><td><span class="tag '+pcl+'">'+ptx+'</span></td><td><span class="tag '+(d.status==='Resolvida'?'tgn':'tyw')+'">'+esc(d.status||'Pendente')+'</span></td><td><button class="btn bg bsm" onclick="formDev('+JSON.stringify(d).replace(/"/g,'&quot;')+')">✏️</button></td></tr>';
       }).join('')+
       '</tbody></table></div>'
     );
@@ -2160,7 +2188,7 @@ async function pgCad(){
   try{
     var {data} = await sb.from('estabelecimentos').select('*');
     _cad=data||[];
-    function rC(items){ g('tb-cad').innerHTML=items.map(function(e){return '<tr><td><strong>'+esc(e.nome_fantasia||('('+String(e.razao_social||'').substring(0,20)+')'))+' </strong></td><td style="font-family:monospace;font-size:11px;color:#5F6368">'+esc(e.cnpj||'—')+'</td><td style="color:#5F6368;font-size:11px">'+esc(String(e.razao_social||'').substring(0,28))+'</td><td>'+esc(e.cidade||'—')+'</td><td><span class="tag tbl">'+esc(e.categoria||'—')+'</span></td><td>'+esc(e.whatsapp||e.telefone_fixo||'—')+'</td><td style="white-space:nowrap"><button class="btn bg bsm" onclick="formCad('+JSON.stringify(e).replace(/"/g,'&quot;')+')">✏️</button> <button class="btn bd bsm" onclick="delCad('+e.id+')">🗑️</button></td></tr>';}).join(''); }
+    function rC(items){ g('tb-cad').innerHTML=items.map(function(e){return '<tr><td><strong>'+esc(e.nome_fantasia||('('+String(e.razao_social||'').substring(0,20)+')'))+' </strong></td><td style="font-family:monospace;font-size:11px;color:var(--text-2)">'+esc(e.cnpj||'—')+'</td><td style="color:var(--text-2);font-size:11px">'+esc(String(e.razao_social||'').substring(0,28))+'</td><td>'+esc(e.cidade||'—')+'</td><td><span class="tag tbl">'+esc(e.categoria||'—')+'</span></td><td>'+esc(e.whatsapp||e.telefone_fixo||'—')+'</td><td style="white-space:nowrap"><button class="btn bg bsm" onclick="formCad('+JSON.stringify(e).replace(/"/g,'&quot;')+')">✏️</button> <button class="btn bd bsm" onclick="delCad('+e.id+')">🗑️</button></td></tr>';}).join(''); }
     setPage('<div class="tbar"><input type="text" id="q-cad" placeholder="🔍 Filtrar..." oninput="filtCad()" style="width:260px"></div><div class="card"><table><thead><tr><th>Nome Fantasia</th><th>CNPJ</th><th>Razão Social</th><th>Cidade</th><th>Categoria</th><th>Contato</th><th></th></tr></thead><tbody id="tb-cad"></tbody></table></div>');
     rC(data||[]);
     window.filtCad=function(){var q=(v('q-cad')||'').toLowerCase();rC(_cad.filter(function(e){return(e.nome_fantasia||'').toLowerCase().includes(q)||(e.razao_social||'').toLowerCase().includes(q)||(e.cnpj||'').includes(q);}));};
@@ -2203,7 +2231,7 @@ async function pgMarcas(){
           '</div>';
       }).join('');
     }
-    setPage('<div class="tbar"><input type="text" id="q-marc" placeholder="🔍 Filtrar..." oninput="filtMarc()" style="width:240px"><span id="cnt-marc" style="color:#5F6368;font-size:12px">'+(data||[]).length+' marcas</span></div><div id="gd-marc" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px"></div>');
+    setPage('<div class="tbar"><input type="text" id="q-marc" placeholder="🔍 Filtrar..." oninput="filtMarc()" style="width:240px"><span id="cnt-marc" style="color:var(--text-2);font-size:12px">'+(data||[]).length+' marcas</span></div><div id="gd-marc" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px"></div>');
     rM(data||[]);
     window.filtMarc=function(){var q=(v('q-marc')||'').toLowerCase();rM(_marcs.filter(function(m){return String(m.nome||'').toLowerCase().includes(q);}));};
   }catch(e){ err(e); }
@@ -2231,8 +2259,8 @@ async function delMarc(id){ if(!confirm('Excluir?'))return; await sb.from('marca
 function pgBack(){
   setPage(
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:800px">'+
-    '<div class="card" style="padding:24px"><div style="font-size:44px;margin-bottom:12px">💾</div><h3 style="font-size:15px;margin-bottom:8px">Exportar Backup</h3><p style="color:#5F6368;font-size:12px;line-height:1.6;margin-bottom:18px">Exporta todos os dados do Supabase para um arquivo JSON.</p><button class="btn bp" onclick="expBkp()">📥 Baixar backup JSON</button><div id="bkp-st" style="margin-top:10px"></div></div>'+
-    '<div class="card" style="padding:24px"><div style="font-size:44px;margin-bottom:12px">📤</div><h3 style="font-size:15px;margin-bottom:8px">Importar Backup</h3><p style="color:#5F6368;font-size:12px;line-height:1.6;margin-bottom:18px">Restaura dados de um backup JSON (SQLite convertido ou Supabase).</p><input type="file" id="bf" accept=".json" style="display:none" onchange="impBkp(this.files[0])"><button class="btn bg" onclick="g(\'bf\').click()">📂 Selecionar JSON</button><div id="imp-bkp-st" style="margin-top:10px"></div></div>'+
+    '<div class="card" style="padding:24px"><div style="font-size:44px;margin-bottom:12px">💾</div><h3 style="font-size:15px;margin-bottom:8px">Exportar Backup</h3><p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:18px">Exporta todos os dados do Supabase para um arquivo JSON.</p><button class="btn bp" onclick="expBkp()">📥 Baixar backup JSON</button><div id="bkp-st" style="margin-top:10px"></div></div>'+
+    '<div class="card" style="padding:24px"><div style="font-size:44px;margin-bottom:12px">📤</div><h3 style="font-size:15px;margin-bottom:8px">Importar Backup</h3><p style="color:var(--text-2);font-size:12px;line-height:1.6;margin-bottom:18px">Restaura dados de um backup JSON (SQLite convertido ou Supabase).</p><input type="file" id="bf" accept=".json" style="display:none" onchange="impBkp(this.files[0])"><button class="btn bg" onclick="g(\'bf\').click()">📂 Selecionar JSON</button><div id="imp-bkp-st" style="margin-top:10px"></div></div>'+
     '</div>'
   );
 }
