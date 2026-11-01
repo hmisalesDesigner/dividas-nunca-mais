@@ -26,8 +26,11 @@
 
   // ---------- Leitura do Extrato ----------
   function tituloMes() {
-    const m = document.body.innerText.match(/NOTAS DE\s+([A-Z]{3}\/\d{4})/i);
-    return m ? m[1].toUpperCase() : null;
+    const sp = document.getElementById('spanPeriodoId');
+    const box = document.getElementById('notasdomes');
+    const t = sp ? sp.textContent.trim().toUpperCase() : '';
+    if (RE_LABEL.test(t) && (!box || box.style.display !== 'none')) return t;
+    return null;
   }
   function linhasDeNotas() {
     const out = [];
@@ -36,7 +39,7 @@
       const id = (html.match(/idDocFiscal=(\d+)/) || [])[1];
       if (!id) return;
       const tp = (html.match(/tpDoc=(\d)/) || [])[1] || '2';
-      const cels = Array.from(tr.children).map(c => c.innerText.trim());
+      const cels = Array.from(tr.children).map(c => c.textContent.replace(/\s+/g, ' ').trim());
       const txt = cels.join(' | ');
       const cnpj = (txt.match(/\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}/) || [])[0] || '';
       const data = (txt.match(/\d{2}\/\d{2}\/\d{4}/) || [])[0] || '';
@@ -51,26 +54,30 @@
     return out;
   }
   function rotulosDeMes() {
-    const achados = [];
-    document.querySelectorAll('a, td, span').forEach(el => {
-      const t = el.textContent.trim().toUpperCase();
-      if (!RE_LABEL.test(t)) return;
-      if (el.tagName !== 'A' && el.children.length) return;
-      const tr = el.closest('tr');
-      let esperado = null;
-      if (tr && tr.children[1]) esperado = parseInt(tr.children[1].innerText.replace(/\D/g, ''), 10) || null;
-      achados.push({ label: t, el, esperado });
+    const out = [];
+    document.querySelectorAll('#minhasnotas tbody tr').forEach(tr => {
+      const td = tr.children[0]; if (!td) return;
+      const label = td.textContent.trim().toUpperCase();
+      if (!RE_LABEL.test(label)) return;
+      const esperado = parseInt((tr.children[1] ? tr.children[1].textContent : '').replace(/\D/g, ''), 10) || 0;
+      out.push({ label, el: td, esperado });
     });
-    return achados;
+    return out;
   }
-  function paginasResumo() {
-    // links "1 2 3" da paginação (< 1 2 3 >)
-    return Array.from(document.querySelectorAll('a, span')).filter(el => {
-      const t = el.textContent.trim();
-      if (!/^\d{1,2}$/.test(t) || el.children.length) return false;
-      const pai = (el.parentElement && el.parentElement.textContent || '').replace(/\s+/g, ' ').trim();
-      return /^[<‹]?\s*(\d{1,2}\s*)+[>›]?$/.test(pai);
-    });
+  // espera o AJAX trazer as notas do mês clicado
+  async function esperarNotas(label, esperado) {
+    const [mm, aa] = [String(MES.indexOf(label.slice(0, 3)) + 1).padStart(2, '0'), label.slice(4)];
+    let ultimo = -1, estavel = 0;
+    for (let i = 0; i < 60; i++) {
+      await sleep(400);
+      if (tituloMes() !== label) continue;
+      const rows = linhasDeNotas();
+      const doMes = rows.filter(r => r.data.slice(3) === mm + '/' + aa).length;
+      if (rows.length && doMes === rows.length && (!esperado || rows.length >= esperado)) { await sleep(400); return true; }
+      estavel = rows.length === ultimo ? estavel + 1 : 0; ultimo = rows.length;
+      if (rows.length && doMes === rows.length && estavel >= 4) return true;
+    }
+    return false;
   }
 
   // ---------- Limpeza de dados pessoais ----------
@@ -113,35 +120,25 @@
   }
   async function passo() {
     let d = await get(); const run = d.run; if (!run) return;
-    const minIdx = run.incremental ? idxMes(MES[new Date(d.lastSync).getMonth()] + '/' + new Date(d.lastSync).getFullYear()) - 1 : -1;
-    for (let guard = 0; guard < 80 && !cancelado; guard++) {
-      run.passos++;
-      await sleep(600);
-      const atual = tituloMes();
-      if (atual && !run.feitos.includes(atual)) {
-        const linhas = linhasDeNotas();
-        let novas = 0;
-        linhas.forEach(n => { if (!d.notas[n.id]) { d.notas[n.id] = Object.assign({ mes: atual, importado: false, html: '' }, n); novas++; } });
-        run.feitos.push(atual);
-        msg('Mês ' + atual + ': ' + linhas.length + ' notas (' + novas + ' novas)');
-        await set(d);
-      }
-      // próximo mês ainda não visitado
-      const meses = rotulosDeMes();
-      meses.forEach(m => { if (m.esperado) run.esperado[m.label] = m.esperado; });
-      const alvo = meses.find(m => !run.feitos.includes(m.label));
-      if (alvo) {
-        if (idxMes(alvo.label) < minIdx) { run.feitos.push(alvo.label); continue; }
-        await set(d);
-        alvo.el.click();
-        if (!(await esperarMes(alvo.label, 12000))) { msg('Aguardando página de ' + alvo.label + '...'); }
-        d = await get(); d.run = d.run || run; Object.assign(d.run, run);
-        continue;
-      }
-      // próxima página da lista de meses
-      const pg = paginasResumo().find(el => !run.paginas.includes(el.textContent.trim()));
-      if (pg) { run.paginas.push(pg.textContent.trim()); await set(d); pg.click(); await sleep(1500); continue; }
-      break;
+    const ult = d.lastSync ? new Date(d.lastSync) : null;
+    const minIdx = run.incremental && ult ? idxMes(MES[ult.getMonth()] + '/' + ult.getFullYear()) - 1 : -1;
+    const meses = rotulosDeMes();
+    for (const m of meses) { run.esperado[m.label] = m.esperado; }
+    for (let k = 0; k < meses.length && !cancelado; k++) {
+      const m = meses[k];
+      if (run.feitos.includes(m.label)) continue;
+      if (!m.esperado || idxMes(m.label) < minIdx) { run.feitos.push(m.label); continue; }
+      msg('Abrindo ' + m.label + ' (' + (k + 1) + '/' + meses.length + ')...');
+      await set(d);
+      m.el.click();
+      const ok = await esperarNotas(m.label, m.esperado);
+      if (!ok) { msg('Não carregou ' + m.label + '. Pulando.'); run.feitos.push(m.label); continue; }
+      const linhas = linhasDeNotas(); let novas = 0;
+      d = await get(); d.run = d.run || run; Object.assign(d.run, run);
+      linhas.forEach(n => { if (!d.notas[n.id]) { d.notas[n.id] = Object.assign({ mes: m.label, importado: false, html: '' }, n); novas++; } });
+      run.feitos.push(m.label); d.run = run;
+      msg(m.label + ': ' + linhas.length + ' de ' + m.esperado + ' notas (' + novas + ' novas)');
+      await set(d);
     }
     await detalhes();
   }
@@ -177,6 +174,7 @@
 
   // ---------- Início ----------
   async function init() {
+    if (!/\/nfprweb\/Extrato/i.test(location.pathname)) return;
     criarPainel();
     const d = await get();
     const dias = d.lastSync ? Math.floor((Date.now() - d.lastSync) / 86400000) : 999;

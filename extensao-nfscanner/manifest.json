@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NFScanner – Nota Paraná",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Coleta suas notas fiscais no Nota Paraná e envia para o NFScanner (Dívidas Nunca Mais).",
   "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["https://notaparana.pr.gov.br/*"],
