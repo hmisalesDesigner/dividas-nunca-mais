@@ -153,3 +153,15 @@ function removerExemplosExpirados() {
   });
   if (DB.dividas.length < antes) agendarSync();
 }
+
+// ===== NFSCANNER (site separado em iframe) =====
+function entrarNFScanner() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('nfscanner-app').style.display = 'flex';
+  const f = document.getElementById('nfscanner-frame');
+  if (!f.getAttribute('src')) f.setAttribute('src', 'nfscanner.html');
+}
+function sairNFScanner() {
+  document.getElementById('nfscanner-app').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+}

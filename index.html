@@ -101,6 +101,9 @@
       <a href="#" class="nav-item" onclick="navigateTo('configuracoes', this)">
         <span class="nav-icon">⚙️</span><span class="nav-label">Configurações</span>
       </a>
+      <a href="#" class="nav-item nav-nfscanner" onclick="entrarNFScanner()" style="margin-top:auto;">
+        <span class="nav-icon">🧾</span><span class="nav-label">NFScanner</span>
+      </a>
     </nav>
     <div class="sidebar-footer">
       <a href="#" class="nav-item nav-beneficios" onclick="entrarBeneficios()" style="position:relative;">
@@ -184,6 +187,13 @@
 <script src="js/beneficios.js"></script>
 <script src="js/app.js"></script>
 <!-- ===== MEUS BENEFÍCIOS SITE ===== -->
+<div id="nfscanner-app" style="display:none;flex-direction:column;height:100vh;background:#0f1117;">
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;background:#161922;border-bottom:1px solid #2a2f3d;">
+    <button onclick="sairNFScanner()" style="background:#2a2f3d;color:#e5e7eb;border:0;border-radius:8px;padding:8px 14px;cursor:pointer;">← Voltar</button>
+    <strong style="color:#e5e7eb;">🧾 NFScanner</strong>
+  </div>
+  <iframe id="nfscanner-frame" style="flex:1;border:0;width:100%;" title="NFScanner"></iframe>
+</div>
 <div id="beneficios-app" style="display:none;flex-direction:column;height:100vh;background:#f3f4f6;">
 
   <!-- Header verde -->
