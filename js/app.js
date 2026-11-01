@@ -165,3 +165,11 @@ function sairNFScanner() {
   document.getElementById('nfscanner-app').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
 }
+
+function atualizarNFScanner() {
+  const f = document.getElementById('nfscanner-frame');
+  const b = document.getElementById('nfs-refresh');
+  if (b) { b.textContent = '⏳ Atualizando...'; b.disabled = true; }
+  f.onload = () => { if (b) { b.textContent = '🔄 Atualizar'; b.disabled = false; } };
+  f.setAttribute('src', 'nfscanner.html?v=24.2&t=' + Date.now());
+}
