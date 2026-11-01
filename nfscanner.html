@@ -206,13 +206,17 @@ tr:hover td{background:var(--bg-hover)}
 h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2)}
 .stabs{flex-wrap:wrap}
 @media(max-width:900px){.g2{grid-template-columns:1fr}.g2>.ch-h,.g2>.ch,.g2>.card{height:340px!important}.kpis{grid-template-columns:repeat(2,1fr)}.minis{grid-template-columns:repeat(2,1fr)}}
+.tk-tipos{margin-top:8px;padding-top:8px;border-top:1px solid var(--border-c);display:flex;flex-direction:column;gap:3px}
+.tk-row{display:flex;justify-content:space-between;font-size:calc(11.5px * var(--fs,1));color:var(--text-2)}
+.tk-row b{color:var(--text-1);font-weight:600}
+.tk-row small{opacity:.8}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.2</p>
+  <p>Notas Fiscais do PR · v25.3</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1378,6 +1382,13 @@ function pgAuditoria(){
     bloco('🧩','Itens com valor zerado',a.itensZerados,'Pode ser brinde ou erro de leitura.',function(i){return '<tr><td colspan="4">'+esc(i.descricao)+'</td></tr>';})+
     bloco('🔗','Itens ou estoque sem nota correspondente',a.itensOrfaos.concat(a.estoqueOrfao),'Registros que apontam para uma nota que não existe mais.',function(i){return '<tr><td colspan="4">'+esc(i.descricao||'')+'</td></tr>';}));
 }
+function ticketPorTipo(notas){
+  var m={}; (notas||[]).forEach(function(n){ var t=n.tipo_loja||'Outro'; var o=m[t]=m[t]||{t:t,q:0,v:0}; o.q++; o.v+=Number(n.valor_total)||0; });
+  var arr=Object.values(m).sort(function(a,b){return b.v-a.v;});
+  var top=arr.slice(0,4), resto=arr.slice(4);
+  if(resto.length){ var o={t:'Demais',q:0,v:0}; resto.forEach(function(x){o.q+=x.q;o.v+=x.v;}); top.push(o); }
+  return '<div class="tk-tipos">'+top.map(function(x){ return '<div class="tk-row"><span>'+esc(x.t)+' <small>('+x.q+')</small></span><b>'+brl(x.q?x.v/x.q:0)+'</b></div>'; }).join('')+'</div>';
+}
 
 function go(tab){
   window._tabAtual = tab;
@@ -1514,7 +1525,7 @@ async function pgDash(){
       '<div class="kpis">'+
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-b">'+ICONS.wallet+'</div><div class="l2">Total Gasto</div></div><div class="v2">'+brl(totalGasto)+'</div>'+trendHtml(trendGasto,false)+'</div>'+
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-g">'+ICONS.percent+'</div><div class="l2">Total Economizado</div></div><div class="v2" style="color:#34A853">'+brl(totalDesc)+'</div>'+trendHtml(trendDesc,true)+'</div>'+
-      '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-b">'+ICONS.receipt+'</div><div class="l2">Ticket Médio</div></div><div class="v2">'+brl(ticketMedio)+'</div>'+trendHtml(trendTicket,false)+'</div>'+
+      '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-b">'+ICONS.receipt+'</div><div class="l2">Ticket Médio</div></div><div class="v2">'+brl(ticketMedio)+'</div>'+trendHtml(trendTicket,false)+ticketPorTipo(notas)+'</div>'+
       '<div class="kpi"><div class="kpi-top"><div class="kpi-ic ic-r">'+ICONS.filetxt+'</div><div class="l2">Tributos</div></div><div class="v2" style="color:#EA4335">'+brl(totalTribut)+'</div>'+trendHtml(trendTribut,false)+'</div>'+
       '</div>'+
       '<div class="g2">'+
