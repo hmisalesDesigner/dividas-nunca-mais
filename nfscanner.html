@@ -212,7 +212,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.0</p>
+  <p>Notas Fiscais do PR · v25.1</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -226,6 +226,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
   <div class="ng">Gestão</div>
   <button class="nb" onclick="go('importar')">📥 Importar Nota</button>
   <button class="nb" onclick="go('np')">🧾 Nota Paraná</button>
+  <button class="nb" onclick="go('buscar')">🔎 Buscar Nota</button>
   <button class="nb" onclick="go('estoque')">📦 Estoque</button>
   <button class="nb" onclick="go('lista')">🛒 Lista de Compras</button>
   <button class="nb" id="nb-dev" onclick="go('devolucoes')">↩️ Devoluções</button>
@@ -777,7 +778,7 @@ function closeMo(){ g('modal').style.display='none'; }
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -824,7 +825,7 @@ function parseNFe(html){
   }
   var estab=lab('Nome / Ra')||'Não identificado', cnpj=lab('CNPJ');
   var chave=lab('Chave de Acesso').replace(/\s+/g,'');
-  var dm=lab('Data de Emiss').match(/\d{2}\/\d{2}\/\d{4}/); var data=dm?dm[0]:'';
+  var dm=lab('Data de Emiss').match(/\d{2}\/\d{2}\/\d{4}/); var data=dm?dm[0]:''; var hm=lab('Data de Emiss').match(/\d{2}\/\d{2}\/\d{4}[\s\S]{0,6}?(\d{2}:\d{2})/); var hora=hm?hm[1]:'';
   var cidadeRaw=lab('Munic'); var cidade=cidadeRaw.indexOf('-')>=0?norm(cidadeRaw.split('-').slice(1).join('-')):cidadeRaw;
   var endr=lab('Endere').split(','); var rua=norm(endr[0]), num=norm(String(endr[1]||'').replace(/[^\dA-Za-z\/ -]/g,' '));
   var bairro=lab('Bairro'), estado=lab('UF');
@@ -847,7 +848,7 @@ function parseNFe(html){
       marca:(prodRef&&prodRef.marca)||gMarca(desc),categoria:(prodRef&&prodRef.categoria)||gCat(desc),local:''});
   });
   itens.forEach(function(it){ if(!it.local) it.local=gLocal(it.categoria); });
-  return {chave:chave,estabelecimento:estab,cnpj:cnpj,dataEmissao:data,rua:rua,numero:num,bairro:bairro,cidade:cidade,estado:estado,
+  return {chave:chave,estabelecimento:estab,cnpj:cnpj,dataEmissao:data,hora:hora,rua:rua,numero:num,bairro:bairro,cidade:cidade,estado:estado,
     valorTotal:tot,descontoTotal:desc_,tributosSefaz:trib,tributosImpresso:trib,formaPagamento:forma,itens:itens};
 }
 
@@ -916,7 +917,7 @@ async function npImportarNota(n){
   if(r.data) return 'dup';
   var tipo=classificarLoja(d.estabelecimento, d.cnpj);
   var ins=await sb.from('notas_fiscais').insert({
-    chave_acesso:chave, data_emissao:d.dataEmissao, estabelecimento:d.estabelecimento, cnpj:d.cnpj,
+    chave_acesso:chave, data_emissao:d.dataEmissao, hora_emissao:d.hora||'', estabelecimento:d.estabelecimento, cnpj:d.cnpj,
     valor_total:d.valorTotal, desconto_total:d.descontoTotal, tributos_total:d.tributosImpresso,
     tributos_sefaz:d.tributosSefaz, tributos_impressos:d.tributosImpresso, forma_pagamento:d.formaPagamento,
     origem:'notaparana', np_id:n.id, np_credito:n.credito, np_situacao:n.situacao, tipo_loja:tipo
@@ -1212,6 +1213,45 @@ async function abrirItem(k){
     '<button class="btn bg" onclick="closeMo()">Fechar</button><button class="btn bs" onclick="addItemLista(\''+esc(x.key).replace(/'/g,"\\'")+'\');closeMo()">🛒 Adicionar à lista</button>');
 }
 
+// ── Buscar nota importada ──
+var _bn={chave:'',data:'',hora:'',valor:'',tol:'0'};
+function pgBuscar(){
+  setActs('');
+  setPage('<div class="alert ai">🔎 Confira se uma nota já foi importada. Preencha um ou mais campos: a busca combina todos.</div>'+
+    '<div class="card" style="padding:16px;margin-bottom:14px"><div class="fr">'+
+    '<div class="fg" style="flex:2"><label>Chave de acesso (44 dígitos ou parte dela)</label><input id="bn-chave" value="'+esc(_bn.chave)+'" placeholder="4126 0776 4304..." oninput="bnRun()"></div>'+
+    '<div class="fg"><label>Data</label><input id="bn-data" type="date" value="'+esc(_bn.data)+'" oninput="bnRun()"></div>'+
+    '<div class="fg"><label>Hora (HH:MM)</label><input id="bn-hora" type="time" value="'+esc(_bn.hora)+'" oninput="bnRun()"></div>'+
+    '<div class="fg"><label>Valor total (R$)</label><input id="bn-valor" value="'+esc(_bn.valor)+'" placeholder="0,00" inputmode="decimal" oninput="bnRun()"></div>'+
+    '<div class="fg"><label>Tolerância</label><select id="bn-tol" onchange="bnRun()"><option value="0">exato</option><option value="1">± R$ 1</option><option value="5">± R$ 5</option><option value="10">± R$ 10</option></select></div>'+
+    '</div><div style="margin-top:8px"><button class="btn bg bsm" onclick="bnLimpar()">Limpar</button></div></div>'+
+    '<div id="bn-res"></div>');
+  g('bn-tol').value=_bn.tol; bnRun();
+}
+function bnLimpar(){ _bn={chave:'',data:'',hora:'',valor:'',tol:'0'}; pgBuscar(); }
+async function bnRun(){
+  _bn.chave=v('bn-chave'); _bn.data=v('bn-data'); _bn.hora=v('bn-hora'); _bn.valor=v('bn-valor'); _bn.tol=v('bn-tol')||'0';
+  var res=g('bn-res'); if(!res) return;
+  var ch=_bn.chave.replace(/\D/g,''), val=_bn.valor?brNum(_bn.valor):null, tol=parseFloat(_bn.tol)||0;
+  var dataBR=_bn.data?_bn.data.split('-').reverse().join('/'):'';
+  if(!ch&&!dataBR&&!_bn.hora&&val===null){ res.innerHTML='<div class="empty"><div class="empty-i">🔎</div><p>Preencha algum campo para buscar.</p></div>'; return; }
+  var r=await sb.from('notas_fiscais').select('*'); var notas=r.data||[];
+  var sem=0;
+  var ok=notas.filter(function(n){
+    if(ch && String(n.chave_acesso||'').replace(/\D/g,'').indexOf(ch)<0) return false;
+    if(dataBR && String(n.data_emissao||'').substring(0,10)!==dataBR) return false;
+    if(_bn.hora){ if(!n.hora_emissao){ sem++; return false; } if(n.hora_emissao!==_bn.hora) return false; }
+    if(val!==null){ var t=Number(n.valor_total)||0; if(Math.abs(t-val)>tol+0.004) return false; }
+    return true;
+  });
+  var msg=_bn.hora&&sem?'<div class="alert aw">⏱️ '+sem+' nota(s) não têm hora registrada (importadas antes desta versão). A hora é guardada nas próximas importações; por ora combine data e valor.</div>':'';
+  if(!ok.length){ res.innerHTML=msg+'<div class="alert ae">❌ Nenhuma nota encontrada. Provavelmente ainda não foi importada.</div>'; return; }
+  var ri=await sb.from('itens').select('nota_id'); var qi={}; (ri.data||[]).forEach(function(i){qi[i.nota_id]=(qi[i.nota_id]||0)+1;});
+  ok.sort(function(a,b){return (nfsDt(b.data_emissao)||0)-(nfsDt(a.data_emissao)||0);});
+  res.innerHTML=msg+'<div class="alert as">✅ '+ok.length+' nota(s) já importada(s).</div><div class="card"><div class="scr"><table><thead><tr><th>Data</th><th>Hora</th><th>Estabelecimento</th><th style="text-align:right">Valor</th><th style="text-align:center">Itens</th><th>Chave de acesso</th></tr></thead><tbody>'+
+    ok.slice(0,100).map(function(n){return '<tr><td>'+esc(fmt(n.data_emissao))+'</td><td>'+esc(n.hora_emissao||'—')+'</td><td style="font-weight:600">'+esc(n.estabelecimento||'')+'</td><td style="text-align:right;font-weight:600">'+brl(n.valor_total)+'</td><td style="text-align:center">'+(qi[n.id]||0)+'</td><td style="font-family:monospace;font-size:11px;white-space:normal;word-break:break-all">'+esc(n.chave_acesso||'')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+}
+
 function go(tab){
   window._tabAtual = tab;
   killCharts();
@@ -1223,7 +1263,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,periodos:pgPeriodos,onde:pgOnde,itens:pgItens}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,periodos:pgPeriodos,onde:pgOnde,itens:pgItens}[tab];
   npAtualizarBanner();
   if(fn) fn();
 }
