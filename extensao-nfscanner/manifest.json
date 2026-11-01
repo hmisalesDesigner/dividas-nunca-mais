@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "NFScanner – Nota Paraná",
+  "version": "1.0.0",
+  "description": "Coleta suas notas fiscais no Nota Paraná e envia para o NFScanner (Dívidas Nunca Mais).",
+  "permissions": ["storage", "unlimitedStorage"],
+  "host_permissions": ["https://notaparana.pr.gov.br/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://notaparana.pr.gov.br/nfprweb/*"],
+      "js": ["sync.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://hmisalesdesigner.github.io/dividas-nunca-mais/*"],
+      "js": ["bridge.js"],
+      "all_frames": true,
+      "run_at": "document_start"
+    }
+  ]
+}

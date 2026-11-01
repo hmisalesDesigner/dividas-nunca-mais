@@ -1,0 +1,16 @@
+NFScanner – Nota Paraná (extensão do Chrome)
+
+INSTALAR (uma vez)
+1. Descompacte esta pasta.
+2. No Chrome abra chrome://extensions e ligue "Modo do desenvolvedor".
+3. Clique em "Carregar sem compactação" e escolha a pasta extensao-nfscanner.
+
+USAR
+1. Entre no Nota Paraná (login normal) e abra o Extrato.
+2. Aparece o painel "NFScanner – Nota Paraná" no canto inferior direito.
+   Clique em "Sincronizar agora" (ou espere a contagem automática, 1x por dia).
+3. No NFScanner (aba "Nota Paraná"), clique em "Importar".
+
+PRIVACIDADE
+- CPF, nome e endereço do consumidor são removidos antes de guardar.
+- Nenhuma senha é lida. Tudo fica no seu navegador e no seu Drive.

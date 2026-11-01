@@ -134,6 +134,7 @@ tr:hover td{background:var(--bg-hover)}
 .ai{background:#EAF2FF;color:#1557b0;border-color:#1A73E8}
 .as{background:#E6F4EA;color:#1e7e34;border-color:#34A853}
 .ae{background:#fce8e6;color:#c0392b;border-color:#EA4335}
+.aw{background:#fff8e1;color:#8a5a00;border-color:#FBBC04}
 .empty{text-align:center;padding:60px 20px;color:var(--text-2)}
 .empty-i{font-size:48px;margin-bottom:12px}
 .tbar{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap}
@@ -174,6 +175,7 @@ tr:hover td{background:var(--bg-hover)}
   <div class="sep"></div>
   <div class="ng">Gestão</div>
   <button class="nb" onclick="go('importar')">📥 Importar Nota</button>
+  <button class="nb" onclick="go('np')">🧾 Nota Paraná</button>
   <button class="nb" onclick="go('estoque')">📦 Estoque</button>
   <button class="nb" onclick="go('lista')">🛒 Lista de Compras</button>
   <button class="nb" id="nb-dev" onclick="go('devolucoes')">↩️ Devoluções</button>
@@ -187,6 +189,7 @@ tr:hover td{background:var(--bg-hover)}
 
 <div id="main">
   <div id="bar"><h2 id="title">Dashboard</h2><div style="display:flex;align-items:center;gap:14px"><span id="sync-st" class="sync-dot sync-syncing" title="Sincronizando..."></span><button id="theme-btn" class="theme-btn" onclick="toggleTheme()" aria-label="Alternar tema">🌙</button><div id="acts"></div></div></div>
+  <div id="np-banner"></div>
   <div id="page"><div class="spin"></div></div>
 </div>
 
@@ -664,7 +667,181 @@ function closeMo(){ g('modal').style.display='none'; }
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná'};
+
+// ══════════════════════════════════════════════════════════════════
+// NOTA PARANÁ (sincronização via extensão do Chrome)
+// ══════════════════════════════════════════════════════════════════
+var NP_URL = 'https://notaparana.pr.gov.br/nfprweb/Extrato';
+function brNum(s){ s=String(s||'').replace(/[^\d.,-]/g,''); if(!s) return 0; return parseFloat(s.replace(/\./g,'').replace(',','.'))||0; }
+
+function classificarLoja(nome, cnpj){
+  var n=' '+String(nome||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')+' ';
+  var c=String(cnpj||'').replace(/\D/g,'').substring(0,8);
+  if(c==='00776574') return 'Loja de departamento';
+  var R=[
+    ['Farmácia', /farmac|drog|raia|pague menos|panvel|nissei|onofre|ultrafarma/],
+    ['Petshop', /\bpet\b|petshop|pet shop|racoes|agropecuar|veterin|cobasi|petz/],
+    ['Posto', /posto|combustiv|petroleo|ipiranga|\bshell\b/],
+    ['Padaria', /padaria|panificadora|confeitaria/],
+    ['Açougue', /acougue|frigorific/],
+    ['Construção', /mater\.? ?(de )?constr|material|constr|madeireira|ferragen|tintas|cimento/],
+    ['Móveis', /moveis|colchoes|eletrodomest/],
+    ['Vestuário', /confec|vestuario|calcad|boutique|roupas|acessorios|moda /],
+    ['Loja de departamento', /americanas|riachuelo|renner|\bc&a\b|magazine|casas bahia|havan|marisa|leroy/],
+    ['Atacado', /atacad|assai|makro|atacarejo/],
+    ['Supermercado', /supermerc|mercado|mercantil|hiper|muffato|condor|carrefour|angeloni|bistek|sulamericana|pao de acucar|brilhante|molicenter|distribuidora/]
+  ];
+  for(var i=0;i<R.length;i++){ if(R[i][1].test(n)) return R[i][0]; }
+  return 'Outro';
+}
+var LOJAS_ALIMENTO = ['Supermercado','Atacado','Padaria','Açougue','Farmácia','Petshop'];
+
+function parseNFe(html){
+  var doc=new DOMParser().parseFromString(html,'text/html');
+  function norm(s){ return String(s||'').replace(/[\s� ]+/g,' ').trim(); }
+  function lab(label, root, any){
+    var ls=(root||doc).querySelectorAll('label'), alvo=label.toLowerCase();
+    for(var i=0;i<ls.length;i++){
+      var tx=norm(ls[i].textContent).toLowerCase();
+      if(any ? tx.indexOf(alvo)>=0 : tx.indexOf(alvo)===0){
+        var sp=ls[i].parentNode.querySelector('span'); if(sp) return norm(sp.textContent);
+      }
+    }
+    return '';
+  }
+  var estab=lab('Nome / Ra')||'Não identificado', cnpj=lab('CNPJ');
+  var chave=lab('Chave de Acesso').replace(/\s+/g,'');
+  var dm=lab('Data de Emiss').match(/\d{2}\/\d{2}\/\d{4}/); var data=dm?dm[0]:'';
+  var cidadeRaw=lab('Munic'); var cidade=cidadeRaw.indexOf('-')>=0?norm(cidadeRaw.split('-').slice(1).join('-')):cidadeRaw;
+  var endr=lab('Endere').split(','); var rua=norm(endr[0]), num=norm(String(endr[1]||'').replace(/[^\dA-Za-z\/ -]/g,' '));
+  var bairro=lab('Bairro'), estado=lab('UF');
+  var tot=brNum(lab('Valor Total da NFe')||lab('Valor Total da Nota'));
+  var desc_=brNum(lab('Valor Total dos Descontos'));
+  var trib=brNum(lab('Valor Aproximado dos Tributos'));
+  var forma='';
+  var cob=doc.getElementById('aba_nft_6');
+  if(cob){ var tg=cob.querySelector('table.toggle span:nth-of-type(1)'); var sps=cob.querySelectorAll('table.toggle td span'); if(sps.length>1) forma=norm(sps[1].textContent).replace(/^\d+\s*-\s*/,''); }
+  var itens=[];
+  doc.querySelectorAll('#Prod table.toggle').forEach(function(t){
+    var d=t.querySelector('.fixo-prod-serv-descricao span'); if(!d) return;
+    var q=t.querySelector('.fixo-prod-serv-qtd span'), u=t.querySelector('.fixo-prod-serv-uc span'), vb=t.querySelector('.fixo-prod-serv-vb span');
+    var det=t.nextElementSibling;
+    var vu=det?brNum(lab('comercializ',det,true)):0, ncm=det?lab('ncm',det,true):'';
+    var desc=norm(d.textContent), qtd=brNum(q?q.textContent:'1')||1, vt=brNum(vb?vb.textContent:'0');
+    var match=matchProduto(desc), prodRef=match?produtoPorNome(match.nome):null;
+    itens.push({descricao:match?match.nome:sugerirNomeLimpo(desc),descricaoOriginal:desc,descricaoSugerida:match?match.nome:null,confirmado:false,
+      quantidade:qtd,unidade:u?norm(u.textContent):'un',valorUnitario:vu||(qtd?vt/qtd:0),valorTotal:vt,ncm:ncm,
+      marca:(prodRef&&prodRef.marca)||gMarca(desc),categoria:(prodRef&&prodRef.categoria)||gCat(desc),local:''});
+  });
+  itens.forEach(function(it){ if(!it.local) it.local=gLocal(it.categoria); });
+  return {chave:chave,estabelecimento:estab,cnpj:cnpj,dataEmissao:data,rua:rua,numero:num,bairro:bairro,cidade:cidade,estado:estado,
+    valorTotal:tot,descontoTotal:desc_,tributosSefaz:trib,tributosImpresso:trib,formaPagamento:forma,itens:itens};
+}
+
+// ---- Comunicação com a extensão ----
+var _npReq = 0;
+function npPedir(type, extra, timeoutMs){
+  return new Promise(function(resolve){
+    var id = ++_npReq, done=false;
+    function on(ev){
+      if(ev.source!==window || !ev.data || ev.data.source!=='nfs-extension' || ev.data.reqId!==id) return;
+      done=true; window.removeEventListener('message', on); resolve(ev.data);
+    }
+    window.addEventListener('message', on);
+    window.postMessage(Object.assign({source:'nfscanner-app', type:type, reqId:id}, extra||{}), '*');
+    setTimeout(function(){ if(!done){ window.removeEventListener('message', on); resolve(null); } }, timeoutMs||1500);
+  });
+}
+
+function npDiasDesdeSync(){
+  var ult=parseInt(localStorage.getItem('nfs_last_sync')||'0',10);
+  return ult ? Math.floor((Date.now()-ult)/86400000) : null;
+}
+function npAtualizarBanner(){
+  var el=g('np-banner'); if(!el) return;
+  var prazo=parseInt(localStorage.getItem('nfs_prazo_dias')||'7',10)||7, dias=npDiasDesdeSync();
+  if(dias!==null && dias<prazo){ el.innerHTML=''; return; }
+  var txt = dias===null ? 'O NFScanner ainda não foi atualizado com o Nota Paraná.' : 'Faz '+dias+' dias que o NFScanner não é atualizado com o Nota Paraná.';
+  el.innerHTML='<div class="alert aw" style="margin:0 0 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span>🧾 '+txt+'</span>'+
+    '<a class="btn bp bsm" href="'+NP_URL+'" target="_blank" rel="noopener">Atualizar no Nota Paraná</a>'+
+    '<button class="btn bg bsm" onclick="go(\'np\')">Importar notas coletadas</button></div>';
+}
+
+async function pgNP(){
+  setPage('<div id="np-box"><div class="spin"></div></div>');
+  var st = await npPedir('NFS_PING');
+  var dias = npDiasDesdeSync();
+  var h='';
+  if(!st){
+    h='<div class="alert aw">Extensão do NFScanner não detectada neste navegador.</div>'+
+      '<div class="card" style="max-width:640px"><h3>Instalar a extensão (uma vez)</h3><ol style="line-height:1.9;padding-left:20px">'+
+      '<li>Baixe a pasta <b>extensao-nfscanner</b> do repositório e descompacte.</li>'+
+      '<li>No Chrome, abra <b>chrome://extensions</b> e ligue o <b>Modo do desenvolvedor</b>.</li>'+
+      '<li>Clique em <b>Carregar sem compactação</b> e escolha a pasta.</li>'+
+      '<li>Recarregue esta página.</li></ol></div>';
+  } else {
+    h='<div class="card" style="max-width:720px"><h3>🧾 Nota Paraná</h3>'+
+      '<p style="margin:8px 0">Última coleta: <b>'+(st.lastSync?new Date(st.lastSync).toLocaleString('pt-BR'):'nunca')+'</b>'+(dias!==null?' ('+dias+' dia(s) atrás)':'')+'</p>'+
+      '<p style="margin:8px 0">Notas coletadas: <b>'+st.total+'</b> · Aguardando importação: <b id="np-pend">'+st.pendentes+'</b></p>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">'+
+      '<a class="btn bg" href="'+NP_URL+'" target="_blank" rel="noopener">🔗 Abrir Nota Paraná e coletar</a>'+
+      '<button class="btn bp" id="np-imp" onclick="npImportar()"'+(st.pendentes?'':' disabled')+'>📥 Importar '+st.pendentes+' nota(s)</button></div>'+
+      '<div id="np-log" style="margin-top:16px"></div></div>';
+  }
+  setPage('<div id="np-box">'+h+'</div>');
+}
+
+async function npImportarNota(n){
+  var d = /id="Prod"|Consulta da NF-e/.test(n.html) ? parseNFe(n.html) : parseNF(n.html);
+  if(n.data) d.dataEmissao=n.data;
+  if(!d.cnpj) d.cnpj=n.cnpj;
+  if(!d.estabelecimento||d.estabelecimento==='Não identificado') d.estabelecimento=n.estabelecimento;
+  if(!d.valorTotal) d.valorTotal=n.valor;
+  d.formaPagamento=d.formaPagamento||'Não informado';
+  var chave=d.chave||('NP'+n.id);
+  var r=await sb.from('notas_fiscais').select('id').eq('chave_acesso', chave).maybeSingle();
+  if(r.data) return 'dup';
+  var tipo=classificarLoja(d.estabelecimento, d.cnpj);
+  var ins=await sb.from('notas_fiscais').insert({
+    chave_acesso:chave, data_emissao:d.dataEmissao, estabelecimento:d.estabelecimento, cnpj:d.cnpj,
+    valor_total:d.valorTotal, desconto_total:d.descontoTotal, tributos_total:d.tributosImpresso,
+    tributos_sefaz:d.tributosSefaz, tributos_impressos:d.tributosImpresso, forma_pagamento:d.formaPagamento,
+    origem:'notaparana', np_id:n.id, np_credito:n.credito, np_situacao:n.situacao, tipo_loja:tipo
+  }).select().single();
+  if(ins.error) throw ins.error;
+  var alimento = LOJAS_ALIMENTO.indexOf(tipo)>=0;
+  d.itens.forEach(function(it){ if(!alimento) it.categoria=tipo; });
+  await sb.from('itens').insert(d.itens.map(function(it){ return {nota_id:ins.data.id, descricao:it.descricao, marca:it.marca,
+    quantidade:it.quantidade, unidade:it.unidade, valor_unitario:it.valorUnitario, valor_total:it.valorTotal,
+    categoria:it.categoria, local:it.local, ncm:it.ncm||''}; }));
+  await autoEstab(d);
+  if(alimento) await syncProdutosFromItens(d.itens);
+  return 'ok';
+}
+async function npImportar(){
+  var btn=g('np-imp'), log=g('np-log'); if(btn) btn.disabled=true;
+  var ok=0, dup=0, falhas=[], total=0;
+  try{
+    while(true){
+      var lote=await npPedir('NFS_GET_PENDING',{limit:30},8000);
+      if(!lote || !lote.notas || !lote.notas.length) break;
+      var ids=[];
+      for(var i=0;i<lote.notas.length;i++){
+        var n=lote.notas[i]; total++;
+        log.innerHTML='<div class="alert ai">⏳ Importando nota '+total+'...</div>';
+        try{ var r=await npImportarNota(n); if(r==='dup') dup++; else ok++; ids.push(n.id); }
+        catch(e){ falhas.push(n.estabelecimento+' #'+n.numero+': '+(e.message||e)); ids.push(n.id); }
+      }
+      await npPedir('NFS_MARK_IMPORTED',{ids:ids},8000);
+    }
+    try{ localStorage.setItem('nfs_last_import', String(Date.now())); }catch(e){}
+    scheduleDriveSave();
+    log.innerHTML='<div class="alert as">✅ '+ok+' nota(s) importada(s)'+(dup?', '+dup+' já existiam':'')+(falhas.length?', '+falhas.length+' com erro':'')+'.</div>'+
+      (falhas.length?'<div class="alert ae" style="margin-top:8px">'+falhas.map(esc).join('<br>')+'</div>':'');
+    npAtualizarBanner();
+  }catch(e){ log.innerHTML='<div class="alert ae">Erro: '+esc(e.message||String(e))+'</div>'; }
+}
 
 function go(tab){
   killCharts();
@@ -676,7 +853,8 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP}[tab];
+  npAtualizarBanner();
   if(fn) fn();
 }
 
@@ -1120,7 +1298,7 @@ function parseNF(html){
   }
   var itens=[];
   doc.querySelectorAll('#tabResult tr').forEach(function(row){
-    var de=row.querySelector('span.txtTit'); if(!de)return;
+    var de=row.querySelector('span.txtTit, span.txtTit2'); if(!de)return;
     var qe=row.querySelector('span.Rqtd');
     var ue=row.querySelector('span.RUN');
     var vue=row.querySelector('span.RvlUnit');
@@ -1132,7 +1310,7 @@ function parseNF(html){
     var match=matchProduto(desc);
     var prodRef=match?produtoPorNome(match.nome):null;
     itens.push({descricao:match?match.nome:sugerirNomeLimpo(desc),descricaoOriginal:desc,descricaoSugerida:match?match.nome:null,confirmado:false,
-      quantidade:qtd,unidade:ue?ue.textContent.trim():'un',
+      quantidade:qtd,unidade:ue?ue.textContent.replace(/^\s*UN:\s*/i,'').trim():'un',
       valorUnitario:pR(vue?vue.textContent:'0'),valorTotal:pR(vte?vte.textContent:'0'),
       marca:(prodRef&&prodRef.marca)||gMarca(desc),categoria:(prodRef&&prodRef.categoria)||gCat(desc),local:''});
   });
@@ -1140,14 +1318,14 @@ function parseNF(html){
   var tn=doc.getElementById('totalNota');
   if(tn){
     tn.querySelectorAll('[id="linhaTotal"]').forEach(function(l){
-      var ss=l.querySelectorAll('span'); if(ss.length<2)return;
-      var lb=ss[0].textContent.toLowerCase().replace(/\s+/g,' ').trim();
-      var val=parseFloat(ss[ss.length-1].textContent.replace(',','.'))||0;
+      var lbEl=l.querySelector('label'), ss=l.querySelectorAll('span'); if(!lbEl||!ss.length)return;
+      var lb=lbEl.textContent.toLowerCase().replace(/\s+/g,' ').trim();
+      var val=parseFloat(ss[ss.length-1].textContent.replace(/\./g,'').replace(',','.'))||0;
       if(lb.includes('valor total'))tot=val;
       else if(lb.includes('desconto'))desc_=val;
       else if(lb.includes('pagar'))pagar=val;
       else if(lb.includes('tributo')||lb.includes('12.741'))trib=val;
-      else if(!forma&&val>0)forma=ss[0].textContent.trim();
+      else if(!forma&&lbEl.classList.contains('tx'))forma=lbEl.textContent.replace(/\s+/g,' ').trim();
     });
   }
   itens.forEach(function(it){if(!it.local)it.local=gLocal(it.categoria);});
@@ -1274,7 +1452,7 @@ async function autoEstab(d){
   var {data:exist} = await sb.from('estabelecimentos').select('id').eq('cnpj', d.cnpj).maybeSingle();
   if(!exist){
     await sb.from('estabelecimentos').insert({nome_fantasia:'', cnpj:d.cnpj, razao_social:d.estabelecimento,
-      rua:d.rua, numero:d.numero, bairro:d.bairro, cidade:d.cidade, estado:d.estado, categoria:'Supermercado'});
+      rua:d.rua, numero:d.numero, bairro:d.bairro, cidade:d.cidade, estado:d.estado, categoria:classificarLoja(d.estabelecimento,d.cnpj)});
   } else {
     await sb.from('estabelecimentos').update({razao_social:d.estabelecimento}).eq('id', exist.id);
   }
@@ -1947,7 +2125,7 @@ function formCad(e){
     '<div class="fg"><label>Razão Social</label><input id="crs" value="'+esc(e.razao_social||'')+'"></div>'+
     '<div class="fr"><div class="fg"><label>Rua</label><input id="crua" value="'+esc(e.rua||'')+'"></div><div class="fg"><label>Número</label><input id="cnum" value="'+esc(e.numero||'')+'"></div></div>'+
     '<div class="fr"><div class="fg"><label>Bairro</label><input id="cbairro" value="'+esc(e.bairro||'')+'"></div><div class="fg"><label>Cidade</label><input id="ccid" value="'+esc(e.cidade||'')+'"></div><div class="fg"><label>UF</label><input id="cuf" value="'+esc(e.estado||'PR')+'" style="max-width:60px"></div></div>'+
-    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Padaria','Atacado','Açougue','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
+    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Petshop','Padaria','Atacado','Açougue','Posto','Loja de departamento','Construção','Móveis','Vestuário','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
     '<button class="btn bg" onclick="closeMo()">Cancelar</button><button class="btn bs" onclick="salvCad('+(e.id||0)+')">💾 Salvar</button>'
   );
 }

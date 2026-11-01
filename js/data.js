@@ -331,6 +331,19 @@ function gerarAlertas() {
     tipo: 'green', msg: `🎉 Parabéns! Você já quitou 50% das suas dívidas!`
   });
 
+  // Lembrete: atualizar NFScanner com o Nota Paraná
+  try {
+    const prazo = (DB.usuario && DB.usuario.nfsPrazoDias) || parseInt(localStorage.getItem('nfs_prazo_dias') || '7', 10) || 7;
+    const ult = parseInt(localStorage.getItem('nfs_last_sync') || '0', 10);
+    const link = ' <a href="https://notaparana.pr.gov.br/nfprweb/Extrato" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">Abrir Nota Paraná</a>';
+    if (!ult) {
+      alertas.push({ tipo: 'yellow', msg: '🧾 NFScanner ainda não foi atualizado com o Nota Paraná.' + link });
+    } else {
+      const dias = Math.floor((Date.now() - ult) / 86400000);
+      if (dias >= prazo) alertas.push({ tipo: 'yellow', msg: `🧾 Faz ${dias} dias que o NFScanner não é atualizado.` + link });
+    }
+  } catch (e) {}
+
   return alertas;
 }
 

@@ -44,6 +44,10 @@ function renderConfiguracoes() {
           <label>Alertar quando saldo for menor que (R$)</label>
           <input id="cfg-limite" type="text" value="${formatarMoeda(u.limiteAlerta || 500)}" oninput="formatMoney(this)" />
         </div>
+        <div class="form-group">
+          <label>Lembrar de atualizar o NFScanner a cada (dias)</label>
+          <input id="cfg-nfs-prazo" type="number" min="1" max="60" value="${u.nfsPrazoDias || 7}" />
+        </div>
       </div>
     </div>
 
@@ -134,6 +138,8 @@ function salvarConfiguracoes() {
   DB.usuario.dataNascimento = document.getElementById('cfg-nascimento').value;
   DB.usuario.renda = renda;
   DB.usuario.limiteAlerta = parseMoney(document.getElementById('cfg-limite').value) || 500;
+  DB.usuario.nfsPrazoDias = Math.max(1, parseInt(document.getElementById('cfg-nfs-prazo').value, 10) || 7);
+  try { localStorage.setItem('nfs_prazo_dias', String(DB.usuario.nfsPrazoDias)); } catch (e) {}
 
   // Salva tudo no localStorage
   salvarLocalStorage();
