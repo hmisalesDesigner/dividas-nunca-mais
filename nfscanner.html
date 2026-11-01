@@ -231,7 +231,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.7</p>
+  <p>Notas Fiscais do PR · v25.8</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -818,7 +818,7 @@ function classificarLoja(nome, cnpj){
     ['Automotivo', /auto ?pecas|autopecas|pecas|oficina|pneu|mecanica|funilaria|baterias/],
     ['Posto', /posto|combustiv|petroleo|ipiranga|\bshell\b/],
     ['Gás e Água', /flamagas|gas ltda|comercio de gas|distribuidora de gas|agua mineral/],
-    ['Digital', /multimidia|ebook|e-book|livraria|livros/],
+    ['Digital', /ebook|e-book|livraria|livros/],
     ['Padaria', /padaria|panificadora|confeitaria/],
     ['Açougue', /acougue|frigorific|casa de carnes|carnes/],
     ['Alimentação', /rotisseria|sorveteria|restaurante|lanchonete|pizzaria|churrasc|acai|cafeteria|hamburg|marmit|alimentos ltda/],
@@ -1311,7 +1311,7 @@ function nomeFantasiaDe(razao){
   return s;
 }
 function modeloChave(c){ return String(c||'').substring(20,22); }
-/*ESTAB*/var ESTAB_CONFIRMADOS = {"11517841001916": {"nome": "AMIGÃO Supermercados"},"76430438006536": {"nome": "Max Atacadista Maringá","categoria": "Atacado"},"76189406004032": {"nome": "CONDOR Supermercados"},"04066922000152": {"nome": "Auto Posto Tuiuti","categoria": "Posto"},"53014034000100": {"nome": "BRILHANTE Supermercado"}};
+/*ESTAB*/var ESTAB_CONFIRMADOS = {"11517841001916": {"nome": "AMIGÃO Supermercados Av. Tuiuti"},"76430438006536": {"nome": "Max Atacadista Maringá","categoria": "Atacado"},"76189406004032": {"nome": "CONDOR Supermercados"},"04066922000152": {"nome": "Auto Posto Tuiuti","categoria": "Posto"},"53014034000100": {"nome": "BRILHANTE Supermercado"},"21729338000159": {"nome": "CANAÃ Baby Móveis infantis"},"92665611017819": {"nome": "PANVEL Av. Pedro Taques","categoria": "Farmácia"},"11517841007019": {"nome": "AMIGÃO Supermercados Av. Guaiapó"},"88212113111351": {"nome": "Farmácia São João","categoria": "Farmácia"},"76430438000414": {"nome": "Super Muffato - Av. João Paulino"},"68762038000135": {"nome": "Depósito Champagnat","categoria": "Construção"},"12553602000236": {"nome": "Casa das Baterias Tanno - Sarandi"},"76189406006329": {"nome": "CONDOR Supermercados Av. Kakogawa"},"61585865099506": {"nome": "Droga Raia - Av. Guaiapó"},"40441372000178": {"nome": "Baratão Confecções - Av. Pedro Taques","categoria": "Vestuário"},"47960950009420": {"nome": "Magazine Luiza - Av. Brasil, 3409"},"03473737000110": {"nome": "BOA COMPRA Supermercado"},"79379491003603": {"nome": "HAVAN Av. Horácio Raccanello"},"63490695000157": {"nome": "Inova Fibra Internet","categoria": "Serviços"}};
 function migrarQualidade(){
   var r={unidades:0,cidades:0,fantasia:0,pagamentos:0,tipoLoja:0,itensSemCat:0,descricoes:0,duplicatas:0,estoqueAjustado:0};
   var notas=DB.notas_fiscais||[], itens=DB.itens||[];
@@ -1389,7 +1389,18 @@ function migrarQualidade(){
     var sig=(c.nome||'')+'|'+(c.categoria||'');
     if(ok[String(e.cnpj)]===sig) return;
     if(c.nome) e.nome_fantasia=c.nome;
-    if(c.categoria) e.categoria=c.categoria;
+    if(c.categoria){
+      e.categoria=c.categoria;
+      var cn=String(e.cnpj||'').replace(/\D/g,''), naoAlim=['Posto','Construção','Móveis','Vestuário','Loja de departamento','Automotivo','Alimentação','Digital','Gás e Água','Serviços','Outro','Supermercado','Atacado'];
+      (DB.notas_fiscais||[]).forEach(function(n){
+        if(String(n.cnpj||'').replace(/\D/g,'')!==cn || n.tipo_loja===c.categoria) return;
+        var antigo=n.tipo_loja; n.tipo_loja=c.categoria; r.tipoLoja++;
+        (DB.itens||[]).forEach(function(it){
+          if(it.nota_id!==n.id || it.categoria!==antigo) return;
+          it.categoria=(LOJAS_ALIMENTO.indexOf(c.categoria)>=0 && c.categoria!=='Atacado')?gCat(it.descricao):c.categoria; it.local=gLocal(it.categoria);
+        });
+      });
+    }
     ok[String(e.cnpj)]=sig; r.fantasia++;
   });
   // 4) cadastro de estabelecimentos
@@ -2807,7 +2818,7 @@ function formCad(e){
     '<div class="fg"><label>Razão Social</label><input id="crs" value="'+esc(e.razao_social||'')+'"></div>'+
     '<div class="fr"><div class="fg"><label>Rua</label><input id="crua" value="'+esc(e.rua||'')+'"></div><div class="fg"><label>Número</label><input id="cnum" value="'+esc(e.numero||'')+'"></div></div>'+
     '<div class="fr"><div class="fg"><label>Bairro</label><input id="cbairro" value="'+esc(e.bairro||'')+'"></div><div class="fg"><label>Cidade</label><input id="ccid" value="'+esc(e.cidade||'')+'"></div><div class="fg"><label>UF</label><input id="cuf" value="'+esc(e.estado||'PR')+'" style="max-width:60px"></div></div>'+
-    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Petshop','Padaria','Atacado','Açougue','Posto','Loja de departamento','Construção','Móveis','Vestuário','Alimentação','Gás e Água','Digital','Automotivo','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
+    '<div class="fr"><div class="fg"><label>WhatsApp</label><input id="cwpp" value="'+esc(e.whatsapp||'')+'"></div><div class="fg"><label>Categoria</label><select id="ccat">'+['Supermercado','Farmácia','Petshop','Padaria','Atacado','Açougue','Posto','Loja de departamento','Construção','Móveis','Vestuário','Alimentação','Gás e Água','Digital','Serviços','Automotivo','Outro'].map(function(c){return '<option'+(c===e.categoria?' selected':'')+'>'+c+'</option>';}).join('')+'</select></div></div>',
     '<button class="btn bg" onclick="closeMo()">Cancelar</button><button class="btn bs" onclick="salvCad('+(e.id||0)+')">💾 Salvar</button>'
   );
 }
