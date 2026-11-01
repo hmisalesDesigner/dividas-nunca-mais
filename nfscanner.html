@@ -231,7 +231,7 @@ h4.sec{font-size:calc(12.5px * var(--fs,1));margin:14px 0 6px;color:var(--text-2
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v25.6</p>
+  <p>Notas Fiscais do PR · v25.7</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1311,6 +1311,7 @@ function nomeFantasiaDe(razao){
   return s;
 }
 function modeloChave(c){ return String(c||'').substring(20,22); }
+/*ESTAB*/var ESTAB_CONFIRMADOS = {"11517841001916": {"nome": "AMIGÃO Supermercados"},"76430438006536": {"nome": "Max Atacadista Maringá","categoria": "Atacado"},"76189406004032": {"nome": "CONDOR Supermercados"},"04066922000152": {"nome": "Auto Posto Tuiuti","categoria": "Posto"},"53014034000100": {"nome": "BRILHANTE Supermercado"}};
 function migrarQualidade(){
   var r={unidades:0,cidades:0,fantasia:0,pagamentos:0,tipoLoja:0,itensSemCat:0,descricoes:0,duplicatas:0,estoqueAjustado:0};
   var notas=DB.notas_fiscais||[], itens=DB.itens||[];
@@ -1381,6 +1382,16 @@ function migrarQualidade(){
     }
   });
   (DB.estoque||[]).forEach(function(e){ var u=normUnidade(e.unidade); if(u!==e.unidade){ e.unidade=u; r.unidades++; } });
+  // 3b) nomes e categorias confirmados pelo usuário (aplicados uma única vez por valor)
+  DB._migr=DB._migr||{}; var ok=DB._migr.estab_ok=DB._migr.estab_ok||{};
+  (DB.estabelecimentos||[]).forEach(function(e){
+    var c=ESTAB_CONFIRMADOS[String(e.cnpj||'').replace(/\D/g,'')]; if(!c) return;
+    var sig=(c.nome||'')+'|'+(c.categoria||'');
+    if(ok[String(e.cnpj)]===sig) return;
+    if(c.nome) e.nome_fantasia=c.nome;
+    if(c.categoria) e.categoria=c.categoria;
+    ok[String(e.cnpj)]=sig; r.fantasia++;
+  });
   // 4) cadastro de estabelecimentos
   (DB.estabelecimentos||[]).forEach(function(e){
     var c=normCidade(e.cidade); if(c!==e.cidade){ e.cidade=c; r.cidades++; }
