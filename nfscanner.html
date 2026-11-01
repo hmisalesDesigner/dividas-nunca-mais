@@ -165,7 +165,7 @@ tr:hover td{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR</p>
+  <p>Notas Fiscais do PR · v24.1</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
@@ -220,7 +220,7 @@ var GDRIVE_FILENAME = 'nfscanner-data.json';
 var LS_KEY = 'nfscanner_db_cache';
 var LS_FILEID_KEY = 'nfscanner_drive_file_id';
 
-var DB = {notas_fiscais:[],itens:[],estabelecimentos:[],estoque:[],devolucoes:[],marcas:[],lista_compras:[],configuracoes:[],_seq:{}};
+var DB = {notas_fiscais:[],itens:[],estabelecimentos:[],estoque:[],devolucoes:[],marcas:[],lista_compras:[],configuracoes:[],_migr:{},_seq:{}};
 var CORES=['#1A73E8','#34A853','#FBBC04','#EA4335','#9C27B0','#FF6F00'];
 document.addEventListener('DOMContentLoaded', function(){
   if(typeof Chart !== 'undefined'){
