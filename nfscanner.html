@@ -238,7 +238,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.3</p>
+  <p>Notas Fiscais do PR · v26.4</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1454,7 +1454,8 @@ function auditarDados(){
   out.valorZero=notas.filter(function(n){return okN(n) && !Number(n.valor_total);});
   var ids={}; notas.forEach(function(n){ids[n.id]=1;});
   out.itensOrfaos=itens.filter(function(i){return !ids[i.nota_id];});
-  out.itensZerados=itens.filter(function(i){return !Number(i.valor_total);});
+  var conf={}; notas.forEach(function(n){ if(NOTAS_CONFERIDAS[n.chave_acesso]) conf[n.id]=1; });
+  out.itensZerados=itens.filter(function(i){return !conf[i.nota_id] && !Number(i.valor_total);});
   var g1={}; notas.forEach(function(n){ var k=[String(n.cnpj||'').replace(/\D/g,''),n.data_emissao,Number(n.valor_total).toFixed(2)].join('#'); (g1[k]=g1[k]||[]).push(n); });
   out.suspeitas=Object.values(g1).filter(function(a){return a.length>1;});
   var cn={}; (DB.estabelecimentos||[]).forEach(function(e){ cn[String(e.cnpj||'').replace(/\D/g,'')]=1; });
