@@ -238,12 +238,13 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.6</p>
+  <p>Notas Fiscais do PR · v27.0</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
   <button class="nb" onclick="go('onde')">🎯 Onde Gasto</button>
   <button class="nb" onclick="go('itens')">💲 Itens e Preços</button>
+  <button class="nb" onclick="go('insights')">🧠 Insights</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
   <button class="nb" onclick="go('resumo')">📋 Resumo Financeiro</button>
   <button class="nb" onclick="go('comparativos')">📉 Comparativos</button>
@@ -807,7 +808,7 @@ function closeMo(){ g('modal').style.display='none'; var mb=document.querySelect
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços',insights:'Insights'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -1187,6 +1188,90 @@ async function pgOnde(){
 }
 
 var _itens={q:'',cat:'',ord:'vezes',lim:150,dados:null};
+/* ===== Insights: cruzamento de dados ===== */
+function insBar(p,cor){ return '<div style="background:var(--bg-3,#2a2a2a);border-radius:4px;height:8px;min-width:80px"><div style="width:'+Math.max(2,Math.min(100,p))+'%;height:8px;border-radius:4px;background:'+(cor||'var(--accent,#4CAF50)')+'"></div></div>'; }
+function insTab(tit,sub,cab,linhas){
+  return '<div class="card" style="margin-bottom:16px"><div class="ch-h"><h3>'+tit+'</h3></div>'+(sub?'<p style="color:var(--text-2);font-size:12px;margin:0 0 8px">'+sub+'</p>':'')+
+    '<div class="scr"><table><thead><tr>'+cab.map(function(c,i){return '<th'+(i?' style="text-align:right"':'')+'>'+c+'</th>';}).join('')+'</tr></thead><tbody>'+linhas.join('')+'</tbody></table></div></div>';
+}
+async function pgInsights(){
+  setActs('');
+  try{
+    var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*');
+    var notas=rn.data||[], itens=ri.data||[], porId={}; notas.forEach(function(n){porId[n.id]=n;});
+    var grupos=nfsAgrupaItens(itens,porId);
+    var norm=function(s){return String(s||'').trim();};
+    // 1) onde comprar mais barato
+    var barato=[];
+    grupos.forEach(function(g){
+      var un=g.unidade, lojas={};
+      g.pontos.forEach(function(p){ if(p.vu>0 && p.un===un){ var l=lojas[p.loja]=lojas[p.loja]||{loja:p.loja,q:0,t:0,n:0}; l.q+=p.q; l.t+=p.vt||p.vu*p.q; l.n++; } });
+      var arr=Object.values(lojas).filter(function(l){return l.q>0;}); if(arr.length<2) return;
+      arr.forEach(function(l){l.m=l.t/l.q;});
+      var tot=arr.reduce(function(s,l){return s+l.t;},0), q=arr.reduce(function(s,l){return s+l.q;},0);
+      var melhor=arr.slice().sort(function(a,b){return a.m-b.m;})[0], usual=arr.slice().sort(function(a,b){return b.q-a.q;})[0];
+      var eco=Math.max(0,tot-melhor.m*q);
+      if(eco<1) return;
+      barato.push({g:g,melhor:melhor,usual:usual,eco:eco,lojas:arr.length,medio:tot/q});
+    });
+    barato.sort(function(a,b){return b.eco-a.eco;});
+    var ecoTotal=barato.reduce(function(s,x){return s+x.eco;},0);
+    // 2) evolução de preços
+    var evo=[];
+    grupos.forEach(function(g){
+      var p=g.pontos.filter(function(x){return x.vu>0 && x.d && x.un===g.unidade;}); if(p.length<3) return;
+      var dias=(p[p.length-1].d-p[0].d)/86400000; if(dias<60) return;
+      var k=Math.max(1,Math.floor(p.length/3));
+      var med=function(a){return a.reduce(function(s,x){return s+x.vu;},0)/a.length;};
+      var ini=med(p.slice(0,k)), fim=med(p.slice(-k)); if(!ini) return;
+      var gasto=g.total;
+      evo.push({g:g,ini:ini,fim:fim,v:(fim/ini-1)*100,gasto:gasto,n:p.length,dias:dias});
+    });
+    var sobem=evo.filter(function(x){return x.v>0;}).sort(function(a,b){return b.v-a.v;});
+    var caem=evo.filter(function(x){return x.v<0;}).sort(function(a,b){return a.v-b.v;});
+    var pesoT=evo.reduce(function(s,x){return s+x.gasto;},0);
+    var inflPessoal=pesoT?evo.reduce(function(s,x){return s+x.v*x.gasto;},0)/pesoT:0;
+    var linhaItem=function(x,extra){ return '<tr class="clk" onclick="abrirItem(\''+esc(x.g.key)+'\',true)"><td>'+esc(x.g.nome)+'</td>'+extra+'</tr>'; };
+    // 3) perfil de gasto
+    var dsem=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'], sem=dsem.map(function(){return {n:0,t:0};});
+    var pag={}, fx={ini:{n:0,t:0},meio:{n:0,t:0},fim:{n:0,t:0}}, cruz={}, formas={};
+    notas.forEach(function(n){
+      var d=nfsDt(n.data_emissao), v=Number(n.valor_total)||0; if(!d) return;
+      sem[d.getDay()].n++; sem[d.getDay()].t+=v;
+      var f=normPagto(n.forma_pagamento)||'Não informado'; var o=pag[f]=pag[f]||{n:0,t:0}; o.n++; o.t+=v;
+      var dd=d.getDate(), b=dd<=10?fx.ini:dd<=20?fx.meio:fx.fim; b.n++; b.t+=v;
+      var tl=n.tipo_loja||'Outro'; (cruz[tl]=cruz[tl]||{})[f]=((cruz[tl]||{})[f]||0)+v; formas[f]=1;
+    });
+    var totalGeral=notas.reduce(function(s,n){return s+(Number(n.valor_total)||0);},0)||1;
+    var maxSem=Math.max.apply(null,sem.map(function(x){return x.t;}))||1;
+    var linSem=sem.map(function(x,i){ return '<tr><td>'+dsem[i]+'</td><td style="text-align:right">'+x.n+'</td><td style="text-align:right">'+brl(x.t)+'</td><td style="text-align:right">'+brl(x.n?x.t/x.n:0)+'</td><td>'+insBar(x.t/maxSem*100)+'</td></tr>'; });
+    var linPag=Object.keys(pag).sort(function(a,b){return pag[b].t-pag[a].t;}).map(function(f){ var o=pag[f]; return '<tr><td>'+esc(f)+'</td><td style="text-align:right">'+o.n+'</td><td style="text-align:right">'+brl(o.t)+'</td><td style="text-align:right">'+brl(o.t/o.n)+'</td><td>'+insBar(o.t/totalGeral*100)+' <small>'+(o.t/totalGeral*100).toFixed(1)+'%</small></td></tr>'; });
+    var nomesFx={ini:'Dias 1–10',meio:'Dias 11–20',fim:'Dias 21–31'};
+    var linFx=Object.keys(fx).map(function(k){ var o=fx[k]; return '<tr><td>'+nomesFx[k]+'</td><td style="text-align:right">'+o.n+'</td><td style="text-align:right">'+brl(o.t)+'</td><td style="text-align:right">'+brl(o.n?o.t/o.n:0)+'</td><td>'+insBar(o.t/totalGeral*100)+' <small>'+(o.t/totalGeral*100).toFixed(1)+'%</small></td></tr>'; });
+    var fl=Object.keys(formas).sort(function(a,b){return (pag[b]||{t:0}).t-(pag[a]||{t:0}).t;});
+    var linCruz=Object.keys(cruz).sort(function(a,b){var s=function(k){return Object.values(cruz[k]).reduce(function(x,y){return x+y;},0);};return s(b)-s(a);}).map(function(tl){
+      var tot=Object.values(cruz[tl]).reduce(function(x,y){return x+y;},0);
+      return '<tr><td>'+esc(tl)+'</td>'+fl.map(function(f){var v=cruz[tl][f]||0;return '<td style="text-align:right">'+(v?brl(v)+' <small>('+(v/tot*100).toFixed(0)+'%)</small>':'—')+'</td>';}).join('')+'<td style="text-align:right"><b>'+brl(tot)+'</b></td></tr>';
+    });
+    var kp=function(ic,lb,val,sub){ return nfsKpi(ic,lb,val,sub); };
+    var html='<div class="kg" style="margin-bottom:16px">'+
+      kp('ic-g','Economia potencial',brl(ecoTotal),barato.length+' itens vendidos mais caro na sua loja usual')+
+      kp('ic-r','Inflação pessoal',(inflPessoal>=0?'+':'')+inflPessoal.toFixed(1)+'%',evo.length+' itens com histórico, ponderado pelo gasto')+
+      kp('ic-b','Itens que subiram',String(sobem.length),'e '+caem.length+' que caíram')+'</div>';
+    html+=insTab('🏷️ Onde comprar mais barato','Itens comprados em 2+ lojas (mesma unidade). Economia = quanto sairia a menos se todas as unidades fossem compradas no preço médio da loja mais barata.',
+      ['Item','Loja mais barata','Preço lá','Sua loja usual','Preço lá','Economia'],
+      barato.slice(0,40).map(function(x){ return linhaItem(x,'<td style="text-align:right">'+esc(x.melhor.loja)+'</td><td style="text-align:right">'+brl(x.melhor.m)+'</td><td style="text-align:right">'+esc(x.usual.loja)+'</td><td style="text-align:right">'+brl(x.usual.m)+'</td><td style="text-align:right"><b>'+brl(x.eco)+'</b></td>'); }));
+    var evoCab=['Item','Preço antes','Preço agora','Variação','Compras'];
+    var evoLin=function(x){ return linhaItem(x,'<td style="text-align:right">'+brl(x.ini)+'</td><td style="text-align:right">'+brl(x.fim)+'</td><td style="text-align:right;color:'+(x.v>0?'#ef5350':'#66bb6a')+'"><b>'+(x.v>0?'+':'')+x.v.toFixed(1)+'%</b></td><td style="text-align:right">'+x.n+'</td>'); };
+    html+=insTab('📈 Itens que mais subiram','Média do primeiro terço das compras vs. último terço (itens com 3+ compras em 60+ dias).',evoCab,sobem.slice(0,25).map(evoLin));
+    html+=insTab('📉 Itens que mais caíram','',evoCab,caem.slice(0,25).map(evoLin));
+    html+=insTab('📅 Dia da semana','Quando você mais gasta.',['Dia','Notas','Total','Ticket médio',''],linSem);
+    html+=insTab('🗓️ Ao longo do mês','Concentração dos gastos por faixa do mês.',['Faixa','Notas','Total','Ticket médio','% do gasto'],linFx);
+    html+=insTab('💳 Forma de pagamento','',['Forma','Notas','Total','Ticket médio','% do gasto'],linPag);
+    html+=insTab('🔀 Tipo de loja × pagamento','Quanto você paga em cada forma, por tipo de loja.',['Tipo de loja'].concat(fl).concat(['Total']),linCruz);
+    setPage(html);
+  }catch(e){ err(e); }
+}
 async function pgItens(){
   setActs('');
   try{
@@ -1627,7 +1712,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,itens:pgItens}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,itens:pgItens,insights:pgInsights}[tab];
   npAtualizarBanner();
   if(fn) fn();
 }
