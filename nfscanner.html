@@ -238,7 +238,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.2</p>
+  <p>Notas Fiscais do PR · v26.3</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1438,12 +1438,20 @@ function migrarQualidade(){
 }
 
 // ── Auditoria (somente leitura): o que ainda merece conferência ──
+var NOTAS_CONFERIDAS={
+ '41251268762038000135650010000127491530500003':'Conferida pelo usuário',
+ '41260568762038000135650010000128321530500001':'Conferida pelo usuário',
+ '41260668762038000135650010000128441530500006':'Conferida pelo usuário',
+ '41261092665611017819651000000981421601705113':'Conferida pelo usuário (farmácia)',
+ '41260113092125000211550010003276401861453229':'Brinde na troca de óleo (valor zero)'
+};
 function auditarDados(){
   var notas=DB.notas_fiscais||[], itens=DB.itens||[], out={};
+  var okN=function(n){return !NOTAS_CONFERIDAS[n.chave_acesso];};
   var soma={}, qtd={}; itens.forEach(function(i){ soma[i.nota_id]=(soma[i.nota_id]||0)+(Number(i.valor_total)||0); qtd[i.nota_id]=(qtd[i.nota_id]||0)+1; });
-  out.divergentes=notas.filter(function(n){ return qtd[n.id] && Math.abs((soma[n.id]||0)-(Number(n.desconto_total)||0)-(Number(n.valor_total)||0))>0.05; }).map(function(n){ return {n:n,itens:soma[n.id]||0}; });
-  out.semItens=notas.filter(function(n){return !qtd[n.id];});
-  out.valorZero=notas.filter(function(n){return !Number(n.valor_total);});
+  out.divergentes=notas.filter(function(n){ return okN(n) && qtd[n.id] && Math.abs((soma[n.id]||0)-(Number(n.desconto_total)||0)-(Number(n.valor_total)||0))>0.05; }).map(function(n){ return {n:n,itens:soma[n.id]||0}; });
+  out.semItens=notas.filter(function(n){return okN(n) && !qtd[n.id];});
+  out.valorZero=notas.filter(function(n){return okN(n) && !Number(n.valor_total);});
   var ids={}; notas.forEach(function(n){ids[n.id]=1;});
   out.itensOrfaos=itens.filter(function(i){return !ids[i.nota_id];});
   out.itensZerados=itens.filter(function(i){return !Number(i.valor_total);});
