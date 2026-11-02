@@ -238,7 +238,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.5</p>
+  <p>Notas Fiscais do PR · v26.6</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -447,7 +447,7 @@ function migrarCategoriasV1(){
   var SEM_CAT=['','Utensílios','Outro',null,undefined];
   var nfs={}, mudNotas=0, mudItens=0, mudEst=0, mudProd=0;
   (DB.notas_fiscais||[]).forEach(function(n){
-    var novo=classificarLoja(n.estabelecimento, n.cnpj);
+    var novo=classificarLoja((n.estabelecimento_original||n.estabelecimento), n.cnpj);
     if(n.tipo_loja!==novo){ n.tipo_loja=novo; mudNotas++; }
     nfs[n.id]=novo;
   });
@@ -1361,7 +1361,7 @@ function migrarQualidade(){
   }
   // 2) notas: tipo de loja e forma de pagamento
   notas.forEach(function(n){
-    if(!n.tipo_loja){ n.tipo_loja=classificarLoja(n.estabelecimento,n.cnpj); r.tipoLoja++; }
+    if(!n.tipo_loja){ n.tipo_loja=classificarLoja((n.estabelecimento_original||n.estabelecimento),n.cnpj); r.tipoLoja++; }
     var f=n.forma_pagamento, nf=f;
     if(/^\d+$/.test(String(f||'').trim())) nf='Não informado';
     else { var np=normPagto(f); if(np!=='Outros') nf=np; }
@@ -1382,7 +1382,7 @@ function migrarQualidade(){
   var tipoCnpj={};
   notas.forEach(function(n){
     if(n.tipo_loja!=='Outro') return;
-    var t=classificarLoja(n.estabelecimento,n.cnpj);
+    var t=classificarLoja((n.estabelecimento_original||n.estabelecimento),n.cnpj);
     if(t==='Outro') t=tipoPorItens(porNota2[n.id]||[]);
     if(t!=='Outro'){ n.tipo_loja=t; r.tipoLoja++; tipoCnpj[String(n.cnpj||'').replace(/\D/g,'')]=t; }
   });
@@ -1431,6 +1431,15 @@ function migrarQualidade(){
     Object.keys(ESTAB_CONFIRMADOS).forEach(function(cn){ var c=ESTAB_CONFIRMADOS[cn]; if(c.categoria) syncTipoNotas(cn,c.categoria,r); });
     DB._migr.estab_notas_v2=Date.now(); r.tipoLoja++;
   }
+  // 3d) nome das notas = nome fantasia do cadastro (mantém o original da nota)
+  var fantasiaPorCnpj={}; (DB.estabelecimentos||[]).forEach(function(e){ if(e.nome_fantasia) fantasiaPorCnpj[String(e.cnpj||'').replace(/\D/g,'')]=e.nome_fantasia; });
+  var trocas={};
+  notas.forEach(function(n){
+    var f=fantasiaPorCnpj[String(n.cnpj||'').replace(/\D/g,'')]; if(!f || n.estabelecimento===f) return;
+    if(!n.estabelecimento_original) n.estabelecimento_original=n.estabelecimento;
+    trocas[n.estabelecimento_original]=f; n.estabelecimento=f; r.fantasia++;
+  });
+  (DB.devolucoes||[]).forEach(function(d){ var f=trocas[d.estabelecimento]; if(f) d.estabelecimento=f; });
   // 4) cadastro de estabelecimentos
   (DB.estabelecimentos||[]).forEach(function(e){
     if(String(e.numero)==='NaN'||String(e.numero)==='undefined'){ e.numero=''; r.cidades++; }
