@@ -238,7 +238,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.4</p>
+  <p>Notas Fiscais do PR · v26.5</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1203,10 +1203,16 @@ async function pgItens(){
     rItens();
   }catch(e){ err(e); }
 }
+function bscNorm(s){return String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();}
+function bscMatch(q,txt){
+  var ws=bscNorm(q).split(' ').filter(Boolean); if(!ws.length) return true;
+  var t=' '+bscNorm(txt);
+  return ws.every(function(w){ if(w.length>3) w=w.replace(/(es|s)$/,''); return t.indexOf(w)>=0; });
+}
 function rItens(){
   var q=normProdName(_itens.q||''), d=(_itens.dados||[]).filter(function(x){
     if(_itens.cat && x.categoria!==_itens.cat) return false;
-    return !q || normProdName(x.nome+' '+x.marca).indexOf(q)>=0;
+    return bscMatch(_itens.q, x.nome+' '+x.marca+' '+(x.categoria||'')+' '+(x.descricoes||[]).join(' '));
   });
   var o=_itens.ord;
   d.sort(function(a,b){
@@ -2750,7 +2756,7 @@ function rEstCards(){
   var hoje=new Date(), q=(_estF.q||'').toLowerCase();
   var diasDe=function(it){ var val=it.validade?new Date(String(it.validade).substring(0,10)):null; return val&&!isNaN(val)?Math.ceil((val-hoje)/86400000):null; };
   var lista=_est.filter(function(i){
-    return (!q||String(i.descricao||'').toLowerCase().includes(q)||String(i.marca||'').toLowerCase().includes(q))&&(!_estF.c||i.categoria===_estF.c)&&(!_estF.l||i.local===_estF.l)&&(!_estF.s||(i.status||'disponivel')===_estF.s);
+    return bscMatch(_estF.q,(i.descricao||'')+' '+(i.marca||'')+' '+(i.categoria||''))&&(!_estF.c||i.categoria===_estF.c)&&(!_estF.l||i.local===_estF.l)&&(!_estF.s||(i.status||'disponivel')===_estF.s);
   });
   var disp=_est.filter(function(i){return (i.status||'disponivel')==='disponivel';});
   var venc=disp.filter(function(i){var d=diasDe(i);return d!==null&&d<=5;}).length;
