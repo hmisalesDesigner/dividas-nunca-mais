@@ -238,7 +238,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v26.0</p>
+  <p>Notas Fiscais do PR · v26.1</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1229,20 +1229,23 @@ async function addItemLista(k){
   await sb.from('lista_compras').insert({descricao:x.nome,marca:x.marca||'',quantidade:1,unidade:'un',prioridade:'Normal',preco_estimado:Math.round(x.medio*100)/100});
   alert('🛒 "'+x.nome+'" adicionado à lista de compras (preço médio '+brl(x.medio)+').');
 }
-async function abrirItem(k){
+async function abrirItem(k,doDrill){
   if(!_itens.dados){ var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*'); var porId={}; (rn.data||[]).forEach(function(n){porId[n.id]=n;}); _itens.dados=nfsAgrupaItens(ri.data||[],porId); }
   var x=itemPorChave(k); if(!x) return;
   var lojas={}; x.pontos.forEach(function(p){ var l=lojas[p.loja]=lojas[p.loja]||{loja:p.loja,min:1e12,soma:0,q:0,n:0}; if(p.vu>0&&p.vu<l.min) l.min=p.vu; l.soma+=p.vt; l.q+=p.q; l.n++; });
   var lj=Object.values(lojas).sort(function(a,b){return a.min-b.min;});
   var fmtD=function(d){return d?nfsPad(d.getDate())+'/'+nfsPad(d.getMonth()+1)+'/'+d.getFullYear():'—';};
   var st=function(l,v,c){return '<div class="mini"><div class="mini-l">'+l+'</div><div class="mini-v"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div></div>';};
+  var voltar=(doDrill&&typeof _dr!=='undefined'&&_dr&&_dr.view);
+  if(voltar){ _dr.hist.push(drSnap()); _dr.view={k:'item'}; }
   openMo('💲 '+esc(x.nome),
     '<div class="minis">'+st('Comprado',x.vezes+'×')+st('Total pago',brl(x.total))+st('Mínimo',brl(x.min),'#34A853')+st('Médio',brl(x.medio))+st('Máximo',brl(x.max),'#EA4335')+st('Último',brl(x.ultimo))+'</div>'+
     '<h4 class="sec">Por loja</h4><table><thead><tr><th>Loja</th><th style="text-align:right">Menor preço</th><th style="text-align:right">Preço médio</th><th style="text-align:center">Compras</th></tr></thead><tbody>'+
     lj.slice(0,8).map(function(l){return '<tr><td>'+esc(String(l.loja).substring(0,30))+'</td><td style="text-align:right;color:#34A853">'+brl(l.min===1e12?0:l.min)+'</td><td style="text-align:right">'+brl(l.q?l.soma/l.q:0)+'</td><td style="text-align:center">'+l.n+'</td></tr>';}).join('')+'</tbody></table>'+
     '<h4 class="sec">Histórico de compras</h4><div class="scr" style="max-height:220px"><table><thead><tr><th>Data</th><th>Loja</th><th style="text-align:right">Qtd</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>'+
     x.pontos.slice().reverse().slice(0,40).map(function(p){return '<tr><td>'+fmtD(p.d)+'</td><td>'+esc(String(p.loja).substring(0,26))+'</td><td style="text-align:right">'+String(Math.round(p.q*100)/100).replace('.',',')+'</td><td style="text-align:right">'+brl(p.vu)+'</td><td style="text-align:right">'+brl(p.vt)+'</td></tr>';}).join('')+'</tbody></table></div>',
-    '<button class="btn bg" onclick="closeMo()">Fechar</button><button class="btn bs" onclick="addItemLista(\''+esc(x.key).replace(/'/g,"\\'")+'\');closeMo()">🛒 Adicionar à lista</button>');
+    (voltar?'<button class="btn bg" onclick="drVoltar()">← Voltar</button>':'')+'<button class="btn bg" onclick="closeMo()">Fechar</button><button class="btn bs" onclick="addItemLista(\''+esc(x.key).replace(/'/g,"\\'")+'\');closeMo()">🛒 Adicionar à lista</button>');
+  var mb0=document.querySelector('#modal .mb'); if(mb0) mb0.classList.remove('wide');
 }
 
 // ── Buscar nota importada ──
@@ -1504,29 +1507,33 @@ function drItens(f,notas){
 }
 function drillF(idx){
   var f=_drg[idx]; if(!f) return;
-  _dr={f:f,tab:'itens',ord:'qtd',hist:[]};
+  _dr={f:f,tab:'itens',ord:'qtd',hist:[],view:null};
   if(f.notaId!==undefined){ drNota(f.notaId,true); return; }
   drRender();
 }
-function drPush(f){ _dr.hist.push({f:_dr.f,tab:_dr.tab,ord:_dr.ord,nota:_dr.nota}); _dr.f=f; _dr.tab='itens'; _dr.ord='qtd'; _dr.nota=null; drRender(); }
-function drVoltar(){ var h=_dr.hist.pop(); if(!h) return closeMo(); _dr.f=h.f; _dr.tab=h.tab; _dr.ord=h.ord; _dr.nota=h.nota; if(_dr.nota!==null&&_dr.nota!==undefined) drNota(_dr.nota,false,true); else drRender(); }
+function drSnap(){ var v=_dr.view||{k:'drill'}; return {k:v.k,id:v.id,f:_dr.f,tab:_dr.tab,ord:_dr.ord}; }
+function drPush(f){ _dr.hist.push(drSnap()); _dr.f=f; _dr.tab='itens'; _dr.ord='qtd'; drRender(); }
+function drVoltar(){
+  var h=_dr&&_dr.hist.pop(); if(!h){ closeMo(); return; }
+  _dr.f=h.f; _dr.tab=h.tab; _dr.ord=h.ord;
+  if(h.k==='nota') drNota(h.id,true); else drRender();
+}
 function drAbre(titulo,body,foot){
   openMo(titulo,body,foot);
   var mb=document.querySelector('#modal .mb'); if(mb) mb.classList.add('wide');
 }
-function drNota(id,primeira,semHist){
+function drNota(id,restaura){
   var n=(DB.notas_fiscais||[]).filter(function(x){return x.id===id;})[0]; if(!n) return;
-  if(!semHist && !primeira){ _dr.hist.push({f:_dr.f,tab:_dr.tab,ord:_dr.ord,nota:_dr.nota}); }
-  _dr.nota=id;
+  if(!restaura && _dr.view){ _dr.hist.push(drSnap()); }
+  _dr.view={k:'nota',id:id};
   var em=drEstMap(), its=(DB.itens||[]).filter(function(i){return i.nota_id===id;}).sort(function(a,b){return (Number(b.valor_total)||0)-(Number(a.valor_total)||0);});
   var info=function(l,v){return '<div class="mini"><div class="mini-l">'+l+'</div><div class="mini-v" style="font-size:calc(13px * var(--fs,1));word-break:break-word">'+v+'</div></div>';};
   drAbre('🧾 '+esc(drLoja(n,em)),
     '<div class="minis">'+info('Data',esc(fmt(n.data_emissao))+(n.hora_emissao?' '+esc(n.hora_emissao):''))+info('Valor total',brl(n.valor_total))+info('Pagamento',esc(n.forma_pagamento||'—'))+info('Desconto',brl(n.desconto_total))+info('Tributos',brl(n.tributos_total))+info('Tipo de loja',esc(n.tipo_loja||'—'))+'</div>'+
     '<div style="font-size:11px;color:var(--text-2);margin-bottom:10px;word-break:break-all">CNPJ '+esc(n.cnpj||'')+' · Chave '+esc(n.chave_acesso||'')+'</div>'+
     '<div class="scr" style="max-height:48vh"><table><thead><tr><th>Item</th><th>Categoria</th><th style="text-align:right">Qtd</th><th style="text-align:right">Preço unit.</th><th style="text-align:right">Total</th></tr></thead><tbody>'+
-    its.map(function(i){return '<tr class="clk" onclick="abrirItem(\''+esc(nfsItemKey(i.descricao)).replace(/'/g,"\\'")+'\')"><td style="font-weight:600">'+esc(i.descricao)+'</td><td>'+catPill(i.categoria)+'</td><td style="text-align:right">'+estQtd(i.quantidade)+' '+esc(i.unidade||'')+'</td><td style="text-align:right">'+brl(i.valor_unitario)+'</td><td style="text-align:right;font-weight:600">'+brl(i.valor_total)+'</td></tr>';}).join('')+'</tbody></table></div>',
-    '<button class="btn bg" onclick="drVoltar()">← Voltar</button><button class="btn bg" onclick="closeMo()">Fechar</button>');
-  if(!_dr.hist.length && primeira){ var b=document.querySelector('#mo-foot .btn.bg'); if(b) b.style.display='none'; }
+    its.map(function(i){return '<tr class="clk" onclick="abrirItem(\''+esc(nfsItemKey(i.descricao)).replace(/'/g,"\\'")+'\',true)"><td style="font-weight:600">'+esc(i.descricao)+'</td><td>'+catPill(i.categoria)+'</td><td style="text-align:right">'+estQtd(i.quantidade)+' '+esc(i.unidade||'')+'</td><td style="text-align:right">'+brl(i.valor_unitario)+'</td><td style="text-align:right;font-weight:600">'+brl(i.valor_total)+'</td></tr>';}).join('')+'</tbody></table></div>',
+    (_dr.hist.length?'<button class="btn bg" onclick="drVoltar()">← Voltar</button>':'')+'<button class="btn bg" onclick="closeMo()">Fechar</button>');
 }
 function drTitulo(f){
   var p=[];
@@ -1537,7 +1544,7 @@ function drTitulo(f){
 }
 function drSet(k,v){ _dr[k]=v; drRender(); }
 function drRender(){
-  _dr.nota=null;
+  _dr.view={k:'drill'};
   var f=_dr.f, notas=drFiltrarNotas(f), itens=drItens(f,notas), em=drEstMap();
   var temItemF=!!(f.cat||f.marca||f.itemKey);
   var notasUsadas=temItemF?notas.filter(function(n){return itens.some(function(i){return i.nota_id===n.id;});}):notas;
@@ -1555,7 +1562,7 @@ function drRender(){
     corpo='<div class="stabs" style="margin-bottom:8px">'+ordBtn('qtd','Maior quantidade')+ordBtn('valor','Maior valor')+ordBtn('medio','Maior preço médio')+'</div>'+
       '<div class="scr" style="max-height:50vh"><table class="drt"><thead><tr><th>Item</th><th>Categoria</th><th style="text-align:right">Quantidade</th><th style="text-align:center">Compras</th><th style="text-align:right">Preço médio</th><th style="text-align:right">Total pago</th><th>% do total</th></tr></thead><tbody>'+
       grp.slice(0,300).map(function(x,i){ var p=totItens?x.total/totItens*100:0;
-        return '<tr class="clk" onclick="abrirItem(\''+esc(x.key).replace(/'/g,"\\'")+'\')"><td style="font-weight:600">'+(i+1)+'. '+esc(x.nome)+'</td><td>'+catPill(x.categoria)+'</td><td style="text-align:right;font-weight:700">'+estQtd(x.qtd)+' <small style="color:var(--text-2)">'+esc(x.unidade||'')+'</small></td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right;font-weight:600">'+brl(x.total)+'</td><td>'+nfsBarra(Math.min(100,p*4))+'<span class="pct">'+p.toFixed(1).replace('.',',')+'%</span></td></tr>'; }).join('')+
+        return '<tr class="clk" onclick="abrirItem(\''+esc(x.key).replace(/'/g,"\\'")+'\',true)"><td style="font-weight:600">'+(i+1)+'. '+esc(x.nome)+'</td><td>'+catPill(x.categoria)+'</td><td style="text-align:right;font-weight:700">'+estQtd(x.qtd)+' <small style="color:var(--text-2)">'+esc(x.unidade||'')+'</small></td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right;font-weight:600">'+brl(x.total)+'</td><td>'+nfsBarra(Math.min(100,p*4))+'<span class="pct">'+p.toFixed(1).replace('.',',')+'%</span></td></tr>'; }).join('')+
       (grp.length>300?'<tr><td colspan="7" style="text-align:center;color:var(--text-2)">+ '+(grp.length-300)+' itens menores</td></tr>':'')+'</tbody></table></div>';
   } else if(_dr.tab==='notas'){
     var ln=notasUsadas.slice().sort(function(a,b){return (nfsDt(b.data_emissao)||0)-(nfsDt(a.data_emissao)||0);});
