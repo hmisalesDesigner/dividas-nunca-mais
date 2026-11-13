@@ -252,25 +252,43 @@ td.clk:hover{background:var(--bg-hover)}
 .cc-prog{text-align:center;color:var(--text-2);font-size:13px;margin:6px 0 18px}
 .cc-row{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap}
 .cc{border-radius:16px;padding:16px 18px;box-sizing:border-box}
-.cc-lado{width:210px;min-height:130px;background:#d6ecff;color:#0d3358;opacity:.8;transform:scale(.92);cursor:pointer;transition:opacity .15s,transform .15s}
+.cc-lado{width:210px;min-height:130px;background:#dbeeff;color:#08233f;opacity:.92;transform:scale(.92);cursor:pointer;transition:opacity .15s,transform .15s}
 .cc-lado:hover{opacity:1;transform:scale(.96)}
-.cc-lado .cod-it{color:#0d3358}
+.cc-lado .cod-it{color:#08233f;opacity:1;font-size:11.5px;font-weight:600}
 .cc-vazio{width:210px;min-height:130px;background:transparent;border:2px dashed var(--border-c);opacity:.35}
 .cc-nm{font-weight:600;font-size:15px;margin-top:6px;line-height:1.3}
-.cc-sub{font-size:11.5px;opacity:.7;margin-top:4px}
-.cc-centro{width:400px;max-width:94vw;background:#ffb74d;color:#3b2300;box-shadow:0 6px 24px rgba(255,152,0,.28);padding:22px}
-.cc-big{font-size:22px;font-weight:700;line-height:1.25;margin-top:2px}
-.cc-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-top:8px}
+.cc-sub{font-size:12.5px;margin-top:5px;color:inherit}
+.cc-centro{width:420px;max-width:94vw;background:#ffb74d;color:#1f1100;box-shadow:0 6px 24px rgba(255,152,0,.28);padding:22px}
+.cc-big{font-size:24px;font-weight:800;line-height:1.25;margin-top:2px;color:#1a0d00}
+.cc-lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#4a2800;margin-top:8px}
 .cc-centro input{width:100%;box-sizing:border-box;margin-top:4px;padding:10px 12px;font-size:15px;border-radius:10px;border:2px solid #e65100;background:#fff8ee;color:#3b2300}
 .cc-btns{display:flex;gap:8px;margin-top:14px;justify-content:space-between;flex-wrap:wrap}
 @media(max-width:900px){.cc-lado,.cc-vazio{width:44%}.cc-centro{order:-1;width:100%}}
+.cc-cod{font-family:monospace;font-size:12px;font-weight:700;color:#4a2800}
+.cc-info{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;font-weight:600;margin-top:8px;color:#2b1700}
+.cc-precos{display:flex;gap:8px;margin-top:12px}
+.cc-precos div{flex:1;background:rgba(255,255,255,.55);border-radius:10px;padding:7px 8px;text-align:center}
+.cc-precos small{display:block;font-size:11px;font-weight:700;color:#4a2800;text-transform:uppercase}
+.cc-precos b{font-size:16px}
+.cc-bar{height:7px;border-radius:5px;background:var(--border-c);margin:8px auto 0;max-width:420px;overflow:hidden}
+.cc-bar i{display:block;height:100%;background:#ff9800}
+.cc-tools{display:flex;gap:10px;justify-content:center;margin-bottom:18px;flex-wrap:wrap}
+.cc-tools input{width:260px;padding:10px 14px;font-size:14px;border-radius:10px}
+.cbtn{font:inherit;font-weight:700;font-size:14px;padding:10px 16px;border-radius:10px;border:2px solid #1f1100;background:#fff;color:#1f1100;cursor:pointer}
+.cbtn:hover{background:#fff3df}
+.cbtn-ok{background:#0d3b82;color:#fff;border-color:#0d3b82}
+.cbtn-ok:hover{background:#0a2f69}
+.cbtn-sug{display:block;width:100%;margin-top:8px;text-align:left;font-weight:600;font-size:13px;border-style:dashed}
+.cc-tools .cbtn{background:var(--bg-card);color:var(--text-1,#e8eaf0);border-color:var(--border-c)}
+.cat-modes{display:flex;gap:8px;margin-bottom:14px}
+.cat-modes .btn{font-size:15px;padding:11px 22px;font-weight:700;border-radius:10px}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.2</p>
+  <p>Notas Fiscais do PR · v28.3</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1469,10 +1487,10 @@ async function pgCatalogo(){
   }catch(e){ err(e); }
 }
 function renderCatalogo(){
-  var tb='<div class="tbar">'+
-    '<button class="btn '+(_cat.view==='cards'?'bp':'bg')+' bsm" onclick="_cat.view=\'cards\';renderCatalogo()">🎴 Cartas</button>'+
-    '<button class="btn '+(_cat.view==='lista'?'bp':'bg')+' bsm" onclick="_cat.view=\'lista\';renderCatalogo()">📋 Lista</button>'+
-    '<button class="btn '+(_cat.view==='lojas'?'bp':'bg')+' bsm" onclick="_cat.view=\'lojas\';renderCatalogo()">🏪 Lojas</button>';
+  var tb='<div class="tbar cat-modes">'+
+    '<button class="btn '+(_cat.view==='cards'?'bp':'bg')+' " onclick="_cat.view=\'cards\';renderCatalogo()">🎴 Cartas</button>'+
+    '<button class="btn '+(_cat.view==='lista'?'bp':'bg')+' " onclick="_cat.view=\'lista\';renderCatalogo()">📋 Lista</button>'+
+    '<button class="btn '+(_cat.view==='lojas'?'bp':'bg')+' " onclick="_cat.view=\'lojas\';renderCatalogo()">🏪 Lojas</button>';
   if(_cat.view==='cards'){ setPage(tb+'</div><div id="cat-cards"></div>'); catPosInicial(); rCatCards(); return; }
   setPage(tb+
     '<input type="text" id="q-cat" placeholder="🔍 Buscar..." value="'+esc(_cat.q)+'" oninput="_cat.q=this.value;rCatLista()" style="width:260px">'+
@@ -1509,22 +1527,48 @@ function catMini(x,i,cls){
   return '<div class="cc cc-lado '+cls+'" onclick="catIr('+i+')"><div class="cod-it">'+esc(r.codigo||'')+(ok?' · ✓':'')+'</div>'+
     '<div class="cc-nm">'+esc(ok?r.nome_real:x.nome)+'</div>'+(ok?'<div class="cc-sub">'+esc(x.nome)+'</div>':'')+'</div>';
 }
+function catSugestao(n){
+  var peq={de:1,da:1,do:1,das:1,dos:1,e:1,com:1,em:1,para:1};
+  return String(n||'').toLowerCase().split(/\s+/).map(function(w,i){ return (i&&peq[w])?w:w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+}
+function catProxSem(){
+  var L=_cat.itens||[], i;
+  for(i=_cat.idx+1;i<L.length;i++) if(!catRow(L[i]).nome_real){ catIr(i); return; }
+  for(i=0;i<_cat.idx;i++) if(!catRow(L[i]).nome_real){ catIr(i); return; }
+}
+function catUsarSug(){ var x=(_cat.itens||[])[_cat.idx]; var inp=g('cat-inp'); if(x&&inp){ inp.value=catSugestao(x.nome); inp.focus(); } }
+function catIrBusca(v){
+  var L=_cat.itens||[], i=L.findIndex(function(x){return bscMatch(v,x.nome+' '+(catRow(x).nome_real||'')+' '+(catRow(x).codigo||''));});
+  if(i>=0) catIr(i);
+}
 function rCatCards(){
   var L=_cat.itens||[], i=_cat.idx, x=L[i]; var box=g('cat-cards'); if(!box) return;
   if(!x){ box.innerHTML='<div class="empty"><p>Nenhum item cadastrado ainda.</p></div>'; return; }
-  var r=catRow(x), feitos=L.filter(function(y){return catRow(y).nome_real;}).length;
+  var r=catRow(x), feitos=L.filter(function(y){return catRow(y).nome_real;}).length, pct=L.length?feitos/L.length*100:0;
   var vars=(r.nomes_originais||x.variantes||[x.nome]).filter(function(v){return v!==x.nome;});
-  box.innerHTML='<div class="cc-prog">Item '+(i+1)+' de '+L.length+' · <b>'+feitos+'</b> com nome real · faltam '+(L.length-feitos)+'</div>'+
+  var pts=x.pontos||[], ult=pts.length?pts[pts.length-1]:null;
+  var lojas={}; pts.forEach(function(p){ if(p.loja) lojas[p.loja]=1; });
+  var dtUlt=ult&&ult.d?ult.d.toLocaleDateString('pt-BR'):'—';
+  var unico=Math.abs(x.max-x.min)<0.005;
+  box.innerHTML='<div class="cc-prog">Item <b>'+(i+1)+'</b> de '+L.length+' · <b>'+feitos+'</b> com nome real · faltam '+(L.length-feitos)+
+      '<div class="cc-bar"><i style="width:'+Math.max(1,pct).toFixed(1)+'%"></i></div></div>'+
+    '<div class="cc-tools"><input type="text" id="cat-go" placeholder="🔍 Ir para um item..." onkeydown="if(event.key===\'Enter\'){catIrBusca(this.value)}">'+
+      '<button class="cbtn" onclick="catProxSem()">⏭ Próximo sem nome</button></div>'+
     '<div class="cc-row">'+catMini(L[i-1],i-1,'cc-ant')+
-    '<div class="cc cc-centro"><div class="cod-it" style="color:#7a3d00;opacity:.9">'+esc(r.codigo||'')+'</div>'+
+    '<div class="cc cc-centro"><div class="cc-cod">'+esc(r.codigo||'')+(r.nome_real?' · ✓ já renomeado':'')+'</div>'+
       '<div class="cc-lbl">Nome na nota</div><div class="cc-big">'+esc(x.nome)+'</div>'+
       (vars.length?'<div class="cc-sub">também veio como: '+esc(vars.slice(0,3).join(' · '))+'</div>':'')+
-      '<div class="cc-sub">'+esc(x.categoria||'')+' · comprado '+x.vezes+'x</div>'+
-      '<div class="cc-lbl" style="margin-top:12px">Nome real</div>'+
+      '<div class="cc-info"><span>🏷️ '+esc(x.categoria||'—')+'</span><span>🛒 comprado '+x.vezes+'x</span>'+(x.marca?'<span>® '+esc(x.marca)+'</span>':'')+'<span>🏪 '+Object.keys(lojas).length+' loja(s)</span></div>'+
+      '<div class="cc-precos"><div><small>Mínimo</small><b style="color:#0b6b2a">'+brl(x.min)+'</b></div>'+
+        (unico?'':'<div><small>Médio</small><b style="color:#7a5200">'+brl(x.medio)+'</b></div><div><small>Máximo</small><b style="color:#a3151a">'+brl(x.max)+'</b></div>')+
+        '<div><small>Última</small><b>'+brl(x.ultimo)+'</b></div></div>'+
+      '<div class="cc-sub">Última compra: '+dtUlt+(ult&&ult.loja?' · '+esc(String(ult.loja).substring(0,28)):'')+'</div>'+
+      '<div class="cc-lbl" style="margin-top:14px">Nome real</div>'+
       '<input type="text" id="cat-inp" value="'+esc(r.nome_real||'')+'" placeholder="Escreva o nome real..." onkeydown="if(event.key===\'Enter\'){catSalvarProx()}">'+
-      '<div class="cc-btns"><button class="btn bg bsm" onclick="catIr('+(i-1)+')">◀ Anterior</button>'+
-      '<button class="btn bg bsm" onclick="catIr('+(i+1)+')">Pular</button>'+
-      '<button class="btn bp bsm" onclick="catSalvarProx()">Salvar e próximo ▶</button></div></div>'+
+      '<button class="cbtn cbtn-sug" onclick="catUsarSug()">✨ Usar sugestão: '+esc(catSugestao(x.nome))+'</button>'+
+      '<div class="cc-btns"><button class="cbtn" onclick="catIr('+(i-1)+')">◀ Anterior</button>'+
+      '<button class="cbtn" onclick="catIr('+(i+1)+')">Pular</button>'+
+      '<button class="cbtn cbtn-ok" onclick="catSalvarProx()">Salvar e próximo ▶</button></div></div>'+
     catMini(L[i+1],i+1,'cc-prox')+'</div>';
   var inp=g('cat-inp'); if(inp) inp.focus();
 }
