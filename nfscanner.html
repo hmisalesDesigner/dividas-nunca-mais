@@ -235,25 +235,27 @@ td.clk:hover{background:var(--bg-hover)}
 .insc table{font-size:14.5px}.insc th{font-size:13px}.insc td,.insc th{padding:9px 12px}.insc small{font-size:12px}
 .livro table{font-size:14px}.livro th,.livro td{padding:8px 12px}
 .livro{overflow:visible}
-.livro-sec{border:1px solid var(--border-c);border-radius:10px;overflow:hidden;margin-bottom:16px}
-.livro-sec-h{padding:10px 14px;font-weight:700;font-size:14px}
-.livro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:12px;background:var(--bg-card)}
-.livro-card{background:var(--bg-page);border:1px solid var(--border-c);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .12s,transform .12s}
-.livro-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}
-.livro-card .nm{font-size:14px;font-weight:600;line-height:1.3;min-height:2.3em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-right:28px}
-.livro-card .vz{float:right;margin-top:-30px;color:var(--text-2);font-size:11px}
-.livro-card .pricerow{display:flex;gap:5px;margin-top:8px}
-.pv{flex:1;text-align:center;padding:4px 2px;border-radius:6px;font-weight:700;font-size:13px}
-.pv-min{background:rgba(76,175,80,.16);color:#66bb6a}
-.pv-med{background:rgba(255,193,7,.16);color:#ffca28}
-.pv-max{background:rgba(239,83,80,.16);color:#ef5350}
+.livro-sec{margin-bottom:22px}
+.livro-sec-h{display:inline-block;padding:4px 12px;font-weight:600;font-size:12.5px;border-radius:5px;margin-bottom:10px}
+.livro-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:1px;background:var(--border-c);border:1px solid var(--border-c);border-radius:8px;overflow:hidden}
+.livro-card{background:var(--bg-card);padding:9px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.livro-card:hover{background:var(--bg-hover)}
+.livro-card .nm{font-size:13.5px;font-weight:500;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.livro-card .pricerow{flex-shrink:0}
+.pv{display:inline-block}
+.livro-card .vz{color:var(--text-2);font-size:11px;flex-shrink:0}
+.livro-card .pricerow{display:flex;gap:8px;flex-shrink:0}
+.pv{font-weight:700;font-size:13px;min-width:46px;text-align:right}
+.pv-min{color:#66bb6a}
+.pv-med{color:#ffca28}
+.pv-max{color:#ef5350}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.4</p>
+  <p>Notas Fiscais do PR · v27.5</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1291,12 +1293,34 @@ async function pgInsights(){
 /* ===== Livro de Preços (supermercados) ===== */
 var _livro={q:'',ord:'nome',dados:null};
 function livroTokens(desc){
-  var STOP={KG:1,G:1,GR:1,GRS:1,ML:1,L:1,LT:1,LTS:1,UN:1,UND:1,UNID:1,UNIDADE:1,PCT:1,PCTE:1,CX:1,FD:1,DZ:1,KIT:1,REFIL:1,EMB:1,GARRAFA:1,LATA:1,SACHE:1,PC:1,PCS:1,FR:1,FRS:1,TIPO:1,COM:1,SEM:1,DA:1,DO:1,DE:1,E:1,PO:1};
-  return normProdName(desc).split(' ').filter(function(t){ return t && !STOP[t] && !/^\d+([.,]\d+)?$/.test(t); });
+  var STOP={KG:1,G:1,GR:1,GRS:1,ML:1,L:1,LT:1,LTS:1,UN:1,UND:1,UNID:1,UNIDADE:1,PCT:1,PCTE:1,CX:1,FD:1,DZ:1,KIT:1,REFIL:1,EMB:1,GARRAFA:1,LATA:1,SACHE:1,PC:1,PCS:1,FR:1,FRS:1,TIPO:1,COM:1,SEM:1,DA:1,DO:1,DE:1,E:1,PO:1,FLV:1,HORT:1,HIDR:1};
+  return normProdName(desc).split(' ').filter(function(t){ return t && t.length>1 && !STOP[t] && !/^\d+([.,]\d+)?$/.test(t); });
+}
+function livroTokMatch(t,u){
+  if(t===u) return true;
+  if(t.length>=3 && u.length>=3) return t.indexOf(u)===0 || u.indexOf(t)===0;
+  return false;
+}
+function livroMerge(h,g){
+  h.qtd+=g.qtd; h.total+=g.total; h.linhas+=g.linhas;
+  h.pontos=h.pontos.concat(g.pontos);
+  h.min=Math.min(h.min,g.min); h.max=Math.max(h.max,g.max);
+  h.vezes=h.vezes+g.vezes;
 }
 function livroAgrupa(itens,notasPorId){
   var base=nfsAgrupaItens(itens,notasPorId);
-  base.forEach(function(g){ g._set=livroTokens(g.nome); });
+  base.forEach(function(g){ g._set=livroTokens(g.nome); g._sig=g.categoria+'|'+g._set.slice().sort().join(' '); });
+  // 1) funde grupos com o mesmo conjunto de palavras (após remover unidades/prefixos) mas nomes diferentes
+  var porSig={};
+  base.forEach(function(g){ if(!g._set.length) return; (porSig[g._sig]=porSig[g._sig]||[]).push(g); });
+  var absorvido1={};
+  Object.keys(porSig).forEach(function(sig){
+    var arr=porSig[sig]; if(arr.length<2) return;
+    arr.sort(function(a,b){ return b.vezes-a.vezes || b.nome.length-a.nome.length; });
+    var h=arr[0];
+    arr.slice(1).forEach(function(g){ livroMerge(h,g); absorvido1[g.key]=true; });
+  });
+  base=base.filter(function(g){ return !absorvido1[g.key]; });
   base.sort(function(a,b){ return a._set.length-b._set.length; });
   var absorvido={};
   base.forEach(function(g,i){
@@ -1305,15 +1329,11 @@ function livroAgrupa(itens,notasPorId){
     base.forEach(function(h,j){
       if(i===j || absorvido[h.key] || h.categoria!==g.categoria) return;
       if(h._set.length<=g._set.length) return;
-      var sub=g._set.every(function(t){ return h._set.indexOf(t)>=0; });
+      var sub=g._set.every(function(t){ return h._set.some(function(u){ return livroTokMatch(t,u); }); });
       if(sub && (h._set.length-g._set.length)<=2) candidatos.push(h);
     });
     if(candidatos.length===1){
-      var h=candidatos[0];
-      h.qtd+=g.qtd; h.total+=g.total; h.linhas+=g.linhas;
-      h.pontos=h.pontos.concat(g.pontos);
-      h.min=Math.min(h.min,g.min); h.max=Math.max(h.max,g.max);
-      h.vezes=Math.max(h.vezes,g.vezes);
+      livroMerge(candidatos[0],g);
       absorvido[g.key]=true;
     }
   });
