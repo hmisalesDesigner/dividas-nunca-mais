@@ -254,12 +254,13 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.10</p>
+  <p>Notas Fiscais do PR · v28.0</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
   <button class="nb" onclick="go('onde')">🎯 Onde Gasto</button>
   <button class="nb" onclick="go('livro')">📖 Livro de Preços</button>
+  <button class="nb" onclick="go('catalogo')">🏷️ Catálogo</button>
   <button class="nb" onclick="go('itens')">💲 Itens e Preços</button>
   <button class="nb" onclick="go('insights')">🧠 Insights</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
@@ -336,7 +337,7 @@ function nextId(table){
   return DB._seq[table];
 }
 function recalcSeq(){
-  ['notas_fiscais','itens','estabelecimentos','estoque','devolucoes','marcas','lista_compras','produtos','configuracoes','alertas_preco'].forEach(function(t){
+  ['notas_fiscais','itens','estabelecimentos','estoque','devolucoes','marcas','lista_compras','produtos','configuracoes','alertas_preco','catalogo_itens'].forEach(function(t){
     var max=0; (DB[t]||[]).forEach(function(r){ if(r.id>max)max=r.id; });
     DB._seq[t]=max;
   });
@@ -825,7 +826,7 @@ function closeMo(){ g('modal').style.display='none'; var mb=document.querySelect
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',livro:'Livro de Preços',itens:'Itens e Preços',insights:'Insights'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',livro:'Livro de Preços',catalogo:'Catálogo',itens:'Itens e Preços',insights:'Insights'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -1400,13 +1401,92 @@ function rLivro(){
         var precos=unico
           ? '<span class="pv pv-min">'+brl(x.min)+'</span><span class="pv"></span><span class="pv"></span>'
           : '<span class="pv pv-min">'+brl(x.min)+'</span><span class="pv pv-med">'+brl(x.medio)+'</span><span class="pv pv-max">'+brl(x.max)+'</span>';
+        var cod=catCodItem(x.key), nomeR=catNomeItem(x.key,x.nome);
         return '<div class="livro-card clk" onclick="abrirItem(\''+esc(x.key)+'\',true)">'+
-          '<div class="nm">'+esc(x.nome)+'</div><div class="vz">'+x.vezes+'x</div>'+
+          '<div class="nm">'+(cod?'<span style="color:var(--text-2);font-weight:400">'+esc(cod)+' · </span>':'')+esc(nomeR)+'</div><div class="vz">'+x.vezes+'x</div>'+
           '<div class="pricerow">'+precos+'</div>'+
         '</div>';
       }).join('')+'</div></div></div>';
   });
   g('b-lv').innerHTML=html;
+}
+/* ===== Catálogo (nomes reais e códigos) ===== */
+function catNomeItem(key,auto){
+  var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===key;});
+  return (c&&c.nome_real)?c.nome_real:auto;
+}
+function catCodItem(key){
+  var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===key;});
+  return c?c.codigo:'';
+}
+var _cat={view:'itens',q:''};
+async function pgCatalogo(){
+  setActs('');
+  try{
+    var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*'), re=await sb.from('estabelecimentos').select('*');
+    var porId={}; (rn.data||[]).forEach(function(n){porId[n.id]=n;});
+    var grupos=nfsAgrupaItens(ri.data||[],porId).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
+    // garante registro + código para cada item
+    var existentes=(DB.catalogo_itens||[]).slice();
+    var porChave={}; existentes.forEach(function(r){porChave[r.chave]=r;});
+    var maxCod=0; existentes.forEach(function(r){ var m=String(r.codigo||'').match(/\d+/); if(m) maxCod=Math.max(maxCod,parseInt(m[0],10)); });
+    var novos=[];
+    grupos.forEach(function(gr){
+      if(!porChave[gr.key]){ maxCod++; var row={chave:gr.key,nome_real:'',codigo:'I'+String(maxCod).padStart(4,'0')}; porChave[gr.key]=row; novos.push(row); }
+    });
+    if(novos.length){ await sb.from('catalogo_itens').insert(novos); }
+    // garante código de loja
+    var estabs=re.data||[]; var maxL=0; estabs.forEach(function(e){ var m=String(e.codigo||'').match(/\d+/); if(m) maxL=Math.max(maxL,parseInt(m[0],10)); });
+    var upsEst=[];
+    estabs.slice().sort(function(a,b){return String(a.nome_fantasia||a.razao_social||'').localeCompare(String(b.nome_fantasia||b.razao_social||''),'pt-BR');}).forEach(function(e){
+      if(!e.codigo){ maxL++; e.codigo='L'+String(maxL).padStart(3,'0'); upsEst.push({id:e.id,codigo:e.codigo}); }
+    });
+    for(var i=0;i<upsEst.length;i++){ await sb.from('estabelecimentos').update({codigo:upsEst[i].codigo}).eq('id',upsEst[i].id); }
+    _cat.itens=grupos; _cat.lojas=estabs;
+    renderCatalogo();
+  }catch(e){ err(e); }
+}
+function renderCatalogo(){
+  setPage('<div class="tbar">'+
+    '<button class="btn '+(_cat.view==='itens'?'bp':'bg')+' bsm" onclick="_cat.view=\'itens\';renderCatalogo()">🏷️ Itens</button>'+
+    '<button class="btn '+(_cat.view==='lojas'?'bp':'bg')+' bsm" onclick="_cat.view=\'lojas\';renderCatalogo()">🏪 Lojas</button>'+
+    '<input type="text" id="q-cat" placeholder="🔍 Buscar..." value="'+esc(_cat.q)+'" oninput="_cat.q=this.value;rCatLista()" style="width:260px">'+
+    '<span id="n-cat" style="color:var(--text-2);font-size:12px"></span></div>'+
+    '<div class="card"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr>'+
+    (_cat.view==='itens'
+      ? '<th style="width:70px">Código</th><th>Nome automático</th><th>Nome real (edite aqui)</th><th style="text-align:center;width:70px">Vezes</th>'
+      : '<th style="width:70px">Código</th><th>Nome fantasia</th><th>CNPJ</th><th>Categoria</th>')+
+    '</tr></thead><tbody id="tb-cat"></tbody></table></div></div>');
+  rCatLista();
+}
+function rCatLista(){
+  var q=_cat.q||'';
+  if(_cat.view==='itens'){
+    var d=(_cat.itens||[]).filter(function(x){ return bscMatch(q, x.nome+' '+(catCodItem(x.key)||'')); });
+    g('n-cat').textContent=d.length+' itens';
+    g('tb-cat').innerHTML=d.map(function(x){
+      var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===x.key;});
+      return '<tr><td style="font-family:monospace;font-size:12px;color:var(--text-2)">'+esc((c&&c.codigo)||'')+'</td>'+
+        '<td style="color:var(--text-2)">'+esc(x.nome)+'</td>'+
+        '<td><input type="text" value="'+esc((c&&c.nome_real)||'')+'" placeholder="Escreva o nome real..." style="width:95%" onchange="salvCatItem(\''+esc(x.key).replace(/'/g,"\\'")+'\',this.value)"></td>'+
+        '<td style="text-align:center;color:var(--text-2)">'+x.vezes+'</td></tr>';
+    }).join('');
+  }else{
+    var d=(_cat.lojas||[]).filter(function(e){ return bscMatch(q, (e.nome_fantasia||e.razao_social||'')+' '+(e.codigo||'')); });
+    d.sort(function(a,b){return String(a.nome_fantasia||a.razao_social||'').localeCompare(String(b.nome_fantasia||b.razao_social||''),'pt-BR');});
+    g('n-cat').textContent=d.length+' lojas';
+    g('tb-cat').innerHTML=d.map(function(e){
+      return '<tr><td style="font-family:monospace;font-size:12px;color:var(--text-2)">'+esc(e.codigo||'')+'</td>'+
+        '<td>'+esc(e.nome_fantasia||('('+String(e.razao_social||'').substring(0,24)+')'))+'</td>'+
+        '<td style="font-family:monospace;font-size:11px;color:var(--text-2)">'+esc(e.cnpj||'—')+'</td>'+
+        '<td><span class="tag tbl">'+esc(e.categoria||'—')+'</span></td></tr>';
+    }).join('');
+  }
+}
+async function salvCatItem(chave,nome){
+  nome=(nome||'').trim();
+  var ex=(DB.catalogo_itens||[]).find(function(r){return r.chave===chave;});
+  if(ex){ ex.nome_real=nome; await sb.from('catalogo_itens').update({nome_real:nome}).eq('chave',chave); }
 }
 async function pgItens(){
   setActs('');
@@ -1446,7 +1526,7 @@ function rItens(){
   var tb=g_('tb-it'); if(!tb) return;
   var mostrar=d.slice(0,_itens.lim);
   tb.innerHTML=mostrar.map(function(x){
-    return '<tr class="clk" onclick="abrirItem(\''+esc(x.key).replace(/'/g,"\\'")+'\')"><td style="font-weight:600">'+esc(x.nome)+(x.marca?' <span style="color:var(--text-2);font-weight:400">· '+esc(x.marca)+'</span>':'')+'</td><td>'+catPill(x.categoria)+'</td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+String(Math.round(x.qtd*100)/100).replace('.',',')+'</td><td style="text-align:right;font-weight:600">'+brl(x.total)+'</td><td style="text-align:right;color:#34A853">'+brl(x.min)+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right;color:#EA4335">'+brl(x.max)+'</td><td style="text-align:right">'+brl(x.ultimo)+'</td><td style="font-size:11px;color:var(--text-2)">'+esc(String(x.lojaBarata||'').substring(0,24))+'</td><td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn bg bsm" title="Adicionar à lista de compras" onclick="addItemLista(\''+esc(x.key).replace(/'/g,"\\'")+'\')">🛒</button></td></tr>';
+    return '<tr class="clk" onclick="abrirItem(\''+esc(x.key).replace(/'/g,"\\'")+'\')"><td style="font-weight:600">'+esc(catNomeItem(x.key,x.nome))+(x.marca?' <span style="color:var(--text-2);font-weight:400">· '+esc(x.marca)+'</span>':'')+'</td><td>'+catPill(x.categoria)+'</td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+String(Math.round(x.qtd*100)/100).replace('.',',')+'</td><td style="text-align:right;font-weight:600">'+brl(x.total)+'</td><td style="text-align:right;color:#34A853">'+brl(x.min)+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right;color:#EA4335">'+brl(x.max)+'</td><td style="text-align:right">'+brl(x.ultimo)+'</td><td style="font-size:11px;color:var(--text-2)">'+esc(String(x.lojaBarata||'').substring(0,24))+'</td><td style="white-space:nowrap" onclick="event.stopPropagation()"><button class="btn bg bsm" title="Adicionar à lista de compras" onclick="addItemLista(\''+esc(x.key).replace(/'/g,"\\'")+'\')">🛒</button></td></tr>';
   }).join('')+(d.length>mostrar.length?'<tr><td colspan="11" style="text-align:center"><button class="btn bg bsm" onclick="_itens.lim+=200;rItens()">Mostrar mais ('+(d.length-mostrar.length)+' restantes)</button></td></tr>':'');
   var n=g_('n-it'); if(n) n.textContent=d.length+' itens';
 }
@@ -1465,7 +1545,7 @@ async function abrirItem(k,doDrill){
   var st=function(l,v,c){return '<div class="mini"><div class="mini-l">'+l+'</div><div class="mini-v"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div></div>';};
   var voltar=(doDrill&&typeof _dr!=='undefined'&&_dr&&_dr.view);
   if(voltar){ _dr.hist.push(drSnap()); _dr.view={k:'item'}; }
-  openMo('💲 '+esc(x.nome),
+  openMo('💲 '+esc(catNomeItem(x.key,x.nome)),
     '<div class="minis">'+st('Comprado',x.vezes+'×')+st('Total pago',brl(x.total))+st('Mínimo',brl(x.min),'#34A853')+st('Médio',brl(x.medio))+st('Máximo',brl(x.max),'#EA4335')+st('Último',brl(x.ultimo))+'</div>'+
     '<h4 class="sec">Por loja</h4><table><thead><tr><th>Loja</th><th style="text-align:right">Menor preço</th><th style="text-align:right">Preço médio</th><th style="text-align:center">Compras</th></tr></thead><tbody>'+
     lj.slice(0,8).map(function(l){return '<tr><td>'+esc(String(l.loja).substring(0,30))+'</td><td style="text-align:right;color:#34A853">'+brl(l.min===1e12?0:l.min)+'</td><td style="text-align:right">'+brl(l.q?l.soma/l.q:0)+'</td><td style="text-align:center">'+l.n+'</td></tr>';}).join('')+'</tbody></table>'+
@@ -1848,7 +1928,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,livro:pgLivro,itens:pgItens,insights:pgInsights}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,livro:pgLivro,catalogo:pgCatalogo,itens:pgItens,insights:pgInsights}[tab];
   npAtualizarBanner();
   if(fn) fn();
 }
