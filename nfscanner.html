@@ -233,17 +233,19 @@ td.clk:hover{background:var(--bg-hover)}
 .kpi.clk{cursor:pointer;transition:box-shadow .15s}.kpi.clk:hover{box-shadow:0 2px 14px rgba(26,115,232,.28)}
 .tm-row.clk{cursor:pointer}
 .insc table{font-size:14.5px}.insc th{font-size:13px}.insc td,.insc th{padding:9px 12px}.insc small{font-size:12px}
+.livro table{font-size:14px}.livro th,.livro td{padding:8px 12px}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.1</p>
+  <p>Notas Fiscais do PR · v27.2</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
   <button class="nb" onclick="go('onde')">🎯 Onde Gasto</button>
+  <button class="nb" onclick="go('livro')">📖 Livro de Preços</button>
   <button class="nb" onclick="go('itens')">💲 Itens e Preços</button>
   <button class="nb" onclick="go('insights')">🧠 Insights</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
@@ -809,7 +811,7 @@ function closeMo(){ g('modal').style.display='none'; var mb=document.querySelect
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',itens:'Itens e Preços',insights:'Insights'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',livro:'Livro de Preços',itens:'Itens e Preços',insights:'Insights'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -1273,6 +1275,73 @@ async function pgInsights(){
     setPage(html);
   }catch(e){ err(e); }
 }
+/* ===== Livro de Preços (supermercados) ===== */
+var _livro={q:'',ord:'nome',dados:null};
+function livroTokens(desc){
+  var STOP={KG:1,G:1,GR:1,GRS:1,ML:1,L:1,LT:1,LTS:1,UN:1,UND:1,UNID:1,UNIDADE:1,PCT:1,PCTE:1,CX:1,FD:1,DZ:1,KIT:1,REFIL:1,EMB:1,GARRAFA:1,LATA:1,SACHE:1,PC:1,PCS:1,FR:1,FRS:1,TIPO:1,COM:1,SEM:1,DA:1,DO:1,DE:1,E:1,PO:1};
+  return normProdName(desc).split(' ').filter(function(t){ return t && !STOP[t] && !/^\d+([.,]\d+)?$/.test(t); });
+}
+function livroAgrupa(itens,notasPorId){
+  var base=nfsAgrupaItens(itens,notasPorId);
+  base.forEach(function(g){ g._set=livroTokens(g.nome); });
+  base.sort(function(a,b){ return a._set.length-b._set.length; });
+  var absorvido={};
+  base.forEach(function(g,i){
+    if(absorvido[g.key] || !g._set.length) return;
+    var candidatos=[];
+    base.forEach(function(h,j){
+      if(i===j || absorvido[h.key] || h.categoria!==g.categoria) return;
+      if(h._set.length<=g._set.length) return;
+      var sub=g._set.every(function(t){ return h._set.indexOf(t)>=0; });
+      if(sub && (h._set.length-g._set.length)<=2) candidatos.push(h);
+    });
+    if(candidatos.length===1){
+      var h=candidatos[0];
+      h.qtd+=g.qtd; h.total+=g.total; h.linhas+=g.linhas;
+      h.pontos=h.pontos.concat(g.pontos);
+      Object.keys(g.nomes||{}).forEach(function(n){});
+      h.min=Math.min(h.min||g.min,g.min||h.min); h.max=Math.max(h.max,g.max);
+      var compras={}; h.pontos.forEach(function(p){compras[p.cnpj+'#'+(p.d||'')]=1;});
+      h.vezes=Math.max(h.vezes,g.vezes)+ (h.vezes===g.vezes?0:0);
+      absorvido[g.key]=true;
+    }
+  });
+  return base.filter(function(g){ return !absorvido[g.key]; }).map(function(g){
+    g.medio=g.qtd?g.total/g.qtd:0;
+    var ord=g.pontos.slice().sort(function(a,b){return (a.d||0)-(b.d||0);});
+    g.ultimo=ord.length?ord[ord.length-1].vu:g.ultimo; g.ultimaData=ord.length?ord[ord.length-1].d:g.ultimaData;
+    return g;
+  });
+}
+async function pgLivro(){
+  setActs('');
+  try{
+    var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*');
+    var notas=(rn.data||[]).filter(function(n){return n.tipo_loja==='Supermercado';});
+    var porId={}; notas.forEach(function(n){porId[n.id]=n;});
+    var itens=(ri.data||[]).filter(function(it){return porId[it.nota_id];});
+    _livro.dados=livroAgrupa(itens,porId);
+    if(!_livro.dados.length){ setPage('<div class="empty"><div class="empty-i">📭</div><p>Nenhum item de supermercado ainda.</p></div>'); return; }
+    setPage('<div class="tbar"><input type="text" id="q-lv" placeholder="🔍 Buscar item..." value="'+esc(_livro.q)+'" oninput="_livro.q=this.value;rLivro()" style="width:280px">'+
+      '<select id="o-lv" onchange="_livro.ord=this.value;rLivro()">'+[['nome','Nome (A–Z)'],['vezes','Mais comprados'],['medio','Maior preço médio'],['diff','Maior variação']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===_livro.ord?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
+      '<span id="n-lv" style="color:var(--text-2);font-size:12px"></span></div>'+
+      '<div class="card livro"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr><th>Item</th><th style="text-align:center">Vezes</th><th style="text-align:right">Mín.</th><th style="text-align:right">Médio</th><th style="text-align:right">Máx.</th></tr></thead><tbody id="b-lv"></tbody></table></div></div>');
+    rLivro();
+  }catch(e){ err(e); }
+}
+function rLivro(){
+  var q=_livro.q||'', d=(_livro.dados||[]).filter(function(x){ return bscMatch(q,x.nome+' '+(x.categoria||'')); });
+  d.sort(function(a,b){
+    if(_livro.ord==='vezes') return b.vezes-a.vezes;
+    if(_livro.ord==='medio') return b.medio-a.medio;
+    if(_livro.ord==='diff') return (b.max-b.min)-(a.max-a.min);
+    return a.nome.localeCompare(b.nome,'pt-BR');
+  });
+  g('n-lv').textContent=d.length+' itens';
+  g('b-lv').innerHTML=d.map(function(x){
+    return '<tr class="clk" onclick="abrirItem(\''+esc(x.key)+'\',true)"><td>'+esc(x.nome)+'</td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+brl(x.min)+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right">'+brl(x.max)+'</td></tr>';
+  }).join('');
+}
 async function pgItens(){
   setActs('');
   try{
@@ -1713,7 +1782,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,itens:pgItens,insights:pgInsights}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,livro:pgLivro,itens:pgItens,insights:pgInsights}[tab];
   npAtualizarBanner();
   if(fn) fn();
 }
