@@ -235,12 +235,15 @@ td.clk:hover{background:var(--bg-hover)}
 .insc table{font-size:14.5px}.insc th{font-size:13px}.insc td,.insc th{padding:9px 12px}.insc small{font-size:12px}
 .livro table{font-size:14px}.livro th,.livro td{padding:8px 12px}
 .livro{overflow:visible}
-.tblivro{width:100%;border-collapse:collapse;font-size:14px}
-.tblivro thead tr th{position:sticky;top:0;z-index:2;padding:10px 12px;text-align:left}
-.tblivro thead tr.sub th{position:sticky;top:34px;background:var(--th-bg);color:var(--text-2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border-c)}
-.tblivro tbody td{padding:9px 12px;border-bottom:1px solid var(--border-c)}
-.tblivro tbody tr:hover td{background:rgba(255,255,255,.03)}
-.pv{display:inline-block;min-width:76px;padding:4px 10px;border-radius:6px;font-weight:700;font-size:15px}
+.livro-sec{border:1px solid var(--border-c);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.livro-sec-h{padding:10px 14px;font-weight:700;font-size:14px}
+.livro-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:12px;background:var(--bg-card)}
+.livro-card{background:var(--bg-page);border:1px solid var(--border-c);border-radius:8px;padding:10px 12px;cursor:pointer;transition:border-color .12s,transform .12s}
+.livro-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}
+.livro-card .nm{font-size:14px;font-weight:600;line-height:1.3;min-height:2.3em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;padding-right:28px}
+.livro-card .vz{float:right;margin-top:-30px;color:var(--text-2);font-size:11px}
+.livro-card .pricerow{display:flex;gap:5px;margin-top:8px}
+.pv{flex:1;text-align:center;padding:4px 2px;border-radius:6px;font-weight:700;font-size:13px}
 .pv-min{background:rgba(76,175,80,.16);color:#66bb6a}
 .pv-med{background:rgba(255,193,7,.16);color:#ffca28}
 .pv-max{background:rgba(239,83,80,.16);color:#ef5350}
@@ -250,7 +253,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.3</p>
+  <p>Notas Fiscais do PR · v27.4</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1364,18 +1367,17 @@ function rLivro(){
   });
   g('n-lv').textContent=d.length+' itens';
   var byS={}; d.forEach(function(x){ var s=secaoLivro(x.categoria); (byS[s.nome]=byS[s.nome]||{s:s,itens:[]}).itens.push(x); });
-  var html='<table class="tblivro"><colgroup><col><col style="width:70px"><col style="width:120px"><col style="width:120px"><col style="width:120px"></colgroup>';
+  var html='';
   SECOES_LIVRO.forEach(function(s){
     var b=byS[s.nome]; if(!b || !b.itens.length) return;
-    html+='<thead><tr><th colspan="5" style="background:'+s.bg+';color:'+s.fg+'">'+s.nome+' <span style="font-weight:400;opacity:.75">('+b.itens.length+')</span></th></tr>'+
-      '<tr class="sub"><th>Item</th><th style="text-align:center">Vezes</th><th style="text-align:center">Mínimo</th><th style="text-align:center">Médio</th><th style="text-align:center">Máximo</th></tr></thead><tbody>';
-    html+=b.itens.map(function(x){
-      return '<tr class="clk" onclick="abrirItem(\''+esc(x.key)+'\',true)"><td>'+esc(x.nome)+'</td><td style="text-align:center;color:var(--text-2)">'+x.vezes+'</td>'+
-        '<td style="text-align:center"><span class="pv pv-min">'+brl(x.min)+'</span></td>'+
-        '<td style="text-align:center"><span class="pv pv-med">'+brl(x.medio)+'</span></td>'+
-        '<td style="text-align:center"><span class="pv pv-max">'+brl(x.max)+'</span></td></tr>';
-    }).join('');
-    html+='</tbody>';
+    html+='<div class="livro-sec" style="border-color:'+s.bg+'66">'+
+      '<div class="livro-sec-h" style="background:'+s.bg+';color:'+s.fg+'">'+s.nome+' <span style="font-weight:400;opacity:.75">('+b.itens.length+')</span></div>'+
+      '<div class="livro-grid">'+b.itens.map(function(x){
+        return '<div class="livro-card clk" onclick="abrirItem(\''+esc(x.key)+'\',true)">'+
+          '<div class="nm">'+esc(x.nome)+'</div><div class="vz">'+x.vezes+'x</div>'+
+          '<div class="pricerow"><span class="pv pv-min">'+brl(x.min)+'</span><span class="pv pv-med">'+brl(x.medio)+'</span><span class="pv pv-max">'+brl(x.max)+'</span></div>'+
+        '</div>';
+      }).join('')+'</div></div>';
   });
   g('b-lv').innerHTML=html;
 }
