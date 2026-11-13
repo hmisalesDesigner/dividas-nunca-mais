@@ -253,7 +253,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.6</p>
+  <p>Notas Fiscais do PR · v27.7</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1381,6 +1381,9 @@ function rLivro(){
     if(_livro.ord==='vezes') return b.vezes-a.vezes;
     if(_livro.ord==='medio') return b.medio-a.medio;
     if(_livro.ord==='diff') return (b.max-b.min)-(a.max-a.min);
+    var la=normProdName(a.nome).charAt(0), lb=normProdName(b.nome).charAt(0);
+    if(la!==lb) return la<lb?-1:1;
+    if(Math.abs(a.medio-b.medio)>0.004) return a.medio-b.medio;
     return a.nome.localeCompare(b.nome,'pt-BR');
   });
   g('n-lv').textContent=d.length+' itens';
@@ -1391,9 +1394,13 @@ function rLivro(){
     html+='<div class="livro-sec" style="border-color:'+s.bg+'66">'+
       '<div class="livro-sec-h" style="background:'+s.bg+';color:'+s.fg+'">'+s.nome+' <span style="font-weight:400;opacity:.75">('+b.itens.length+')</span></div>'+
       '<div class="livro-grid">'+b.itens.map(function(x){
+        var unico=Math.abs(x.max-x.min)<0.005 && Math.abs(x.medio-x.min)<0.005;
+        var precos=unico
+          ? '<span class="pv pv-min">'+brl(x.min)+'</span><span class="pv"></span><span class="pv"></span>'
+          : '<span class="pv pv-min">'+brl(x.min)+'</span><span class="pv pv-med">'+brl(x.medio)+'</span><span class="pv pv-max">'+brl(x.max)+'</span>';
         return '<div class="livro-card clk" onclick="abrirItem(\''+esc(x.key)+'\',true)">'+
           '<div class="nm">'+esc(x.nome)+'</div><div class="vz">'+x.vezes+'x</div>'+
-          '<div class="pricerow"><span class="pv pv-min">'+brl(x.min)+'</span><span class="pv pv-med">'+brl(x.medio)+'</span><span class="pv pv-max">'+brl(x.max)+'</span></div>'+
+          '<div class="pricerow">'+precos+'</div>'+
         '</div>';
       }).join('')+'</div></div>';
   });
