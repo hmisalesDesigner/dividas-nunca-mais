@@ -248,13 +248,14 @@ td.clk:hover{background:var(--bg-hover)}
 .pv-min{color:#66bb6a;font-weight:700}
 .pv-med{color:#ffca28;font-weight:400}
 .pv-max{color:#ef5350;font-weight:400}
+.cod-it{font-family:monospace;font-size:10.5px;color:var(--text-2);opacity:.75;letter-spacing:.02em}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.0</p>
+  <p>Notas Fiscais do PR · v28.1</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1147,7 +1148,7 @@ function nfsAgrupaItens(itens, notasPorId){
     var barato=ord.filter(function(p){return p.vu===minP;})[0];
     return {key:k,nome:top(o.nomes),categoria:top(o.cat),marca:top(o.marcas),vezes:Object.keys(o.compras).length,linhas:o.pontos.length,qtd:o.qtd,total:o.total,
       min:minP,max:maxP,medio:o.qtd?o.total/o.qtd:0,ultimo:ord.length?ord[ord.length-1].vu:0,ultimaData:ord.length?ord[ord.length-1].d:null,
-      lojaBarata:barato?barato.loja:'',pontos:ord,unidade:(o.pontos[0]||{}).un||''};
+      lojaBarata:barato?barato.loja:'',pontos:ord,unidade:(o.pontos[0]||{}).un||'',variantes:Object.keys(o.nomes)};
   });
   return arr;
 }
@@ -1403,7 +1404,7 @@ function rLivro(){
           : '<span class="pv pv-min">'+brl(x.min)+'</span><span class="pv pv-med">'+brl(x.medio)+'</span><span class="pv pv-max">'+brl(x.max)+'</span>';
         var cod=catCodItem(x.key), nomeR=catNomeItem(x.key,x.nome);
         return '<div class="livro-card clk" onclick="abrirItem(\''+esc(x.key)+'\',true)">'+
-          '<div class="nm">'+(cod?'<span style="color:var(--text-2);font-weight:400">'+esc(cod)+' · </span>':'')+esc(nomeR)+'</div><div class="vz">'+x.vezes+'x</div>'+
+          '<div class="nm">'+(cod?'<span class="cod-it">'+esc(cod)+'</span> ':'')+esc(nomeR)+'</div><div class="vz">'+x.vezes+'x</div>'+
           '<div class="pricerow">'+precos+'</div>'+
         '</div>';
       }).join('')+'</div></div></div>';
@@ -1430,11 +1431,17 @@ async function pgCatalogo(){
     var existentes=(DB.catalogo_itens||[]).slice();
     var porChave={}; existentes.forEach(function(r){porChave[r.chave]=r;});
     var maxCod=0; existentes.forEach(function(r){ var m=String(r.codigo||'').match(/\d+/); if(m) maxCod=Math.max(maxCod,parseInt(m[0],10)); });
-    var novos=[];
+    var novos=[], atualizar=[];
     grupos.forEach(function(gr){
-      if(!porChave[gr.key]){ maxCod++; var row={chave:gr.key,nome_real:'',codigo:'I'+String(maxCod).padStart(4,'0')}; porChave[gr.key]=row; novos.push(row); }
+      var r=porChave[gr.key];
+      if(!r){ maxCod++; r={chave:gr.key,nome_real:'',codigo:'I'+String(maxCod).padStart(4,'0'),nomes_originais:gr.variantes}; porChave[gr.key]=r; novos.push(r); return; }
+      // nunca perde uma variação de nome já vista; só acrescenta as que forem surgindo
+      var atuais=r.nomes_originais||(r.nome_real===undefined?[]:[]); atuais=r.nomes_originais||[];
+      var faltam=gr.variantes.filter(function(v){ return atuais.indexOf(v)<0; });
+      if(faltam.length){ r.nomes_originais=atuais.concat(faltam); atualizar.push({chave:r.chave,nomes_originais:r.nomes_originais}); }
     });
     if(novos.length){ await sb.from('catalogo_itens').insert(novos); }
+    for(var ai=0; ai<atualizar.length; ai++){ await sb.from('catalogo_itens').update({nomes_originais:atualizar[ai].nomes_originais}).eq('chave',atualizar[ai].chave); }
     // garante código de loja
     var estabs=re.data||[]; var maxL=0; estabs.forEach(function(e){ var m=String(e.codigo||'').match(/\d+/); if(m) maxL=Math.max(maxL,parseInt(m[0],10)); });
     var upsEst=[];
@@ -1466,8 +1473,10 @@ function rCatLista(){
     g('n-cat').textContent=d.length+' itens';
     g('tb-cat').innerHTML=d.map(function(x){
       var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===x.key;});
-      return '<tr><td style="font-family:monospace;font-size:12px;color:var(--text-2)">'+esc((c&&c.codigo)||'')+'</td>'+
-        '<td style="color:var(--text-2)">'+esc(x.nome)+'</td>'+
+      var vars=(c&&c.nomes_originais)||x.variantes||[x.nome];
+      var outras=vars.filter(function(v){return v!==x.nome;});
+      return '<tr><td class="cod-it">'+esc((c&&c.codigo)||'')+'</td>'+
+        '<td style="color:var(--text-2)">'+esc(x.nome)+(outras.length?'<div style="font-size:11px;color:var(--text-2);opacity:.65;margin-top:2px" title="Todas as grafias já recebidas desse item, guardadas para nunca se perder">também veio como: '+esc(outras.slice(0,4).join(' · '))+(outras.length>4?' · +'+(outras.length-4):'')+'</div>':'')+'</td>'+
         '<td><input type="text" value="'+esc((c&&c.nome_real)||'')+'" placeholder="Escreva o nome real..." style="width:95%" onchange="salvCatItem(\''+esc(x.key).replace(/'/g,"\\'")+'\',this.value)"></td>'+
         '<td style="text-align:center;color:var(--text-2)">'+x.vezes+'</td></tr>';
     }).join('');
@@ -1476,7 +1485,7 @@ function rCatLista(){
     d.sort(function(a,b){return String(a.nome_fantasia||a.razao_social||'').localeCompare(String(b.nome_fantasia||b.razao_social||''),'pt-BR');});
     g('n-cat').textContent=d.length+' lojas';
     g('tb-cat').innerHTML=d.map(function(e){
-      return '<tr><td style="font-family:monospace;font-size:12px;color:var(--text-2)">'+esc(e.codigo||'')+'</td>'+
+      return '<tr><td class="cod-it">'+esc(e.codigo||'')+'</td>'+
         '<td>'+esc(e.nome_fantasia||('('+String(e.razao_social||'').substring(0,24)+')'))+'</td>'+
         '<td style="font-family:monospace;font-size:11px;color:var(--text-2)">'+esc(e.cnpj||'—')+'</td>'+
         '<td><span class="tag tbl">'+esc(e.categoria||'—')+'</span></td></tr>';
