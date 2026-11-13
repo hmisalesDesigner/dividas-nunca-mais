@@ -241,21 +241,19 @@ td.clk:hover{background:var(--bg-hover)}
 .livro-card{background:var(--bg-card);padding:9px 12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .livro-card:hover{background:var(--bg-hover)}
 .livro-card .nm{font-size:13.5px;font-weight:500;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
-.livro-card .pricerow{flex-shrink:0}
-.pv{display:inline-block}
-.livro-card .vz{color:var(--text-2);font-size:11px;flex-shrink:0}
+..livro-card .vz{color:var(--text-2);font-size:11px;flex-shrink:0}
 .livro-card .pricerow{display:flex;gap:8px;flex-shrink:0}
-.pv{font-weight:700;font-size:13px;min-width:46px;text-align:right}
-.pv-min{color:#66bb6a}
-.pv-med{color:#ffca28}
-.pv-max{color:#ef5350}
+.pv{display:inline-block;font-size:13px;min-width:58px;text-align:right}
+.pv-min{color:#66bb6a;font-weight:700}
+.pv-med{color:#ffca28;font-weight:400}
+.pv-max{color:#ef5350;font-weight:400}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.5</p>
+  <p>Notas Fiscais do PR · v27.6</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
