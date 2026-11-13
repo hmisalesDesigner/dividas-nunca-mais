@@ -234,13 +234,23 @@ td.clk:hover{background:var(--bg-hover)}
 .tm-row.clk{cursor:pointer}
 .insc table{font-size:14.5px}.insc th{font-size:13px}.insc td,.insc th{padding:9px 12px}.insc small{font-size:12px}
 .livro table{font-size:14px}.livro th,.livro td{padding:8px 12px}
+.livro{overflow:visible}
+.tblivro{width:100%;border-collapse:collapse;font-size:14px}
+.tblivro thead tr th{position:sticky;top:0;z-index:2;padding:10px 12px;text-align:left}
+.tblivro thead tr.sub th{position:sticky;top:34px;background:var(--th-bg);color:var(--text-2);font-size:12px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border-c)}
+.tblivro tbody td{padding:9px 12px;border-bottom:1px solid var(--border-c)}
+.tblivro tbody tr:hover td{background:rgba(255,255,255,.03)}
+.pv{display:inline-block;min-width:76px;padding:4px 10px;border-radius:6px;font-weight:700;font-size:15px}
+.pv-min{background:rgba(76,175,80,.16);color:#66bb6a}
+.pv-med{background:rgba(255,193,7,.16);color:#ffca28}
+.pv-max{background:rgba(239,83,80,.16);color:#ef5350}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.2</p>
+  <p>Notas Fiscais do PR · v27.3</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1299,10 +1309,8 @@ function livroAgrupa(itens,notasPorId){
       var h=candidatos[0];
       h.qtd+=g.qtd; h.total+=g.total; h.linhas+=g.linhas;
       h.pontos=h.pontos.concat(g.pontos);
-      Object.keys(g.nomes||{}).forEach(function(n){});
-      h.min=Math.min(h.min||g.min,g.min||h.min); h.max=Math.max(h.max,g.max);
-      var compras={}; h.pontos.forEach(function(p){compras[p.cnpj+'#'+(p.d||'')]=1;});
-      h.vezes=Math.max(h.vezes,g.vezes)+ (h.vezes===g.vezes?0:0);
+      h.min=Math.min(h.min,g.min); h.max=Math.max(h.max,g.max);
+      h.vezes=Math.max(h.vezes,g.vezes);
       absorvido[g.key]=true;
     }
   });
@@ -1312,6 +1320,23 @@ function livroAgrupa(itens,notasPorId){
     g.ultimo=ord.length?ord[ord.length-1].vu:g.ultimo; g.ultimaData=ord.length?ord[ord.length-1].d:g.ultimaData;
     return g;
   });
+}
+var SECOES_LIVRO=[
+  {nome:'🥬 Horti-Fruti', cats:['Frutas','Legumes e Vegetais'], bg:'#c5e1a5', fg:'#1b3d0f'},
+  {nome:'🥩 Carnes', cats:['Proteínas'], bg:'#c62828', fg:'#ffffff'},
+  {nome:'🧀 Laticínios e Frios', cats:['Laticínios'], bg:'#90caf9', fg:'#0d2b4e'},
+  {nome:'🍞 Padaria', cats:['Pães e Panificados'], bg:'#d7a86e', fg:'#3b2411'},
+  {nome:'🛒 Mercearia', cats:['Grãos e Cereais','Massas e Farinhas','Óleos e Azeites','Condimentos e Temperos','Enlatados e Conservas','Carboidratos','Alimentação'], bg:'#e6d08a', fg:'#3b320a'},
+  {nome:'🍬 Doces e Snacks', cats:['Doces e Sobremesas','Snacks e Biscoitos','Café, Chá e Achocolatados'], bg:'#f06292', fg:'#3d0f22'},
+  {nome:'🥤 Bebidas', cats:['Bebidas e Sucos'], bg:'#9575cd', fg:'#ffffff'},
+  {nome:'🧼 Limpeza e Higiene', cats:['Limpeza','Higiene Pessoal','Descartáveis','Papelaria'], bg:'#64b5f6', fg:'#0a2540'},
+  {nome:'💊 Farmácia e Saúde', cats:['Farmácia e Medicamentos','Suplementos e Vitaminas'], bg:'#4db6ac', fg:'#06302b'},
+  {nome:'🐾 Pet', cats:['Pets'], bg:'#ffb74d', fg:'#3b2300'},
+  {nome:'📦 Outros', cats:[], bg:'#9e9e9e', fg:'#1a1a1a'}
+];
+function secaoLivro(cat){
+  for(var i=0;i<SECOES_LIVRO.length-1;i++) if(SECOES_LIVRO[i].cats.indexOf(cat)>=0) return SECOES_LIVRO[i];
+  return SECOES_LIVRO[SECOES_LIVRO.length-1];
 }
 async function pgLivro(){
   setActs('');
@@ -1325,7 +1350,7 @@ async function pgLivro(){
     setPage('<div class="tbar"><input type="text" id="q-lv" placeholder="🔍 Buscar item..." value="'+esc(_livro.q)+'" oninput="_livro.q=this.value;rLivro()" style="width:280px">'+
       '<select id="o-lv" onchange="_livro.ord=this.value;rLivro()">'+[['nome','Nome (A–Z)'],['vezes','Mais comprados'],['medio','Maior preço médio'],['diff','Maior variação']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===_livro.ord?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
       '<span id="n-lv" style="color:var(--text-2);font-size:12px"></span></div>'+
-      '<div class="card livro"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr><th>Item</th><th style="text-align:center">Vezes</th><th style="text-align:right">Mín.</th><th style="text-align:right">Médio</th><th style="text-align:right">Máx.</th></tr></thead><tbody id="b-lv"></tbody></table></div></div>');
+      '<div class="card livro"><div class="scr" style="height:auto;max-height:640px" id="b-lv"></div></div>');
     rLivro();
   }catch(e){ err(e); }
 }
@@ -1338,9 +1363,21 @@ function rLivro(){
     return a.nome.localeCompare(b.nome,'pt-BR');
   });
   g('n-lv').textContent=d.length+' itens';
-  g('b-lv').innerHTML=d.map(function(x){
-    return '<tr class="clk" onclick="abrirItem(\''+esc(x.key)+'\',true)"><td>'+esc(x.nome)+'</td><td style="text-align:center">'+x.vezes+'</td><td style="text-align:right">'+brl(x.min)+'</td><td style="text-align:right">'+brl(x.medio)+'</td><td style="text-align:right">'+brl(x.max)+'</td></tr>';
-  }).join('');
+  var byS={}; d.forEach(function(x){ var s=secaoLivro(x.categoria); (byS[s.nome]=byS[s.nome]||{s:s,itens:[]}).itens.push(x); });
+  var html='<table class="tblivro"><colgroup><col><col style="width:70px"><col style="width:120px"><col style="width:120px"><col style="width:120px"></colgroup>';
+  SECOES_LIVRO.forEach(function(s){
+    var b=byS[s.nome]; if(!b || !b.itens.length) return;
+    html+='<thead><tr><th colspan="5" style="background:'+s.bg+';color:'+s.fg+'">'+s.nome+' <span style="font-weight:400;opacity:.75">('+b.itens.length+')</span></th></tr>'+
+      '<tr class="sub"><th>Item</th><th style="text-align:center">Vezes</th><th style="text-align:center">Mínimo</th><th style="text-align:center">Médio</th><th style="text-align:center">Máximo</th></tr></thead><tbody>';
+    html+=b.itens.map(function(x){
+      return '<tr class="clk" onclick="abrirItem(\''+esc(x.key)+'\',true)"><td>'+esc(x.nome)+'</td><td style="text-align:center;color:var(--text-2)">'+x.vezes+'</td>'+
+        '<td style="text-align:center"><span class="pv pv-min">'+brl(x.min)+'</span></td>'+
+        '<td style="text-align:center"><span class="pv pv-med">'+brl(x.medio)+'</span></td>'+
+        '<td style="text-align:center"><span class="pv pv-max">'+brl(x.max)+'</span></td></tr>';
+    }).join('');
+    html+='</tbody>';
+  });
+  g('b-lv').innerHTML=html;
 }
 async function pgItens(){
   setActs('');
