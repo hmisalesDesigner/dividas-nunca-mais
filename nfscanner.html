@@ -253,7 +253,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v27.7</p>
+  <p>Notas Fiscais do PR · v27.8</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1391,7 +1391,7 @@ function rLivro(){
   var html='';
   SECOES_LIVRO.forEach(function(s){
     var b=byS[s.nome]; if(!b || !b.itens.length) return;
-    html+='<div class="livro-sec" style="border-color:'+s.bg+'66">'+
+    html+='<div class="livro-sec" style="border-color:'+s.bg+'66;border-left:4px solid '+s.bg+'">'+
       '<div class="livro-sec-h" style="background:'+s.bg+';color:'+s.fg+'">'+s.nome+' <span style="font-weight:400;opacity:.75">('+b.itens.length+')</span></div>'+
       '<div class="livro-grid">'+b.itens.map(function(x){
         var unico=Math.abs(x.max-x.min)<0.005 && Math.abs(x.medio-x.min)<0.005;
