@@ -249,13 +249,28 @@ td.clk:hover{background:var(--bg-hover)}
 .pv-med{color:#ffca28;font-weight:400}
 .pv-max{color:#ef5350;font-weight:400}
 .cod-it{font-family:monospace;font-size:10.5px;color:var(--text-2);opacity:.75;letter-spacing:.02em}
+.cc-prog{text-align:center;color:var(--text-2);font-size:13px;margin:6px 0 18px}
+.cc-row{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap}
+.cc{border-radius:16px;padding:16px 18px;box-sizing:border-box}
+.cc-lado{width:210px;min-height:130px;background:#d6ecff;color:#0d3358;opacity:.8;transform:scale(.92);cursor:pointer;transition:opacity .15s,transform .15s}
+.cc-lado:hover{opacity:1;transform:scale(.96)}
+.cc-lado .cod-it{color:#0d3358}
+.cc-vazio{width:210px;min-height:130px;background:transparent;border:2px dashed var(--border-c);opacity:.35}
+.cc-nm{font-weight:600;font-size:15px;margin-top:6px;line-height:1.3}
+.cc-sub{font-size:11.5px;opacity:.7;margin-top:4px}
+.cc-centro{width:400px;max-width:94vw;background:#ffb74d;color:#3b2300;box-shadow:0 6px 24px rgba(255,152,0,.28);padding:22px}
+.cc-big{font-size:22px;font-weight:700;line-height:1.25;margin-top:2px}
+.cc-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;opacity:.7;margin-top:8px}
+.cc-centro input{width:100%;box-sizing:border-box;margin-top:4px;padding:10px 12px;font-size:15px;border-radius:10px;border:2px solid #e65100;background:#fff8ee;color:#3b2300}
+.cc-btns{display:flex;gap:8px;margin-top:14px;justify-content:space-between;flex-wrap:wrap}
+@media(max-width:900px){.cc-lado,.cc-vazio{width:44%}.cc-centro{order:-1;width:100%}}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.1</p>
+  <p>Notas Fiscais do PR · v28.2</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1420,7 +1435,7 @@ function catCodItem(key){
   var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===key;});
   return c?c.codigo:'';
 }
-var _cat={view:'itens',q:''};
+var _cat={view:'cards',q:'',idx:0};
 async function pgCatalogo(){
   setActs('');
   try{
@@ -1454,21 +1469,68 @@ async function pgCatalogo(){
   }catch(e){ err(e); }
 }
 function renderCatalogo(){
-  setPage('<div class="tbar">'+
-    '<button class="btn '+(_cat.view==='itens'?'bp':'bg')+' bsm" onclick="_cat.view=\'itens\';renderCatalogo()">🏷️ Itens</button>'+
-    '<button class="btn '+(_cat.view==='lojas'?'bp':'bg')+' bsm" onclick="_cat.view=\'lojas\';renderCatalogo()">🏪 Lojas</button>'+
+  var tb='<div class="tbar">'+
+    '<button class="btn '+(_cat.view==='cards'?'bp':'bg')+' bsm" onclick="_cat.view=\'cards\';renderCatalogo()">🎴 Cartas</button>'+
+    '<button class="btn '+(_cat.view==='lista'?'bp':'bg')+' bsm" onclick="_cat.view=\'lista\';renderCatalogo()">📋 Lista</button>'+
+    '<button class="btn '+(_cat.view==='lojas'?'bp':'bg')+' bsm" onclick="_cat.view=\'lojas\';renderCatalogo()">🏪 Lojas</button>';
+  if(_cat.view==='cards'){ setPage(tb+'</div><div id="cat-cards"></div>'); catPosInicial(); rCatCards(); return; }
+  setPage(tb+
     '<input type="text" id="q-cat" placeholder="🔍 Buscar..." value="'+esc(_cat.q)+'" oninput="_cat.q=this.value;rCatLista()" style="width:260px">'+
     '<span id="n-cat" style="color:var(--text-2);font-size:12px"></span></div>'+
     '<div class="card"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr>'+
-    (_cat.view==='itens'
+    (_cat.view!=='lojas'
       ? '<th style="width:70px">Código</th><th>Nome automático</th><th>Nome real (edite aqui)</th><th style="text-align:center;width:70px">Vezes</th>'
       : '<th style="width:70px">Código</th><th>Nome fantasia</th><th>CNPJ</th><th>Categoria</th>')+
     '</tr></thead><tbody id="tb-cat"></tbody></table></div></div>');
   rCatLista();
 }
+/* --- modo cartas: retoma de onde parou --- */
+function catRow(x){ return (DB.catalogo_itens||[]).find(function(r){return r.chave===x.key;})||{}; }
+function catPosInicial(){
+  var L=_cat.itens||[]; if(!L.length){ _cat.idx=0; return; }
+  var i=L.findIndex(function(x){return x.key===DB._cat_pos;});
+  if(i<0){ i=L.findIndex(function(x){return !catRow(x).nome_real;}); if(i<0) i=0; }
+  _cat.idx=i;
+}
+function catIr(i){
+  var L=_cat.itens||[]; if(!L.length) return;
+  _cat.idx=Math.max(0,Math.min(L.length-1,i));
+  DB._cat_pos=L[_cat.idx].key; scheduleDriveSave();
+  rCatCards();
+}
+async function catSalvarProx(){
+  var L=_cat.itens||[], x=L[_cat.idx]; if(!x) return;
+  var inp=g('cat-inp'); if(inp) await salvCatItem(x.key,inp.value);
+  catIr(_cat.idx+1);
+}
+function catMini(x,i,cls){
+  if(!x) return '<div class="cc cc-vazio '+cls+'"></div>';
+  var r=catRow(x), ok=!!r.nome_real;
+  return '<div class="cc cc-lado '+cls+'" onclick="catIr('+i+')"><div class="cod-it">'+esc(r.codigo||'')+(ok?' · ✓':'')+'</div>'+
+    '<div class="cc-nm">'+esc(ok?r.nome_real:x.nome)+'</div>'+(ok?'<div class="cc-sub">'+esc(x.nome)+'</div>':'')+'</div>';
+}
+function rCatCards(){
+  var L=_cat.itens||[], i=_cat.idx, x=L[i]; var box=g('cat-cards'); if(!box) return;
+  if(!x){ box.innerHTML='<div class="empty"><p>Nenhum item cadastrado ainda.</p></div>'; return; }
+  var r=catRow(x), feitos=L.filter(function(y){return catRow(y).nome_real;}).length;
+  var vars=(r.nomes_originais||x.variantes||[x.nome]).filter(function(v){return v!==x.nome;});
+  box.innerHTML='<div class="cc-prog">Item '+(i+1)+' de '+L.length+' · <b>'+feitos+'</b> com nome real · faltam '+(L.length-feitos)+'</div>'+
+    '<div class="cc-row">'+catMini(L[i-1],i-1,'cc-ant')+
+    '<div class="cc cc-centro"><div class="cod-it" style="color:#7a3d00;opacity:.9">'+esc(r.codigo||'')+'</div>'+
+      '<div class="cc-lbl">Nome na nota</div><div class="cc-big">'+esc(x.nome)+'</div>'+
+      (vars.length?'<div class="cc-sub">também veio como: '+esc(vars.slice(0,3).join(' · '))+'</div>':'')+
+      '<div class="cc-sub">'+esc(x.categoria||'')+' · comprado '+x.vezes+'x</div>'+
+      '<div class="cc-lbl" style="margin-top:12px">Nome real</div>'+
+      '<input type="text" id="cat-inp" value="'+esc(r.nome_real||'')+'" placeholder="Escreva o nome real..." onkeydown="if(event.key===\'Enter\'){catSalvarProx()}">'+
+      '<div class="cc-btns"><button class="btn bg bsm" onclick="catIr('+(i-1)+')">◀ Anterior</button>'+
+      '<button class="btn bg bsm" onclick="catIr('+(i+1)+')">Pular</button>'+
+      '<button class="btn bp bsm" onclick="catSalvarProx()">Salvar e próximo ▶</button></div></div>'+
+    catMini(L[i+1],i+1,'cc-prox')+'</div>';
+  var inp=g('cat-inp'); if(inp) inp.focus();
+}
 function rCatLista(){
   var q=_cat.q||'';
-  if(_cat.view==='itens'){
+  if(_cat.view!=='lojas'){
     var d=(_cat.itens||[]).filter(function(x){ return bscMatch(q, x.nome+' '+(catCodItem(x.key)||'')); });
     g('n-cat').textContent=d.length+' itens';
     g('tb-cat').innerHTML=d.map(function(x){
