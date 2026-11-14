@@ -356,7 +356,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.1</p>
+  <p>Notas Fiscais do PR · v29.2</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -2463,7 +2463,7 @@ async function pgDash(){
     var marcaGasto={}; itens.forEach(function(it){ if(it.marca) marcaGasto[it.marca]=(marcaGasto[it.marca]||0)+(Number(it.valor_total)||0); });
     var topMarcasAll=Object.entries(marcaFreq).sort(function(a,b){return b[1]-a[1];}).map(function(e){return{marca:e[0],qtd:e[1],gasto:marcaGasto[e[0]]||0};});
     window._marcasAll=topMarcasAll;
-    var topMarcas=topMarcasAll.slice(0,7);
+    var topMarcas=topMarcasAll.slice(0,8);
 
     var ultimas=[...notas].sort(function(a,b){return String(b.data_importacao||'')>String(a.data_importacao||'')?1:-1;}).slice(0,10);
 
@@ -2476,9 +2476,7 @@ async function pgDash(){
       '</div>'+
       '<div class="g2">'+
       '<div class="ch ch-h" style="height:280px"><h4>Gastos mensais</h4><canvas id="ch-g"></canvas></div>'+
-      '<div class="card"><div class="card-hd"><span>Top Marcas</span><a class="ver-todas" style="margin:0" onclick="marcasModal()">Ver todas ('+topMarcasAll.length+')</a></div><div class="scr" style="max-height:236px"><table><thead><tr><th style="width:28px">#</th><th>Marca</th><th style="text-align:right">Unid.</th><th style="text-align:right">Gasto</th></tr></thead><tbody>'+
-      topMarcas.map(function(m,i){return '<tr class="clk" onclick="'+dk({marca:m.marca})+'"><td style="color:var(--text-2)">'+(i+1)+'</td><td style="font-weight:600">'+esc(m.marca)+'</td><td style="text-align:right">'+m.qtd+'</td><td style="text-align:right">'+brl(m.gasto)+'</td></tr>';}).join('')+
-      '</tbody></table></div></div></div>'+
+      '<div class="ch ch-h" style="height:280px;display:flex;flex-direction:column"><div class="card-hd" style="padding:0 0 6px;border:0"><span style="font-weight:700">Top Marcas <span style="font-weight:400;color:var(--text-2);font-size:12px">· unidades compradas</span></span><a class="ver-todas" style="margin:0;padding:0" onclick="marcasModal()">Ver todas ('+topMarcasAll.length+')</a></div><div style="flex:1;min-height:0;position:relative"><canvas id="ch-marcas"></canvas></div></div></div>'+
       cardTicketTipos(notas)+
       '<div class="g2">'+
       '<div class="card"><div class="card-hd">Produtos mais comprados</div><div class="pm-wrap"><div class="pm-filtros" id="pm-f"></div><div class="pm-tab" id="pm-t"></div></div></div>'+
@@ -2487,6 +2485,8 @@ async function pgDash(){
       '</tbody></table></div></div>'
     );
     pmRender();
+    setTimeout(function(){ var el=g_('ch-marcas'); if(!el||!topMarcas.length) return;
+      try{ CHARTS.marcas=criarGraficoComFonte(el,{type:'bar',data:{labels:topMarcas.map(function(m){return m.marca;}),datasets:[{data:topMarcas.map(function(m){return m.qtd;}),backgroundColor:topMarcas.map(function(m,i){return CORES[i%CORES.length]+'cc';}),borderRadius:5,barPercentage:.7}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:function(ev,els){ if(els.length) drillF(dki({marca:topMarcas[els[0].index].marca})); },onHover:function(ev,els){ if(ev.native&&ev.native.target) ev.native.target.style.cursor=els.length?'pointer':'default'; },plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){var m=topMarcas[c.dataIndex]; return m.qtd+' un. · '+brl(m.gasto);}}}},scales:{x:{ticks:{font:{size:12},maxTicksLimit:5}},y:{grid:{display:false},ticks:{font:{size:13}}}}}}); }catch(e){ console.warn('Gráfico de marcas falhou:',e); } },90);
     if(meses.length){
       setTimeout(function(){
         try{ CHARTS.g=criarGraficoComFonte(g('ch-g'),{type:'bar',data:{labels:meses.map(function(m){return m.mes;}),datasets:[{data:meses.map(function(m){return m.total;}),backgroundColor:'rgba(26,115,232,.75)',borderRadius:5}]},options:{onClick:function(ev,els){ if(els.length) drillF(dki({mes:meses[els[0].index].mes,t:'Mês '+meses[els[0].index].mes})); },onHover:function(ev,els){ if(ev.native&&ev.native.target) ev.native.target.style.cursor=els.length?'pointer':'default'; },responsive:true,maintainAspectRatio:false,layout:{padding:{left:8,right:14,top:8,bottom:4}},plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return brl(ctx.parsed.y);}}}},scales:{y:{ticks:{font:{size:14},maxTicksLimit:6,callback:function(v){return brl(v);}}},x:{ticks:{font:{size:12.5}}}}}}); }catch(e){ console.warn('Gráfico falhou ao renderizar:', e); }
