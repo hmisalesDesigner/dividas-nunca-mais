@@ -350,13 +350,22 @@ td.clk:hover{background:var(--bg-hover)}
 .res-ano th{font-size:calc(13px * var(--fs,1))}.res-ano td{font-size:calc(16px * var(--fs,1));padding:10px 14px}.res-ano th{padding:9px 14px}
 .comp-res td,.comp-res th{padding:14px 16px;font-size:calc(15px * var(--fs,1))}
 .ins-rec{background:var(--bg-card);border-left:5px solid #FBBC04;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:14px;line-height:1.5}
+
+*{scrollbar-width:thin;scrollbar-color:#4a5368 transparent}
+*::-webkit-scrollbar{width:8px;height:8px}*::-webkit-scrollbar-track{background:transparent}
+*::-webkit-scrollbar-thumb{background:#4a5368;border-radius:6px}*::-webkit-scrollbar-thumb:hover{background:#667089}
+:root:not([data-theme="dark"]) *{scrollbar-color:#c3c9d6 transparent}
+:root:not([data-theme="dark"]) *::-webkit-scrollbar-thumb{background:#c3c9d6}
+.pm-filtros{flex:0 0 170px}
+.pm-tab table{width:100%}
+.pm-tab thead th{position:sticky;top:0;z-index:2}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.2</p>
+  <p>Notas Fiscais do PR · v29.3</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -2478,7 +2487,7 @@ async function pgDash(){
       '<div class="ch ch-h" style="height:280px"><h4>Gastos mensais</h4><canvas id="ch-g"></canvas></div>'+
       '<div class="ch ch-h" style="height:280px;display:flex;flex-direction:column"><div class="card-hd" style="padding:0 0 6px;border:0"><span style="font-weight:700">Top Marcas <span style="font-weight:400;color:var(--text-2);font-size:12px">· unidades compradas</span></span><a class="ver-todas" style="margin:0;padding:0" onclick="marcasModal()">Ver todas ('+topMarcasAll.length+')</a></div><div style="flex:1;min-height:0;position:relative"><canvas id="ch-marcas"></canvas></div></div></div>'+
       cardTicketTipos(notas)+
-      '<div class="g2">'+
+      '<div class="g2" style="grid-template-columns:minmax(0,1.75fr) minmax(0,1fr)">'+
       '<div class="card"><div class="card-hd">Produtos mais comprados</div><div class="pm-wrap"><div class="pm-filtros" id="pm-f"></div><div class="pm-tab" id="pm-t"></div></div></div>'+
       '<div class="card"><div class="card-hd">Últimas notas</div><table><thead><tr><th>Estabelecimento</th><th>Data</th><th>Valor</th><th>Itens</th><th>Status</th></tr></thead><tbody>'+
       ultimas.map(function(n){return '<tr class="clk" onclick="'+dk({notaId:n.id})+'"><td>'+esc(String(estabNome[n.cnpj]||n.estabelecimento||'').substring(0,24))+'</td><td style="color:var(--text-2)">'+fmt(n.data_emissao)+'</td><td style="font-weight:600">'+brl(n.valor_total)+'</td><td style="text-align:center">'+(itensPorNota[n.id]||0)+'</td><td><span class="tag tgn">Processado</span></td></tr>';}).join('')+
