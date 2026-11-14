@@ -288,7 +288,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.5</p>
+  <p>Notas Fiscais do PR · v28.6</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -351,7 +351,7 @@ var GDRIVE_FILENAME = 'nfscanner-data.json';
 var LS_KEY = 'nfscanner_db_cache';
 var LS_FILEID_KEY = 'nfscanner_drive_file_id';
 
-var DB = {notas_fiscais:[],itens:[],estabelecimentos:[],estoque:[],devolucoes:[],marcas:[],lista_compras:[],configuracoes:[],_migr:{},_seq:{}};
+var DB = {notas_fiscais:[],itens:[],estabelecimentos:[],estoque:[],devolucoes:[],marcas:[],lista_compras:[],produtos:[],alertas_preco:[],catalogo_itens:[],configuracoes:[],_migr:{},_seq:{}};
 var CORES=['#1A73E8','#34A853','#FBBC04','#EA4335','#9C27B0','#FF6F00'];
 document.addEventListener('DOMContentLoaded', function(){
   if(typeof Chart !== 'undefined'){
@@ -447,7 +447,7 @@ async function loadFromDrive(){
   var txt = await r.text();
   if(txt && txt.trim()){
     var parsed = JSON.parse(txt);
-    Object.keys(DB).forEach(function(k){ if(parsed[k]!==undefined) DB[k]=parsed[k]; });
+    Object.keys(parsed).forEach(function(k){ if(parsed[k]!==undefined) DB[k]=parsed[k]; });
   }
   recalcSeq();
   saveLocal();
@@ -550,7 +550,7 @@ async function initGoogleAuth(){
           await loadFromDrive();
         }catch(e){
           var cached=loadLocal();
-          if(cached) Object.keys(DB).forEach(function(k){ if(cached[k]!==undefined) DB[k]=cached[k]; });
+          if(cached) Object.keys(cached).forEach(function(k){ if(cached[k]!==undefined) DB[k]=cached[k]; });
           recalcSeq();
         }
         setSyncStatus('ok');
@@ -3471,12 +3471,13 @@ function pgBack(){
   );
 }
 async function exportarBackupArquivo(){
-  var tabelas=['notas_fiscais','itens','estabelecimentos','estoque','devolucoes','marcas','lista_compras','produtos'];
+  var tabelas=['notas_fiscais','itens','estabelecimentos','estoque','devolucoes','marcas','lista_compras','produtos','catalogo_itens','alertas_preco'];
   var out={};
   for(var i=0;i<tabelas.length;i++){
     var {data} = await sb.from(tabelas[i]).select('*');
     out[tabelas[i]]=data||[];
   }
+  out._cat_pos=DB._cat_pos||null;
   var blob=new Blob([JSON.stringify(out,null,2)],{type:'application/json'});
   var a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -3595,6 +3596,12 @@ async function finalizarImportBkp(){
       var devIns=data.devolucoes.map(function(dv){ var c=Object.assign({},dv); delete c.id; return c; });
       await sb.from('devolucoes').insert(devIns);
     }
+    if(data.catalogo_itens && data.catalogo_itens.length){
+      var catIns=data.catalogo_itens.filter(function(c){ return !(DB.catalogo_itens||[]).some(function(r){return r.chave===c.chave;}); }).map(function(c){ var k=Object.assign({},c); delete k.id; return k; });
+      if(catIns.length) await sb.from('catalogo_itens').insert(catIns);
+    }
+    if(data._cat_pos) DB._cat_pos=data._cat_pos;
+    scheduleDriveSave();
     _bkpRevisao=null;
     setPage('<div style="max-width:480px;text-align:center;padding:40px"><div style="font-size:56px;margin-bottom:14px">✅</div><h3>Backup importado!</h3><p style="color:var(--text-2);margin:12px 0">Todos os produtos foram revisados e salvos.</p><button class="btn bp" onclick="go(\'dashboard\')">📊 Ver Dashboard</button></div>');
   }catch(ex){ alert('Erro ao importar: '+ex.message); }
