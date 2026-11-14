@@ -356,7 +356,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.0</p>
+  <p>Notas Fiscais do PR · v29.1</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1238,7 +1238,7 @@ function perMaiorCard(maior,atual,gr,gtxt,vis){
     for(var k=1;k<=nd;k++){ var cls=(k===d.getDate())?' mx':((uls.getFullYear()===ano&&uls.getMonth()===mes&&k===uls.getDate())?' ul':(dias[k]?' tem':'')); cel+='<b class="'+cls.trim()+'">'+k+'</b>'; }
     cal='<div class="mcal"><div class="mcal-t">'+mesNomes[mes]+'/'+ano+'</div><div class="mcal-g"><s>D</s><s>S</s><s>T</s><s>Q</s><s>Q</s><s>S</s><s>S</s>'+cel+'</div><div class="mcal-l"><span class="mx"></span>maior <span class="ul"></span>último</div></div>';
   }
-  return '<div class="kpi clk kpi-cal" onclick="'+dk({ini:maior.ini.toISOString(),fim:nfsProximo(maior.ini,gr).toISOString(),t:'Período '+maior.rotulo})+'" title="Período com o maior gasto entre os exibidos. O último '+gtxt+' com compras é '+atual.rotulo+'."><div><div class="kpi-top"><div class="kpi-ic ic-r">'+ICONS.trophy+'</div><div class="l2">Maior '+gtxt+'</div></div><div class="v2">'+brl(maior.total)+'</div><div class="s">'+maior.rotulo+(maior.ini.getTime()!==atual.ini.getTime()?' · o último foi '+atual.rotulo:' · é o último')+'</div></div>'+cal+'</div>';
+  return '<div class="kpi clk kpi-cal" onclick="'+dk({ini:maior.ini.toISOString(),fim:nfsProximo(maior.ini,gr).toISOString(),t:'Período '+maior.rotulo})+'" title="Período com o maior gasto entre os exibidos. O último '+gtxt+' com compras é '+atual.rotulo+'."><div><div class="kpi-top"><div class="kpi-ic ic-r">'+ICONS.trophy+'</div><div class="l2">Maior '+gtxt+'</div></div><div class="v2">'+brl(maior.total)+'</div><div class="s">'+maior.rotulo+(maior.ini.getTime()!==atual.ini.getTime()?'<br>o último foi '+atual.rotulo:'<br>é também o último')+'</div></div>'+cal+'</div>';
 }
 function perPainel(notas){
   var hoje=new Date(), a=hoje.getFullYear(), m=hoje.getMonth(), d=hoje.getDate(), nd=new Date(a,m+1,0).getDate();
@@ -1307,7 +1307,7 @@ function evSom(tipo){
     else { for(var i=0;i<4;i++){ nota(i%2?620:880,i*0.28,0.26,'square',0.08); } }
   }catch(e){}
 }
-function evFechar(){ var el=g_('ev-pop'); if(el) el.remove(); evFila(); }
+function evFechar(){ var el=g_('ev-pop'); if(el) el.remove(); if(_evQ.length) setTimeout(function(){ if(window._tabAtual==='periodos') evFila(); },25000); else atualizarBadges(); }
 var _evQ=[];
 function evFila(){
   if(g_('ev-pop')) return; var e=_evQ.shift(); if(!e) { atualizarBadges(); return; }
