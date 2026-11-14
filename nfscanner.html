@@ -359,13 +359,18 @@ td.clk:hover{background:var(--bg-hover)}
 .pm-filtros{flex:0 0 170px}
 .pm-tab table{width:100%}
 .pm-tab thead th{position:sticky;top:0;z-index:2}
+.lv-bar{display:flex;align-items:center;gap:10px;flex-wrap:nowrap}
+.lv-bar input{width:220px;flex-shrink:0}.lv-bar select{flex-shrink:0}
+.lv-bar .lv-sec{flex:1;min-width:0;margin:0;gap:6px}
+.lv-bar .lv-b{padding:7px 8px;font-size:12px}
+@media(max-width:1300px){.lv-bar{flex-wrap:wrap}.lv-bar .lv-sec{flex:1 0 100%}}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.3</p>
+  <p>Notas Fiscais do PR · v29.4</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1631,9 +1636,9 @@ async function pgLivro(){
     var itens=(ri.data||[]).filter(function(it){return porId[it.nota_id];});
     _livro.dados=livroAgrupa(itens,porId);
     if(!_livro.dados.length){ setPage('<div class="empty"><div class="empty-i">📭</div><p>Nenhum item de supermercado ainda.</p></div>'); return; }
-    setPage('<div class="lv-sec" id="lv-sec">'+livroBotoes()+'</div><div class="tbar"><input type="text" id="q-lv" placeholder="🔍 Buscar item..." value="'+esc(_livro.q)+'" oninput="_livro.q=this.value;rLivro()" style="width:280px">'+
+    setPage('<div class="tbar lv-bar"><input type="text" id="q-lv" placeholder="🔍 Buscar item..." value="'+esc(_livro.q)+'" oninput="_livro.q=this.value;rLivro()" style="width:280px">'+
       '<select id="o-lv" onchange="_livro.ord=this.value;rLivro()">'+[['nome','Nome (A–Z)'],['vezes','Mais comprados'],['medio','Maior preço médio'],['diff','Maior variação']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===_livro.ord?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
-      '<span id="n-lv" style="color:var(--text-2);font-size:12px"></span></div>'+
+      '<span id="n-lv" style="color:var(--text-2);font-size:12px;white-space:nowrap"></span><div class="lv-sec" id="lv-sec">'+livroBotoes()+'</div></div>'+
       '<div class="card livro"><div class="scr" style="height:auto;max-height:640px" id="b-lv"></div></div>');
     rLivro();
   }catch(e){ err(e); }
