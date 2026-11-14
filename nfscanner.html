@@ -288,7 +288,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.3</p>
+  <p>Notas Fiscais do PR · v28.4</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1527,16 +1527,26 @@ function catMini(x,i,cls){
   return '<div class="cc cc-lado '+cls+'" onclick="catIr('+i+')"><div class="cod-it">'+esc(r.codigo||'')+(ok?' · ✓':'')+'</div>'+
     '<div class="cc-nm">'+esc(ok?r.nome_real:x.nome)+'</div>'+(ok?'<div class="cc-sub">'+esc(x.nome)+'</div>':'')+'</div>';
 }
+var CAT_ABREV={abob:'Abóbora',achoc:'Achocolatado',amac:'Amaciante',bisc:'Biscoito',bov:'Bovino',calabr:'Calabresa',choc:'Chocolate',desinf:'Desinfetante',deterg:'Detergente',desod:'Desodorante',fil:'Filé',frg:'Frango',lin:'Linguiça',mac:'Macarrão',mortad:'Mortadela',pres:'Presunto',queij:'Queijo',refrig:'Refrigerante',refog:'Refogado',req:'Requeijão',salsic:'Salsicha',tomat:'Tomate',sab:'Sabão',cebolinh:'Cebolinha'};
 function catSugestao(n){
-  var peq={de:1,da:1,do:1,das:1,dos:1,e:1,com:1,em:1,para:1};
-  return String(n||'').toLowerCase().split(/\s+/).map(function(w,i){ return (i&&peq[w])?w:w.charAt(0).toUpperCase()+w.slice(1); }).join(' ');
+  var peq={de:1,da:1,do:1,das:1,dos:1,e:1,com:1,em:1,para:1,sem:1};
+  var t=String(n||'').toLowerCase().replace(/\./g,function(m,i,s){ return /\d/.test(s.charAt(i-1))&&/\d/.test(s.charAt(i+1))?',':' '; }).replace(/\s+/g,' ').trim().split(' ');
+  t=t.filter(function(w,i){ return !(i===0 && (w==='flv'||w==='hort')); });
+  t=t.map(function(w,i){
+    var m=w.match(/^(\d+(?:,\d+)?)(kg|g|gr|ml|l|lt|un)$/);
+    if(m){ var u={kg:'kg',g:'g',gr:'g',ml:'mL',l:'L',lt:'L',un:'un'}[m[2]]; return m[1]+' '+u; }
+    if(w==='kg') return 'kg';
+    if(CAT_ABREV[w]) return CAT_ABREV[w];
+    return (i&&peq[w])?w:w.charAt(0).toUpperCase()+w.slice(1);
+  });
+  return t.join(' ').replace(/(\d) (kg|g|mL|L|un)\b/g,'$1 $2');
 }
+function catUsarSug(){ var x=(_cat.itens||[])[_cat.idx]; var inp=g('cat-inp'); if(x&&inp){ inp.value=catSugestao(x.nome); inp.focus(); } }
 function catProxSem(){
   var L=_cat.itens||[], i;
   for(i=_cat.idx+1;i<L.length;i++) if(!catRow(L[i]).nome_real){ catIr(i); return; }
   for(i=0;i<_cat.idx;i++) if(!catRow(L[i]).nome_real){ catIr(i); return; }
 }
-function catUsarSug(){ var x=(_cat.itens||[])[_cat.idx]; var inp=g('cat-inp'); if(x&&inp){ inp.value=catSugestao(x.nome); inp.focus(); } }
 function catIrBusca(v){
   var L=_cat.itens||[], i=L.findIndex(function(x){return bscMatch(v,x.nome+' '+(catRow(x).nome_real||'')+' '+(catRow(x).codigo||''));});
   if(i>=0) catIr(i);
@@ -1565,7 +1575,7 @@ function rCatCards(){
       '<div class="cc-sub">Última compra: '+dtUlt+(ult&&ult.loja?' · '+esc(String(ult.loja).substring(0,28)):'')+'</div>'+
       '<div class="cc-lbl" style="margin-top:14px">Nome real</div>'+
       '<input type="text" id="cat-inp" value="'+esc(r.nome_real||'')+'" placeholder="Escreva o nome real..." onkeydown="if(event.key===\'Enter\'){catSalvarProx()}">'+
-      '<button class="cbtn cbtn-sug" onclick="catUsarSug()">✨ Usar sugestão: '+esc(catSugestao(x.nome))+'</button>'+
+      (catSugestao(x.nome)!==x.nome?'<button class="cbtn cbtn-sug" onclick="catUsarSug()">✨ Usar sugestão: '+esc(catSugestao(x.nome))+'</button>':'')+
       '<div class="cc-btns"><button class="cbtn" onclick="catIr('+(i-1)+')">◀ Anterior</button>'+
       '<button class="cbtn" onclick="catIr('+(i+1)+')">Pular</button>'+
       '<button class="cbtn cbtn-ok" onclick="catSalvarProx()">Salvar e próximo ▶</button></div></div>'+
