@@ -288,7 +288,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v28.6</p>
+  <p>Notas Fiscais do PR · v28.7</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1454,9 +1454,15 @@ function catCodItem(key){
   return c?c.codigo:'';
 }
 var _cat={view:'cards',q:'',idx:0};
+var _catBusy=false;
 async function pgCatalogo(){
   setActs('');
+  if(_catBusy) return; _catBusy=true;
   try{
+    // remove registros duplicados da mesma chave (mantém o que já tem nome real)
+    var vistos={}, dup=[];
+    (DB.catalogo_itens||[]).slice().sort(function(a,b){return (b.nome_real?1:0)-(a.nome_real?1:0);}).forEach(function(r){ if(vistos[r.chave]) dup.push(r); else vistos[r.chave]=1; });
+    if(dup.length){ DB.catalogo_itens=DB.catalogo_itens.filter(function(r){return dup.indexOf(r)<0;}); scheduleDriveSave(); }
     var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*'), re=await sb.from('estabelecimentos').select('*');
     var porId={}; (rn.data||[]).forEach(function(n){porId[n.id]=n;});
     var grupos=nfsAgrupaItens(ri.data||[],porId).sort(function(a,b){return a.nome.localeCompare(b.nome,'pt-BR');});
@@ -1485,6 +1491,7 @@ async function pgCatalogo(){
     _cat.itens=grupos; _cat.lojas=estabs;
     renderCatalogo();
   }catch(e){ err(e); }
+  finally{ _catBusy=false; }
 }
 function renderCatalogo(){
   var tb='<div class="tbar cat-modes">'+
@@ -1588,7 +1595,7 @@ function rCatCards(){
 function rCatLista(){
   var q=_cat.q||'';
   if(_cat.view!=='lojas'){
-    var d=(_cat.itens||[]).filter(function(x){ return bscMatch(q, x.nome+' '+(catCodItem(x.key)||'')); });
+    var d=(_cat.itens||[]).filter(function(x){ return bscMatch(q, x.nome+' '+(catRow(x).nome_real||'')+' '+(catCodItem(x.key)||'')); });
     g('n-cat').textContent=d.length+' itens';
     g('tb-cat').innerHTML=d.map(function(x){
       var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===x.key;});
@@ -1614,7 +1621,8 @@ function rCatLista(){
 async function salvCatItem(chave,nome){
   nome=(nome||'').trim();
   var ex=(DB.catalogo_itens||[]).find(function(r){return r.chave===chave;});
-  if(ex){ ex.nome_real=nome; await sb.from('catalogo_itens').update({nome_real:nome}).eq('chave',chave); }
+  if(ex){ if(ex.nome_real===nome) return; ex.nome_real=nome; await sb.from('catalogo_itens').update({nome_real:nome}).eq('chave',chave); }
+  else { var maxC=0; (DB.catalogo_itens||[]).forEach(function(r){ var m=String(r.codigo||'').match(/\d+/); if(m) maxC=Math.max(maxC,parseInt(m[0],10)); }); await sb.from('catalogo_itens').insert({chave:chave,nome_real:nome,codigo:'I'+String(maxC+1).padStart(4,'0'),nomes_originais:[]}); }
 }
 async function pgItens(){
   setActs('');
