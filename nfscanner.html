@@ -364,13 +364,33 @@ td.clk:hover{background:var(--bg-hover)}
 .lv-bar .lv-sec{flex:1;min-width:0;margin:0;gap:6px}
 .lv-bar .lv-b{padding:7px 8px;font-size:12px}
 @media(max-width:1300px){.lv-bar{flex-wrap:wrap}.lv-bar .lv-sec{flex:1 0 100%}}
+/* ===== Cotações (estilo Google Finance) ===== */
+.cot-grid{display:flex;flex-direction:column;gap:6px}
+.cot-card{background:var(--bg-card);border:1px solid var(--border-c);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:14px;cursor:pointer}
+.cot-card:hover{background:var(--bg-hover)}
+.cot-id{flex:1 1 220px;min-width:0}
+.cot-nm{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cot-marca{font-size:11px;color:var(--text-2)}
+.cot-chart{flex:0 0 118px;display:flex;align-items:center;justify-content:center}
+.cot-svg{display:block}
+.cot-nospark{width:118px;font-size:10.5px;color:var(--text-2);text-align:center;opacity:.65}
+.cot-right{flex:0 0 150px;text-align:right}
+.cot-price{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.cot-delta{display:flex;align-items:center;justify-content:flex-end;gap:3px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.cot-delta svg{width:11px;height:11px;stroke-width:3.5}
+.cot-delta.queda{color:#34A853}
+.cot-delta.alta{color:#EA4335}
+.cot-delta.neutro{color:var(--text-2);font-weight:500}
+.cot-pct{opacity:.85}
+.cot-vezes{font-size:10.5px;color:var(--text-2);margin-top:1px}
+@media(max-width:900px){.cot-chart{display:none}.cot-right{flex:0 0 120px}}
 </style>
 </head>
 <body>
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.5</p>
+  <p>Notas Fiscais do PR · v29.6</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -379,6 +399,7 @@ td.clk:hover{background:var(--bg-hover)}
   <button class="nb" onclick="go('catalogo')">🏷️ Catálogo</button>
   <button class="nb" onclick="go('itens')">💲 Itens e Preços</button>
   <button class="nb" onclick="go('insights')">🧠 Insights</button>
+  <button class="nb" onclick="go('cotacoes')">📈 Cotações</button>
   <button class="nb" onclick="go('analise')">📈 Análise de Preços</button>
   <button class="nb" onclick="go('resumo')">📋 Resumo Financeiro</button>
   <button class="nb" onclick="go('comparativos')">⚖️ Comparativos</button>
@@ -946,7 +967,7 @@ function closeMo(){ g('modal').style.display='none'; var mb=document.querySelect
 var TABS = {dashboard:'Dashboard',importar:'Importar Nota Fiscal',analise:'Análise de Preços',
   resumo:'Resumo Financeiro',comparativos:'Comparativos',supermercados:'Supermercados',
   estoque:'Estoque',lista:'Lista de Compras',devolucoes:'Devoluções',
-  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',livro:'Livro de Preços',catalogo:'Catálogo',itens:'Itens e Preços',insights:'Insights'};
+  cadastros:'Estabelecimentos',marcas:'Marcas',backup:'Backup',np:'Nota Paraná',buscar:'Buscar Nota',auditoria:'Qualidade dos Dados',periodos:'Gastos por Período',onde:'Onde Gasto',livro:'Livro de Preços',catalogo:'Catálogo',itens:'Itens e Preços',insights:'Insights',cotacoes:'Cotações'};
 
 // ══════════════════════════════════════════════════════════════════
 // NOTA PARANÁ (sincronização via extensão do Chrome)
@@ -1927,6 +1948,106 @@ async function abrirItem(k,doDrill){
   var mb0=document.querySelector('#modal .mb'); if(mb0) mb0.classList.remove('wide');
 }
 
+// ══════════════════════════════════════════════════════════════════
+// COTAÇÕES (estilo Google Finance: preço, variação, gráfico de área)
+// ══════════════════════════════════════════════════════════════════
+var _cot={q:'',sec:'',ord:'var_desc',lim:120,dados:null};
+function cotBotoes(){
+  var cont={}; (_cot.dados||[]).forEach(function(x){ var n=secaoLivro(x.categoria).nome; cont[n]=(cont[n]||0)+1; });
+  return SECOES_LIVRO.map(function(sc){ var on=_cot.sec===sc.nome; return '<button class="lv-b'+(on?' on':'')+'" style="--bg:'+sc.bg+';--fg:'+sc.fg+'" onclick="cotSec(\''+sc.nome.replace(/'/g,"\\'")+'\')">'+sc.nome+' <small>'+(cont[sc.nome]||0)+'</small></button>'; }).join('');
+}
+function cotSec(n){ _cot.sec=(_cot.sec===n)?'':n; var b=g_('cot-sec'); if(b) b.innerHTML=cotBotoes(); rCotacoes(); }
+function cotVar(x){
+  var pr=x.pontos.filter(function(p){return p.vu>0;});
+  if(pr.length<2) return null;
+  var primeiro=pr[0].vu, ultimo=pr[pr.length-1].vu;
+  if(!primeiro) return null;
+  return {primeiro:primeiro,ultimo:ultimo,pct:(ultimo-primeiro)/primeiro*100,abs:ultimo-primeiro};
+}
+// SVG estilo Google Finance: linha + área em gradiente + linha pontilhada do preço inicial
+function cotSpark(pontos,cor,w,h){
+  w=w||120; h=h||36;
+  var pr=pontos.filter(function(p){return p.vu>0;});
+  if(pr.length<2) return '';
+  var vals=pr.map(function(p){return p.vu;});
+  var min=Math.min.apply(null,vals), max=Math.max.apply(null,vals);
+  if(max===min){ max=min+Math.max(min*0.02,0.01); min=min-Math.max(min*0.02,0.01); }
+  var pad=3, n=vals.length;
+  var pts=vals.map(function(v,i){
+    var x=pad+(w-pad*2)*(n===1?0:i/(n-1));
+    var y=pad+(h-pad*2)*(1-(v-min)/(max-min));
+    return [x,y];
+  });
+  var line=pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ');
+  var area=pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' L ');
+  var baseY=(h-pad).toFixed(1);
+  var yPrimeiro=(pad+(h-pad*2)*(1-(vals[0]-min)/(max-min))).toFixed(1);
+  var gid='cg'+Math.random().toString(36).slice(2,9);
+  return '<svg viewBox="0 0 '+w+' '+h+'" width="'+w+'" height="'+h+'" class="cot-svg">'+
+    '<defs><linearGradient id="'+gid+'" x1="0" y1="0" x2="0" y2="1">'+
+      '<stop offset="0%" stop-color="'+cor+'" stop-opacity=".35"/>'+
+      '<stop offset="100%" stop-color="'+cor+'" stop-opacity="0"/>'+
+    '</linearGradient></defs>'+
+    '<line x1="'+pad+'" y1="'+yPrimeiro+'" x2="'+(w-pad)+'" y2="'+yPrimeiro+'" stroke="var(--text-2)" stroke-width="1" stroke-dasharray="2,3" opacity=".55"/>'+
+    '<path d="M '+pts[0][0].toFixed(1)+','+baseY+' L '+area+' L '+pts[n-1][0].toFixed(1)+','+baseY+' Z" fill="url(#'+gid+')"/>'+
+    '<polyline points="'+line+'" fill="none" stroke="'+cor+'" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>'+
+    '<circle cx="'+pts[n-1][0].toFixed(1)+'" cy="'+pts[n-1][1].toFixed(1)+'" r="2.4" fill="'+cor+'"/>'+
+  '</svg>';
+}
+async function pgCotacoes(){
+  setActs('');
+  try{
+    var rn=await sb.from('notas_fiscais').select('*'), ri=await sb.from('itens').select('*');
+    var porId={}; (rn.data||[]).forEach(function(n){porId[n.id]=n;});
+    _cot.dados=nfsAgrupaItens(ri.data||[],porId);
+    if(!_cot.dados.length){ setPage('<div class="empty"><div class="empty-i">📭</div><p>Nenhum item ainda.</p></div>'); return; }
+    setPage('<div class="tbar lv-bar"><input type="text" id="q-cot" placeholder="🔍 Buscar item..." value="'+esc(_cot.q)+'" oninput="_cot.q=this.value;_cot.lim=120;rCotacoes()" style="width:260px">'+
+      '<select id="o-cot" onchange="_cot.ord=this.value;rCotacoes()">'+[['var_desc','Maior alta'],['var_asc','Maior queda'],['vezes','Mais comprados'],['nome','Nome (A–Z)']].map(function(o){return '<option value="'+o[0]+'"'+(o[0]===_cot.ord?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>'+
+      '<span id="n-cot" style="color:var(--text-2);font-size:12px;white-space:nowrap"></span><div class="lv-sec" id="cot-sec">'+cotBotoes()+'</div></div>'+
+      '<div id="cot-grid" class="cot-grid"></div>');
+    rCotacoes();
+  }catch(e){ err(e); }
+}
+function rCotacoes(){
+  var d=(_cot.dados||[]).filter(function(x){
+    if(_cot.sec && secaoLivro(x.categoria).nome!==_cot.sec) return false;
+    return bscMatch(_cot.q, x.nome+' '+(x.marca||'')+' '+(x.categoria||''));
+  });
+  var comVar=d.map(function(x){ return {x:x, v:cotVar(x)}; });
+  comVar.sort(function(a,b){
+    if(_cot.ord==='nome') return a.x.nome.localeCompare(b.x.nome,'pt-BR');
+    if(_cot.ord==='vezes') return b.x.vezes-a.x.vezes;
+    var pa=a.v?a.v.pct:-Infinity, pb=b.v?b.v.pct:-Infinity;
+    if(_cot.ord==='var_asc') return pa-pb;
+    return pb-pa; // var_desc (maior alta primeiro; sem variação vai ao final)
+  });
+  var el=g_('cot-grid'); if(!el) return;
+  var mostrar=comVar.slice(0,_cot.lim);
+  el.innerHTML=mostrar.map(function(o){
+    var x=o.x, vr=o.v, cod=catCodItem(x.key), nomeR=catNomeItem(x.key,x.nome);
+    var cor='var(--text-2)', setaSvg='', pctTxt='Sem variação', absTxt='', deltaCls='neutro';
+    if(vr){
+      var subiu=vr.pct>0.01, caiu=vr.pct<-0.01;
+      cor=caiu?'#34A853':(subiu?'#EA4335':'var(--text-2)'); // verde=caiu(bom), vermelho=subiu(ruim)
+      deltaCls=caiu?'queda':(subiu?'alta':'neutro');
+      setaSvg=subiu?ICONS.up:(caiu?ICONS.down:'');
+      pctTxt=(vr.pct>=0?'+':'')+vr.pct.toFixed(2).replace('.',',')+'%';
+      absTxt=(vr.abs>=0?'+':'-')+brl(Math.abs(vr.abs)).replace('R$ ','R$ ');
+    }
+    var spark=vr?cotSpark(x.pontos,cor,118,36):'<div class="cot-nospark">sem histórico suficiente</div>';
+    return '<div class="cot-card clk" onclick="abrirItem(\''+esc(x.key).replace(/'/g,"\\'")+'\',true)">'+
+      '<div class="cot-id">'+(cod?'<span class="cod-it">'+esc(cod)+'</span>':'')+'<div class="cot-nm">'+esc(nomeR)+'</div>'+(x.marca?'<div class="cot-marca">'+esc(x.marca)+'</div>':'')+'</div>'+
+      '<div class="cot-chart">'+spark+'</div>'+
+      '<div class="cot-right">'+
+        '<div class="cot-price">'+brl(x.ultimo)+'</div>'+
+        '<div class="cot-delta '+deltaCls+'">'+setaSvg+'<span>'+absTxt+'</span><span class="cot-pct">('+pctTxt+')</span></div>'+
+        '<div class="cot-vezes">'+x.vezes+'× comprado</div>'+
+      '</div>'+
+    '</div>';
+  }).join('')+(comVar.length>mostrar.length?'<button class="btn bg" style="margin:10px auto;display:block" onclick="_cot.lim+=200;rCotacoes()">Mostrar mais ('+(comVar.length-mostrar.length)+' restantes)</button>':'');
+  var n=g_('n-cot'); if(n) n.textContent=d.length+' itens';
+}
+
 // ── Buscar nota importada ──
 var _bn={chave:'',data:'',hora:'',valor:'',tol:'0'};
 function pgBuscar(){
@@ -2352,7 +2473,7 @@ function go(tab){
   spin();
   var fn = {dashboard:pgDash,importar:pgImp,analise:pgAnal,resumo:pgRes,
     comparativos:pgComp,supermercados:pgSup,estoque:pgEst,lista:pgLista,
-    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,livro:pgLivro,catalogo:pgCatalogo,itens:pgItens,insights:pgInsights}[tab];
+    devolucoes:pgDev,cadastros:pgCad,marcas:pgMarcas,backup:pgBack,np:pgNP,buscar:pgBuscar,auditoria:pgAuditoria,periodos:pgPeriodos,onde:pgOnde,livro:pgLivro,catalogo:pgCatalogo,itens:pgItens,insights:pgInsights,cotacoes:pgCotacoes}[tab];
   npAtualizarBanner();
   if(fn) fn();
   setTimeout(atualizarBadges,50);
