@@ -256,6 +256,9 @@ td.clk:hover{background:var(--bg-hover)}
 .cc-lado:hover{opacity:1;transform:scale(.96)}
 .cc-lado .cod-it{color:#08233f;opacity:1;font-size:11.5px;font-weight:600}
 .cc-vazio{width:210px;min-height:130px;background:transparent;border:2px dashed var(--border-c);opacity:.35}
+.cc-fim{display:flex;align-items:center;justify-content:center;text-align:center;color:var(--text-2);font-size:12px;line-height:1.6;padding:12px;opacity:.7}
+.cc-fim[onclick]{cursor:pointer}.cc-fim[onclick]:hover{opacity:1;border-color:#FBBC04}
+.cc-falt{color:#FBBC04;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .cc-nm{font-weight:600;font-size:15px;margin-top:6px;line-height:1.3}
 .cc-sub{font-size:12.5px;margin-top:5px;color:inherit}
 .cc-centro{width:420px;max-width:94vw;background:#ffb74d;color:#1f1100;box-shadow:0 6px 24px rgba(255,152,0,.28);padding:22px}
@@ -402,7 +405,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.8</p>
+  <p>Notas Fiscais do PR · v29.9</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1797,7 +1800,13 @@ async function catSalvarProx(){
   catIr(_cat.idx+1);
 }
 function catMini(x,i,cls){
-  if(!x) return '<div class="cc cc-vazio '+cls+'"></div>';
+  if(!x){
+    if(cls==='cc-prox'){
+      var falt=(_cat.itens||[]).filter(function(y){return !catRow(y).nome_real;}).length;
+      return '<div class="cc cc-vazio cc-fim '+cls+'"'+(falt?' onclick="catProxSem()"':'')+'><div>🏁 Fim da lista<br>'+(falt?'<b>⏭ Ir para os '+falt+' sem nome</b>':'✓ Todos com nome real')+'</div></div>';
+    }
+    return '<div class="cc cc-vazio '+cls+'"></div>';
+  }
   var r=catRow(x), ok=!!r.nome_real;
   return '<div class="cc cc-lado '+cls+'" onclick="catIr('+i+')"><div class="cod-it">'+esc(r.codigo||'')+(ok?' · ✓':'')+'</div>'+
     '<div class="cc-nm">'+esc(ok?r.nome_real:x.nome)+'</div>'+(ok?'<div class="cc-sub">'+esc(x.nome)+'</div>':'')+'</div>';
@@ -1838,7 +1847,7 @@ function rCatCards(){
   var lojas={}; pts.forEach(function(p){ if(p.loja) lojas[p.loja]=1; });
   var dtUlt=ult&&ult.d?ult.d.toLocaleDateString('pt-BR'):'—';
   var unico=Math.abs(x.max-x.min)<0.005;
-  box.innerHTML='<div class="cc-prog">Item <b>'+(i+1)+'</b> de '+L.length+' · <b>'+feitos+'</b> com nome real · faltam '+(L.length-feitos)+
+  box.innerHTML='<div class="cc-prog">Item <b>'+(i+1)+'</b> de '+L.length+' · <b>'+feitos+'</b> com nome real · '+(L.length-feitos?'<span class="cc-falt" onclick="catProxSem()" title="Ir para o próximo sem nome">faltam '+(L.length-feitos)+'</span>':'<span style="color:#34A853">✓ tudo nomeado</span>')+
       '<div class="cc-bar"><i style="width:'+Math.max(1,pct).toFixed(1)+'%"></i></div></div>'+
     '<div class="cc-tools"><input type="text" id="cat-go" placeholder="🔍 Ir para um item..." onkeydown="if(event.key===\'Enter\'){catIrBusca(this.value)}">'+
       '<button class="cbtn" onclick="catProxSem()">⏭ Próximo sem nome</button></div>'+
