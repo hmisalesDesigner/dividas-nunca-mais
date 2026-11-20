@@ -282,6 +282,7 @@ td.clk:hover{background:var(--bg-hover)}
 .cbtn-ok{background:#0d3b82;color:#fff;border-color:#0d3b82}
 .cbtn-ok:hover{background:#0a2f69}
 .cbtn-sug{display:block;width:100%;margin-top:8px;text-align:left;font-weight:600;font-size:13px;border-style:dashed}
+.cbtn-ok2{display:block;width:100%;margin-top:8px;text-align:left;font-weight:600;font-size:13px}
 .cc-tools .cbtn{background:var(--bg-card);color:var(--text-1,#e8eaf0);border-color:var(--border-c)}
 .cat-modes{display:flex;gap:8px;margin-bottom:14px}
 .cat-modes .btn{font-size:15px;padding:11px 22px;font-weight:700;border-radius:10px}
@@ -405,7 +406,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.10</p>
+  <p>Notas Fiscais do PR · v29.11</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1772,7 +1773,7 @@ function renderCatalogo(){
   if(_cat.view==='cards'){ setPage(tb+'</div><div id="cat-cards"></div>'); catPosInicial(); rCatCards(); return; }
   setPage(tb+
     '<input type="text" id="q-cat" placeholder="🔍 Buscar..." value="'+esc(_cat.q)+'" oninput="_cat.q=this.value;rCatLista()" style="width:260px">'+
-    (_cat.view!=='lojas'?'<button class="btn '+(_cat.soSem?'bp':'bg')+'" id="b-sem" onclick="_cat.soSem=!_cat.soSem;renderCatalogo()">⚠ Só sem nome real</button>':'')+
+    (_cat.view!=='lojas'?'<button class="btn '+(_cat.soSem?'bp':'bg')+'" id="b-sem" onclick="_cat.soSem=!_cat.soSem;renderCatalogo()">⚠ Só sem nome real</button>'+(_cat.soSem?'<button class="btn bg" onclick="catManterTodos()">✓ Manter nome da nota em todos</button>':''):'')+
     '<span id="n-cat" style="color:var(--text-2);font-size:12px"></span></div>'+
     '<div class="card"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr>'+
     (_cat.view!=='lojas'
@@ -1829,6 +1830,18 @@ function catSugestao(n){
   return t.join(' ').replace(/(\d) (kg|g|mL|L|un)\b/g,'$1 $2');
 }
 function catSugFinal(x){ return catSugestaoKey(x)||catSugestao(x.nome); }
+async function catManter(){
+  var L=_cat.itens||[], x=L[_cat.idx]; if(!x) return;
+  await salvCatItem(x.key,x.nome);
+  catIr(_cat.idx+1);
+}
+async function catManterTodos(){
+  var L=(_cat.itens||[]).filter(function(x){return !catRow(x).nome_real;});
+  if(!L.length) return;
+  if(!confirm('Manter o nome da nota como nome real nos '+L.length+' itens sem nome?')) return;
+  for(var i=0;i<L.length;i++) await salvCatItem(L[i].key,L[i].nome);
+  renderCatalogo();
+}
 function catUsarSug(){ var x=(_cat.itens||[])[_cat.idx]; var inp=g('cat-inp'); if(x&&inp){ inp.value=catSugFinal(x); inp.focus(); } }
 function catProxSem(){
   var L=_cat.itens||[], i;
@@ -1864,6 +1877,7 @@ function rCatCards(){
       '<div class="cc-lbl" style="margin-top:14px">Nome real</div>'+
       '<input type="text" id="cat-inp" value="'+esc(r.nome_real||'')+'" placeholder="Escreva o nome real..." onkeydown="if(event.key===\'Enter\'){catSalvarProx()}">'+
       (catSugFinal(x)!==x.nome?'<button class="cbtn cbtn-sug" onclick="catUsarSug()">✨ Usar sugestão: '+esc(catSugFinal(x))+'</button>':'')+
+      (!r.nome_real?'<button class="cbtn cbtn-ok2" onclick="catManter()" title="O nome que veio na nota já está bom: grava como nome real e passa para o próximo">✓ O nome da nota está bom</button>':'')+
       '<div class="cc-btns"><button class="cbtn" onclick="catIr('+(i-1)+')">◀ Anterior</button>'+
       '<button class="cbtn" onclick="catIr('+(i+1)+')">Pular</button>'+
       '<button class="cbtn cbtn-ok" onclick="catSalvarProx()">Salvar e próximo ▶</button></div></div>'+
