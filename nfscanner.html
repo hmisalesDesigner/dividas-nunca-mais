@@ -405,7 +405,7 @@ td.clk:hover{background:var(--bg-hover)}
 
 <nav id="sidebar">
   <h1>🧾 NFScanner</h1>
-  <p>Notas Fiscais do PR · v29.9</p>
+  <p>Notas Fiscais do PR · v29.10</p>
   <div class="ng">Análise</div>
   <button class="nb on" onclick="go('dashboard')">📊 Dashboard</button>
   <button class="nb" onclick="go('periodos')">🗓️ Gastos por Período</button>
@@ -1772,6 +1772,7 @@ function renderCatalogo(){
   if(_cat.view==='cards'){ setPage(tb+'</div><div id="cat-cards"></div>'); catPosInicial(); rCatCards(); return; }
   setPage(tb+
     '<input type="text" id="q-cat" placeholder="🔍 Buscar..." value="'+esc(_cat.q)+'" oninput="_cat.q=this.value;rCatLista()" style="width:260px">'+
+    (_cat.view!=='lojas'?'<button class="btn '+(_cat.soSem?'bp':'bg')+'" id="b-sem" onclick="_cat.soSem=!_cat.soSem;renderCatalogo()">⚠ Só sem nome real</button>':'')+
     '<span id="n-cat" style="color:var(--text-2);font-size:12px"></span></div>'+
     '<div class="card"><div class="scr" style="height:auto;max-height:620px"><table><thead><tr>'+
     (_cat.view!=='lojas'
@@ -1872,8 +1873,10 @@ function rCatCards(){
 function rCatLista(){
   var q=_cat.q||'';
   if(_cat.view!=='lojas'){
-    var d=(_cat.itens||[]).filter(function(x){ return bscMatch(q, x.nome+' '+(catRow(x).nome_real||'')+' '+(catCodItem(x.key)||'')); });
-    g('n-cat').textContent=d.length+' itens';
+    var d=(_cat.itens||[]).filter(function(x){ return (!_cat.soSem||!catRow(x).nome_real) && bscMatch(q, x.nome+' '+(catRow(x).nome_real||'')+' '+(catCodItem(x.key)||'')); });
+    var chavesOk={}; (_cat.itens||[]).forEach(function(x){chavesOk[x.key]=1;});
+    var orf=(DB.catalogo_itens||[]).filter(function(r){return r.nome_real && !chavesOk[r.chave];}).length;
+    g('n-cat').textContent=d.length+' itens'+(orf?' · ⚠ '+orf+' nome(s) real(is) sem item correspondente (chave antiga)':'');
     g('tb-cat').innerHTML=d.map(function(x){
       var c=(DB.catalogo_itens||[]).find(function(r){return r.chave===x.key;});
       var vars=(c&&c.nomes_originais)||x.variantes||[x.nome];
