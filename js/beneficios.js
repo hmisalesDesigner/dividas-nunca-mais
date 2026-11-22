@@ -464,6 +464,7 @@ function cardBeneficio(p) {
       ${p.tipo === 'pontos' && p.saldoCashback ? `<div style="font-size:14px;font-weight:600;color:#34a85a;margin-bottom:2px;">${formatarMoeda(p.saldoCashback)} cashback</div>` : ''}
       ${p.taxaConversao && p.tipo === 'pontos' ? `<div style="font-size:11px;color:#666;margin-bottom:4px;">≈ ${formatarMoeda((p.saldo || 0) * p.taxaConversao)}</div>` : ''}
       ${renderLotesCard(p)}
+      ${renderSorteiosCard(p)}
       <div style="font-size:11px;color:${expCor};margin-bottom:12px;">
         ${p.expiracao ? `⏰ Expira: ${formatarData(p.expiracao)} (${expDias}d)` : 'Não expira'}
       </div>
@@ -473,6 +474,7 @@ function cardBeneficio(p) {
       </div>
       <div style="display:flex;gap:6px;margin-top:6px;">
         ${p.tipo === 'pontos' ? `<button onclick="abrirModalLotes(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">📦 Lotes</button>` : ''}
+        ${ehNotaParana(p) ? `<button onclick="abrirModalSorteios(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">🎰 Sorteios${p.sorteios && p.sorteios.length > 0 ? ` (${p.sorteios.length})` : ''}</button>` : ''}
         <button onclick="abrirModalCupons(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">🎟️ Cupons${p.cupons && p.cupons.length > 0 ? ` (${p.cupons.length})` : ''}</button>
       </div>
     </div>
@@ -1055,6 +1057,158 @@ function removerLote(id, idx) {
   fecharModal();
   abrirModalLotes(id);
   renderBeneficios();
+}
+
+// ===== SORTEIOS (Nota Paraná) =====
+// Regulamento: 1 bilhete na primeira compra do período + 1 bilhete a cada R$ 200 em notas
+// registradas (cada nota conta até R$ 10.000). Bilhete só vale no sorteio do seu período.
+// Crédito de prêmio é cancelado se não usado em 1 ano após ser disponibilizado.
+function ehNotaParana(p) {
+  const n = (p.nome || '').toLowerCase();
+  return n.includes('nota paraná') || n.includes('nota parana');
+}
+
+function bilhetesPorValor(valor) {
+  valor = Number(valor) || 0;
+  if (valor <= 0) return 0;
+  return 1 + Math.floor(valor / 200);
+}
+
+function somaUmAno(iso) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + 1);
+  return d.toISOString().split('T')[0];
+}
+
+function diasAte(iso) {
+  return Math.ceil((new Date(iso + 'T12:00:00') - new Date(hojeISO() + 'T12:00:00')) / 86400000);
+}
+
+function renderSorteiosCard(p) {
+  if (!ehNotaParana(p) || !p.sorteios || p.sorteios.length === 0) return '';
+  const hoje = hojeISO();
+  const linhas = [];
+  p.sorteios.forEach(function(x) {
+    if (x.premio && x.premio.valor > 0) {
+      const dias = diasAte(x.premio.expira);
+      if (dias >= 0) {
+        const cor = dias <= 30 ? '#ef4444' : dias <= 90 ? '#f59e0b' : '#217346';
+        linhas.push('<div style="font-size:11px;color:' + cor + ';margin-bottom:2px;">🏆 Prêmio ' + formatarMoeda(x.premio.valor) + ' — usar até ' + formatarData(x.premio.expira) + ' (' + dias + 'd)</div>');
+      }
+    }
+    if (!x.dataSorteio || x.dataSorteio >= hoje) {
+      linhas.push('<div style="font-size:11px;color:#666;margin-bottom:2px;">🎰 ' + (x.nome || 'Sorteio') + ': ' + (x.bilhetes || 0) + ' bilhete' + (x.bilhetes === 1 ? '' : 's') + (x.dataSorteio ? ' · sorteio em ' + formatarData(x.dataSorteio) : '') + '</div>');
+    }
+  });
+  return linhas.length ? '<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">' + linhas.join('') + '</div>' : '';
+}
+
+function abrirModalSorteios(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  if (!p.sorteios) p.sorteios = [];
+  const hoje = hojeISO();
+  const lista = p.sorteios.map(function(x, i) {
+    const feito = x.dataSorteio && x.dataSorteio < hoje;
+    const status = feito ? '✅ Realizado' : x.dataSorteio ? '⏳ Aguardando' : '📝 Em aberto';
+    let premio = '';
+    if (x.premio && x.premio.valor > 0) {
+      const dias = diasAte(x.premio.expira);
+      premio = '<div style="font-size:12px;color:' + (dias < 0 ? 'var(--text-muted)' : dias <= 30 ? 'var(--red)' : 'var(--green)') + ';margin-top:4px;">🏆 Prêmio ' + formatarMoeda(x.premio.valor) + ' — ' + (dias < 0 ? 'cancelado em ' : 'usar até ') + formatarData(x.premio.expira) + (dias >= 0 ? ' (' + dias + 'd)' : '') + '</div>';
+    }
+    const btnPremio = feito && !(x.premio && x.premio.valor > 0)
+      ? '<button onclick="registrarPremioSorteio(' + id + ',' + i + ')" style="background:var(--green);border:none;color:#000;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🏆 Ganhei</button>' : '';
+    return '<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
+      + '<div><div style="font-weight:600;">' + (x.nome || 'Sorteio') + ' · ' + (x.bilhetes || 0) + ' bilhete' + (x.bilhetes === 1 ? '' : 's') + '</div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);">' + status
+      + (x.inicio && x.fim ? ' · período ' + formatarData(x.inicio) + ' a ' + formatarData(x.fim) : '')
+      + (x.dataSorteio ? ' · sorteio ' + formatarData(x.dataSorteio) : '') + '</div></div>'
+      + '<div style="display:flex;gap:6px;align-items:center;">' + btnPremio
+      + '<button onclick="removerSorteio(' + id + ',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button></div>'
+      + '</div>' + premio + '</div>';
+  }).join('') || '<p style="color:var(--text-muted);font-size:13px;">Nenhum sorteio registrado.</p>';
+
+  abrirModal('🎰 Sorteios — ' + p.nome, `
+    <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;line-height:1.5;">
+      Nota Paraná é cashback do governo e concorre a sorteios. Regras: <strong>1 bilhete</strong> na primeira compra do período
+      + <strong>1 a cada R$ 200</strong> em notas registradas (até R$ 10.000 por nota). O bilhete vale só no sorteio do seu período.
+      Prêmio não usado em <strong>1 ano</strong> é cancelado.
+    </p>
+    <div style="margin-bottom:16px;">${lista}</div>
+    <div style="border-top:1px solid var(--border);padding-top:16px;">
+      <h4 style="font-size:13px;margin-bottom:12px;">+ Registrar Sorteio</h4>
+      <div class="form-group"><label>Nome</label><input id="sor-nome" type="text" placeholder="Ex: Sorteio dezembro/2026" /></div>
+      <div class="form-row">
+        <div class="form-group"><label>Início do período</label><input id="sor-ini" type="date" /></div>
+        <div class="form-group"><label>Fim do período</label><input id="sor-fim" type="date" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Soma das notas no período (R$)</label><input id="sor-valor" type="number" step="0.01" min="0" placeholder="Ex: 650,00" oninput="sorCalc()" /></div>
+        <div class="form-group"><label>Data do sorteio</label><input id="sor-data" type="date" /></div>
+      </div>
+      <div id="sor-calc" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Informe o valor para calcular os bilhetes.</div>
+      <div class="form-group"><label>Bilhetes (se já conferiu no portal)</label><input id="sor-bil" type="number" min="0" placeholder="Em branco = usa o cálculo" /></div>
+      <button class="btn-primary btn-sm" onclick="adicionarSorteio(${id})" style="width:100%;">+ Salvar Sorteio</button>
+    </div>
+    <div class="modal-actions"><button class="btn-secondary" onclick="fecharModal()">Fechar</button></div>
+  `, '520px');
+}
+
+function sorCalc() {
+  const v = parseFloat(document.getElementById('sor-valor').value) || 0;
+  const el = document.getElementById('sor-calc');
+  if (v <= 0) { el.textContent = 'Informe o valor para calcular os bilhetes.'; return; }
+  const b = bilhetesPorValor(v);
+  const falta = 200 - (v % 200);
+  el.innerHTML = '🎟️ <strong>' + b + ' bilhete' + (b === 1 ? '' : 's') + '</strong> · faltam ' + formatarMoeda(falta) + ' para o próximo';
+}
+
+function adicionarSorteio(id) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  const nome = document.getElementById('sor-nome').value.trim();
+  const ini = document.getElementById('sor-ini').value;
+  const fim = document.getElementById('sor-fim').value;
+  const data = document.getElementById('sor-data').value;
+  const valor = parseFloat(document.getElementById('sor-valor').value) || 0;
+  const bilTxt = document.getElementById('sor-bil').value;
+  if (!nome) { showAlert('⚠️', 'Informe o nome do sorteio.'); return; }
+  if (ini && fim && fim < ini) { showAlert('⚠️', 'O fim do período é antes do início.'); return; }
+  const bilhetes = bilTxt !== '' ? Math.max(0, parseInt(bilTxt) || 0) : bilhetesPorValor(valor);
+  if (!p.sorteios) p.sorteios = [];
+  p.sorteios.push({ id: gerarId(), nome: nome, inicio: ini || null, fim: fim || null, dataSorteio: data || null, valorNotas: valor || null, bilhetes: bilhetes, premio: null });
+  p.sorteios.sort(function(a, b) { return (b.dataSorteio || b.fim || '9999') < (a.dataSorteio || a.fim || '9999') ? 1 : -1; });
+  agendarSync();
+  fecharModal();
+  abrirModalSorteios(id);
+  renderBeneficios();
+}
+
+function registrarPremioSorteio(id, idx) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p || !p.sorteios || !p.sorteios[idx]) return;
+  const v = parseFloat(String(prompt('Valor do prêmio (R$):', '') || '').replace(',', '.'));
+  if (!(v > 0)) return;
+  const disp = prompt('Data em que o crédito foi disponibilizado (AAAA-MM-DD):', hojeISO());
+  if (!disp || !/^\d{4}-\d{2}-\d{2}$/.test(disp)) { showAlert('⚠️', 'Data inválida. Use AAAA-MM-DD.'); return; }
+  p.sorteios[idx].premio = { valor: v, disponibilizadoEm: disp, expira: somaUmAno(disp) };
+  agendarSync();
+  fecharModal();
+  abrirModalSorteios(id);
+  renderBeneficios();
+}
+
+function removerSorteio(id, idx) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p || !p.sorteios) return;
+  if (confirm('Remover este sorteio?')) {
+    p.sorteios.splice(idx, 1);
+    agendarSync();
+    fecharModal();
+    abrirModalSorteios(id);
+    renderBeneficios();
+  }
 }
 
 // ===== CUPONS & TICKETS =====
