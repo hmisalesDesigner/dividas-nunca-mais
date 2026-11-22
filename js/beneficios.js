@@ -153,6 +153,8 @@ function confirmarVencidos(p, saldoAnterior, novoSaldo) {
   if (!lotes.length) return { vencido: 0, lotes: [] };
   const fmt = n => (n || 0).toLocaleString('pt-BR');
   const vencido = lotes.reduce((s, l) => s + (l.quantidade || 0), 0);
+  // Lote maior que o saldo anterior: o vencimento já foi descontado numa atualização antiga; só limpa o lote
+  if (vencido > saldoAnterior) return { vencido: 0, lotes };
   const esperado = saldoAnterior - vencido;
   const dif = novoSaldo - esperado;
   const msg = p.nome + ' — pontos já vencidos:\n'
