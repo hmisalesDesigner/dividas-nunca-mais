@@ -198,7 +198,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.2';
+const SITE_VERSION = 'v1.3';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
@@ -220,6 +220,7 @@ async function atualizarSite() {
       syncPendente = false;
     }
     if (typeof accessToken !== 'undefined' && accessToken) doDrive = await carregarDoDrive();
+    if (typeof migrarProgramas === 'function') migrarProgramas();
     salvarLocalStorage();
     atualizarDatetime();
     if (typeof renderizarAlertas === 'function') renderizarAlertas();

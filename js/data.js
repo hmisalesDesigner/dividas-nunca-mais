@@ -396,7 +396,7 @@ if (!DB.programas) DB.programas = [
   { id: 1, nome: 'Livelo', tipo: 'pontos', categoria: 'cartao', saldo: 0, expiracao: null, logo: '💎' },
   { id: 2, nome: 'Méliuz', tipo: 'cashback', categoria: 'varejo', saldo: 0, expiracao: null, logo: '💰' },
   { id: 3, nome: 'Dinheiro na Nota', tipo: 'cashback', categoria: 'governo', saldo: 0, expiracao: null, logo: '🧾' },
-  { id: 4, nome: 'Nota Paraná', tipo: 'pontos', categoria: 'governo', saldo: 0, expiracao: null, logo: '📋' },
+  { id: 4, nome: 'Nota Paraná', tipo: 'cashback', categoria: 'governo', saldo: 0, expiracao: null, logo: '📋' },
   { id: 5, nome: 'Meu Posto', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '⛽' },
   { id: 6, nome: 'KMV', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '🚗' },
   { id: 7, nome: 'Nescafé Dolce Gusto CLUB', tipo: 'pontos', categoria: 'lifestyle', saldo: 0, expiracao: null, logo: '☕' },

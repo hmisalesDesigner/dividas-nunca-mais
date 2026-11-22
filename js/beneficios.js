@@ -11,10 +11,32 @@ const CATEGORIAS_BENEFICIOS = {
 let popupFila = [];
 let popupAtual = 0;
 
+// Corrige programas cadastrados com o tipo errado (idempotente).
+// Nota Paraná é cashback do governo (R$), não tem pontos.
+function migrarProgramas() {
+  let mudou = false;
+  (DB.programas || []).forEach(p => {
+    const nome = (p.nome || '').toLowerCase();
+    if (p.tipo === 'pontos' && (nome.includes('nota paraná') || nome.includes('nota parana'))) {
+      if (!(p.saldo > 0) && p.saldoCashback > 0) p.saldo = p.saldoCashback; // o saldo em R$ estava no campo de cashback
+      p.tipo = 'cashback';
+      delete p.saldoCashback;
+      delete p.taxaConversao;
+      // histórico: tira zeros finais que vieram do campo de pontos
+      const h = DB.historicoSaldo && DB.historicoSaldo[p.id];
+      if (h && p.saldo > 0) while (h.length > 1 && h[h.length - 1].saldo === 0) h.pop();
+      mudou = true;
+    }
+  });
+  if (mudou && typeof agendarSync === 'function') agendarSync();
+  return mudou;
+}
+
 function entrarBeneficios() {
   document.getElementById('app').style.display = 'none';
   document.getElementById('beneficios-app').style.display = 'flex';
   if (!DB.programas) DB.programas = [];
+  migrarProgramas();
   if (!DB.resgates) DB.resgates = [];
   if (!DB.historicoSaldo) DB.historicoSaldo = {};
   renderBeneficios();
