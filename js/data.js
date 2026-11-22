@@ -403,6 +403,7 @@ if (!DB.programas) DB.programas = [
   { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', categoria: 'aerea', saldo: 0, expiracao: null, logo: '✈️' },
 ];
 if (!DB.resgates) DB.resgates = [];
+if (!DB.assinaturas) DB.assinaturas = [];
 if (!DB.origensPagamento) DB.origensPagamento = [
   { id: 1, emoji: '🏦', tipo: 'Banco', titular: 'Margarida' },
   { id: 2, emoji: '📈', tipo: 'Resgate de Dividendos', titular: 'Henrique' },

@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.6 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.7 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.7 | (a publicar) | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
 | Site v1.6 | `9938983` | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
 | Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
 | Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
@@ -385,6 +386,42 @@ App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js
 **Pendências:** (1) alerta de expiração de créditos do Nota Paraná (ideia); (3) itens em categoria errada no NFScanner (não autorizado); (4) dividir `nfscanner.html` em arquivos menores (sugerido).
 
 **Privacidade:** nunca guardar login/senha, CPF, nome completo ou endereço em memória/docs.
+
+---
+
+## 21. Aba Assinaturas Recorrentes (`js/assinaturas.js`, v1.7)
+
+Nasceu de um caso real: duas assinaturas iguais correndo em paralelo por 10 meses na fatura
+do cartao sem ninguem notar. Por isso a **deteccao de duplicidade e a funcao principal** da
+aba, nao um extra.
+
+`DB.assinaturas[]` = `{id, nome, fornecedor, valor, diaCobranca, categoria, cartao,
+observacao, status: 'ativa'|'cancelada', inicio, canceladaEm, historico:[{data, valor}]}`.
+Inicializada em `js/data.js` junto de `DB.resgates`.
+
+| Funcao | O que faz |
+|--------|-----------|
+| `normalizarFornecedor(nome)` | Reduz o nome a um token comparavel. Tira acentos, pontuacao e os prefixos de adquirente (`ebn`, `dl`, `com`, `br`...). **O Sicoob gruda um "V" no fim do nome do lojista** (`ADOBEV`, `1PASSWORDV`, `GoogleV`), entao o V final cai quando sobram 4+ caracteres |
+| `duplicidadesAssinaturas()` | Agrupa as ativas por fornecedor normalizado e devolve os grupos com 2+ itens. Vira o banner vermelho no topo da aba |
+| `variacaoAssinatura(a)` | Compara o valor atual com o ultimo do `historico` e devolve a variacao % (reajuste) |
+| `proximaCobranca(dia)` | Proxima data a partir do dia do mes; `null` para dia invalido |
+| `salvarAssinatura(id)` | Ao editar, se o valor mudou empurra o anterior para `historico` antes de sobrescrever. Avisa na hora se a nova assinatura cai num grupo duplicado |
+| `cancelarAssinatura(id)` | Marca `status: 'cancelada'` e informa a economia mensal. Nao apaga — `removerAssinatura` faz isso, com confirmacao |
+
+`esc()` **nao existia no site pai** (so dentro do `nfscanner.html`); foi criada em
+`js/utils.js` para esta aba e esta disponivel para as demais.
+
+Registro da aba: item no `<nav>` + `<div id="page-assinaturas" class="page">` em `index.html`,
+entrada no mapa `titulos` e um `case` no `switch` de `navigateTo()` (`js/app.js`), e a tag
+`<script src="js/assinaturas.js">` **antes** de `beneficios.js`.
+
+**Privacidade:** o repositorio e publico. Dados financeiros reais do usuario (valores de
+fatura, saldos, assinaturas dele) **nunca** entram no codigo — a aba so oferece o cadastro;
+os dados vivem no Drive e no localStorage dele.
+
+**Testes:** `/tmp/tass/t.js` — 22 casos em jsdom: normalizacao de fornecedor (incluindo o V
+do Sicoob e acentos), totais mensal/anual, agrupamento de duplicidade, cancelar/reativar,
+escape de HTML no nome e proxima cobranca.
 
 ---
 

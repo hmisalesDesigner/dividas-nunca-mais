@@ -63,6 +63,7 @@ function navigateTo(page, el) {
     planejador: 'Planejador de Quitação',
     calendario: 'Calendário Financeiro',
     orcamentos: 'Orçamentos',
+    assinaturas: 'Assinaturas Recorrentes',
     configuracoes: 'Configurações',
     contas: 'Contas Recorrentes',
     copel: 'Copel — Energia Elétrica',
@@ -87,6 +88,7 @@ function navigateTo(page, el) {
     case 'planejador': renderPlanejador(); break;
     case 'calendario': renderCalendario(); break;
     case 'orcamentos': renderOrcamentos(); break;
+    case 'assinaturas': renderAssinaturas(); break;
     case 'configuracoes': renderConfiguracoes(); break;
     case 'contas': renderContas(); break;
     case 'copel': renderCopel(); break;

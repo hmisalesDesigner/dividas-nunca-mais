@@ -1,6 +1,13 @@
 // ===== UTILS =====
 
 // Formata moeda PT-BR
+// Escapa HTML — usado por qualquer tela que monte markup com dado do usuário
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function formatarMoeda(valor) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 }
@@ -164,7 +171,7 @@ function focarBusca() {
 const CATEGORIAS = {
   '👤 Pessoa Física': ['Amigos', 'Família', 'Pessoal'],
   '🏢 Pessoa Jurídica': ['Fornecedores', 'Serviços', 'Outros'],
-  '💳 Cartões de Crédito': ['Nubank', 'Itaú', 'Bradesco', 'Santander', 'Inter', 'Outro'],
+  '💳 Cartões de Crédito': ['Nubank', 'Itaú', 'Bradesco', 'Santander', 'Inter', 'Sicoob', 'Outro'],
   '🏠 Imóveis': ['Aluguel', 'Financiamento', 'Condomínio', 'IPTU'],
   '🚗 Veículos': ['Financiamento', 'Seguro', 'IPVA', 'Manutenção'],
   '🏛️ Impostos': ['IRPF', 'MEI', 'INSS', 'ISS', 'Outro'],
@@ -198,7 +205,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.6';
+const SITE_VERSION = 'v1.7';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
