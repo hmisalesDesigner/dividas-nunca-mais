@@ -1167,8 +1167,11 @@ function abrirModalSorteios(id) {
       <button class="btn-secondary btn-sm" onclick="importarSorteiosDoPortal(${id})" style="white-space:nowrap;">📥 Importar do portal</button>
     </div>
     <div style="margin-bottom:16px;">${lista}</div>
-    <div style="border-top:1px solid var(--border);padding-top:16px;">
-      <h4 style="font-size:13px;margin-bottom:12px;">+ Registrar Sorteio</h4>
+    <details style="border-top:1px solid var(--border);padding-top:16px;">
+      <summary style="font-size:12px;color:var(--text-secondary);cursor:pointer;list-style:none;user-select:none;">
+        ✏️ Lançar um sorteio à mão <span style="opacity:.6;">(normalmente desnecessário — use Importar do portal)</span>
+      </summary>
+      <h4 style="font-size:13px;margin:12px 0;">+ Registrar Sorteio</h4>
       <div class="form-group"><label>Nome</label><input id="sor-nome" type="text" placeholder="Ex: Sorteio dezembro/2026" /></div>
       <div class="form-row">
         <div class="form-group"><label>Início do período</label><input id="sor-ini" type="date" /></div>
@@ -1181,7 +1184,7 @@ function abrirModalSorteios(id) {
       <div id="sor-calc" style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Informe o valor para calcular os bilhetes.</div>
       <div class="form-group"><label>Bilhetes (se já conferiu no portal)</label><input id="sor-bil" type="number" min="0" placeholder="Em branco = usa o cálculo" /></div>
       <button class="btn-primary btn-sm" onclick="adicionarSorteio(${id})" style="width:100%;">+ Salvar Sorteio</button>
-    </div>
+    </details>
     <div class="modal-actions"><button class="btn-secondary" onclick="fecharModal()">Fechar</button></div>
   `, '520px');
 }
@@ -1274,22 +1277,22 @@ function sorteioNomePortal(s) {
   return 'Sorteio ' + (s.nr || '?') + (s.periodo ? ' · ' + s.periodo : '');
 }
 
-async function importarSorteiosDoPortal(id) {
+async function importarSorteiosDoPortal(id, silencioso) {
   const p = DB.programas.find(x => x.id === id);
-  if (!p) return;
+  if (!p) return 0;
 
   let resp;
   try {
     resp = await nfsExtPergunta('NFS_GET_SORTEIOS');
   } catch (e) {
-    showAlert('🧩', 'A extensão do NFScanner não respondeu. Confira em chrome://extensions se ela está instalada e ativa, e recarregue esta página.');
-    return;
+    if (!silencioso) showAlert('🧩', 'A extensão do NFScanner não respondeu. Confira em brave://extensions (ou chrome://extensions) se ela está instalada e ativa, e recarregue esta página.');
+    return 0;
   }
 
   const lista = (resp.sorteios || []).filter(s => s && s.nr);
   if (!lista.length) {
-    showAlert('📭', 'A extensão ainda não leu nenhum sorteio. Entre no Nota Paraná, abra a aba MEUS BILHETES e clique em "Ler sorteios" no painel do canto.');
-    return;
+    if (!silencioso) showAlert('📭', 'A extensão ainda não leu nenhum sorteio. Entre no Nota Paraná, abra a aba MEUS BILHETES e clique em "Ler sorteios" no painel do canto.');
+    return 0;
   }
 
   if (!p.sorteios) p.sorteios = [];
@@ -1330,13 +1333,105 @@ async function importarSorteiosDoPortal(id) {
 
   ordenarSorteios(p);
   agendarSync();
-  fecharModal();
-  abrirModalSorteios(id);
   renderBeneficios();
 
   const aLancar = p.sorteios.filter(x => (x.premiados || 0) > 0 && !(x.premio && x.premio.valor > 0)).length;
+  if (silencioso) {
+    // na importação automática só interrompe o usuário se houver prêmio a lançar
+    if (aLancar) showAlert('🏆', 'Você tem ' + aLancar + ' sorteio(s) com bilhete premiado! Abra 🎰 Sorteios no cartão do Nota Paraná e clique em "Ganhei" para lançar o valor.');
+    return novos + atualizados;
+  }
+  fecharModal();
+  abrirModalSorteios(id);
   showAlert('✅', novos + ' sorteio(s) novo(s) e ' + atualizados + ' atualizado(s) a partir do portal.'
     + (aLancar ? ' 🏆 ' + aLancar + ' com bilhete premiado — clique em "Ganhei" para lançar o valor do crédito.' : ''));
+  return novos + atualizados;
+}
+
+// ===== IMPORTAÇÃO AUTOMÁTICA + LEMBRETE DE SORTEIO =====
+const NP_URL_BILHETES = 'https://notaparana.pr.gov.br/nfprweb/Bilhete';
+
+function programaNotaParana() {
+  return (DB.programas || []).find(ehNotaParana);
+}
+
+// Pendente = o sorteio já aconteceu (ou é hoje) e o portal ainda não nos disse o resultado.
+function sorteiosPendentes() {
+  const p = programaNotaParana();
+  if (!p || !p.sorteios) return [];
+  const hoje = hojeISO();
+  return p.sorteios.filter(function(x) {
+    return x.origem === 'portal' && x.dataSorteio && x.dataSorteio <= hoje && x.premiados == null;
+  });
+}
+
+function sorteiosAdiadosHoje() {
+  try { return localStorage.getItem('dnm_sorteios_adiado') === hojeISO(); } catch (e) { return false; }
+}
+
+function adiarLembreteSorteio() {
+  try { localStorage.setItem('dnm_sorteios_adiado', hojeISO()); } catch (e) {}
+  fecharModal();
+}
+
+function abrirPortalBilhetes() {
+  try { localStorage.setItem('dnm_sorteios_adiado', hojeISO()); } catch (e) {}
+  fecharModal();
+  window.open(NP_URL_BILHETES, '_blank');
+}
+
+// Só mostra quando não há outro modal na tela, para não atropelar os pop-ups de saldo.
+function telaOcupada() {
+  const ids = ['saldo-modal', 'ben-modal-overlay', 'modal-overlay', 'alert-popup'];
+  return ids.some(function(id) {
+    const el = document.getElementById(id);
+    return el && el.style.display && el.style.display !== 'none';
+  });
+}
+
+function verificarSorteiosPendentes(tentativa) {
+  tentativa = tentativa || 0;
+  if (sorteiosAdiadosHoje()) return;
+  const pend = sorteiosPendentes();
+  if (!pend.length) return;
+  if (telaOcupada()) {
+    if (tentativa < 20) setTimeout(function() { verificarSorteiosPendentes(tentativa + 1); }, 3000);
+    return;
+  }
+  const hoje = hojeISO();
+  const linhas = pend.map(function(x) {
+    const hojeMesmo = x.dataSorteio === hoje;
+    return '<li style="margin-bottom:6px;">' + (x.nome || 'Sorteio')
+      + ' — sorteio ' + (hojeMesmo ? '<strong>hoje</strong>' : 'em ' + formatarData(x.dataSorteio))
+      + (x.bilhetes ? ' · ' + x.bilhetes + ' bilhete' + (x.bilhetes === 1 ? '' : 's') : '') + '</li>';
+  }).join('');
+
+  abrirModal('🎰 Hora de conferir seus bilhetes', `
+    <p style="color:var(--text-secondary);font-size:13px;line-height:1.5;margin-bottom:12px;">
+      ${pend.length === 1 ? 'Um sorteio do Nota Paraná já ocorreu' : pend.length + ' sorteios do Nota Paraná já ocorreram'}
+      e o resultado ainda não foi conferido:
+    </p>
+    <ul style="font-size:13px;margin:0 0 16px 18px;padding:0;">${linhas}</ul>
+    <p style="color:var(--text-secondary);font-size:12px;line-height:1.5;margin-bottom:16px;">
+      Abra o Nota Paraná, entre na aba <strong>MEUS BILHETES</strong> e espere o painel do NFScanner dizer que leu os sorteios.
+      Ao voltar aqui, o resultado entra sozinho.
+    </p>
+    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn-secondary" onclick="adiarLembreteSorteio()">Lembrar amanhã</button>
+      <button class="btn-primary" onclick="abrirPortalBilhetes()">Abrir Nota Paraná</button>
+    </div>
+  `, '480px');
+}
+
+// Importa em silêncio e, logo depois, decide se lembra o usuário.
+async function autoImportarSorteios() {
+  const p = programaNotaParana();
+  try {
+    if (p && nfsExtInstalada()) await importarSorteiosDoPortal(p.id, true);
+  } catch (e) {
+    console.warn('auto-importação de sorteios falhou:', e);
+  }
+  verificarSorteiosPendentes();
 }
 
 // ===== CUPONS & TICKETS =====

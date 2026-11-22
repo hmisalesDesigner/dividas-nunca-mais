@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.5 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.6 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.6 | (a publicar) | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
 | Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
 | Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
 | Site v1.3 | `ae179e3` | Nota Paraná vira cashback (migração automática `migrarProgramas`) |
@@ -411,6 +412,20 @@ A tabela `#sorteios` vem **renderizada pelo servidor**. Só `#lista-bilhetes` (n
 
 **`js/beneficios.js`** — `nfsExtPergunta(type, extra, timeout)` (postMessage com `reqId` e timeout de 4 s), `nfsExtInstalada()`, `importarSorteiosDoPortal(id)`. O upsert casa por `nr`, com fallback em `inicio`+`fim` (pega sorteios lançados à mão antes), e **nunca** sobrescreve `premio` nem um `nome` editado à mão (`origem !== 'portal'`). O botão "🏆 Ganhei" só aparece quando `premiados == null || premiados > 0`.
 
+### Importação automática e lembrete (v1.6)
+
+| Função (`js/beneficios.js`) | O que faz |
+|---|---|
+| `importarSorteiosDoPortal(id, silencioso)` | `silencioso = true` não abre modal nem mostra "X novos"; só interrompe se houver prêmio a lançar. Devolve quantos sorteios mexeu |
+| `autoImportarSorteios()` | Importa em silêncio e chama `verificarSorteiosPendentes()`. Chamada em `iniciarApp()` (`js/app.js`, 2,5 s depois) e no fim de `atualizarSite()` (`js/utils.js`, 1,2 s depois) |
+| `sorteiosPendentes()` | `origem === 'portal' && dataSorteio <= hoje && premiados == null` — ou seja, o sorteio já ocorreu (ou é hoje) e o portal ainda não disse o resultado. Lançamentos à mão ficam de fora de propósito |
+| `verificarSorteiosPendentes(tentativa)` | Pop-up pedindo para abrir o portal. `telaOcupada()` adia 3 s (até 20 vezes) se `saldo-modal`, `ben-modal-overlay`, `modal-overlay` ou `alert-popup` estiverem visíveis, para não atropelar os pop-ups de saldo |
+| `adiarLembreteSorteio()` / `abrirPortalBilhetes()` | Gravam `dnm_sorteios_adiado = hoje` no localStorage — o lembrete some pelo resto do dia e volta no dia seguinte |
+
+O formulário "+ Registrar Sorteio" virou um `<details>` recolhido ("✏️ Lançar um sorteio à mão"): o portal entrega todos aqueles campos, e preenchê-los à mão só cria entrada divergente. Ficou como saída de emergência se a extensão falhar. O **valor do prêmio** continua manual de propósito (botão "🏆 Ganhei") — o portal não mostra esse valor na tela de bilhetes.
+
+`hojeISO()` é definida em `js/beneficios.js` (não em `utils.js`): em teste, sobrescrever **depois** de carregar o arquivo, senão a declaração de função ganha do stub.
+
 **Validação:** a fórmula `bilhetesPorValor()` (1 + ⌊valor/200⌋) foi conferida contra os 10 períodos já fechados do portal e acerta todos os 10.
 
-**Testes:** `/tmp/tsor/` — `test.js` (parser contra o HTML real), `e2e.js` (extensão → ponte → upsert → reimportação idempotente), `pagina.js` (pior caso: paginação que remove linhas do DOM). jsdom **não** preenche `ev.source` em `postMessage` da mesma janela, então `e2e.js` afrouxa só essa checagem do `bridge.js`.
+**Testes:** `/tmp/tsor/` — `test.js` (parser contra o HTML real), `e2e.js` (extensão → ponte → upsert → reimportação idempotente), `pagina.js` (pior caso: paginação que remove linhas do DOM), `lembrete.js` (9 cenários do pop-up: futuro, hoje, passado, já conferido, adiado, tela ocupada, manual, plural). jsdom **não** preenche `ev.source` em `postMessage` da mesma janela, então `e2e.js` afrouxa só essa checagem do `bridge.js`.

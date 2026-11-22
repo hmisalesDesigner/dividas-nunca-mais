@@ -17,6 +17,12 @@ function iniciarApp() {
     if (typeof atualizarBadgeBeneficios === 'function') atualizarBadgeBeneficios();
   }, 1000);
 
+  // Importa sorteios do Nota Paraná pela extensão e, se algum já sorteado
+  // seguir sem resultado, lembra o usuário de abrir o portal.
+  setTimeout(() => {
+    if (typeof autoImportarSorteios === 'function') autoImportarSorteios();
+  }, 2500);
+
   // Atualiza header
   document.getElementById('user-photo').src = DB.usuario.foto || '';
   const benPhoto = document.getElementById('user-photo-ben');
