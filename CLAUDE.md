@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.4 · commit `6c9450d`
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.5 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.5 + Ext 1.2.0 | (a publicar) | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
 | Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
 | Site v1.3 | `ae179e3` | Nota Paraná vira cashback (migração automática `migrarProgramas`) |
 | Site v1.2 | `5dcec24` | Botão 🔄 Atualizar (Dashboard), resgate de cashback, ⏳ Vencimentos |
@@ -336,7 +337,7 @@ git push origin main
 |------|--------|
 | Itens em categoria errada (ex.: "Abob Cabotcha" em "Café, Chá e Achocolatados") | Mencionado, não autorizado |
 | Alerta de expiração de créditos do Nota Paraná | Ideia pendente |
-| Montar `CLAUDE.md` com preferências + subagente Sonnet | Oferecido, não aceito |
+| Números individuais dos bilhetes (`#lista-bilhetes`, vem por AJAX) | Não usado pelo modelo do app; só se for pedido |
 | Dividir `nfscanner.html` em arquivos menores | Sugerido, pendente |
 
 ---
@@ -376,8 +377,40 @@ App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js
 
 **Testes:** Playwright em `/tmp/pw/` (`ben_test.js`, `ben_all.js`, `ben_mig.js`, `ben_sor.js`); carregar backup `dividas-nunca-mais-backup-2026-11-22-corrigido.json`, stub do OAuth Google. Proxy do sandbox bloqueia CDN/Google (inofensivo).
 
-**Commits:** trailers `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` e `Claude-Session: …`.
+**Commits:** trailers `Co-Authored-By: Claude <modelo que fez o trabalho> <noreply@anthropic.com>` e `Claude-Session: …` (o modelo varia por sessão — não fixar em um nome).
 
-**Pendências:** (1) página `notaparana.pr.gov.br/nfprweb/Bilhete` exige login — o Claude **não** digita senha; o usuário cola texto/print dos sorteios e bilhetes para cadastrar; (2) alerta de expiração de créditos do Nota Paraná (ideia); (3) itens em categoria errada no NFScanner (não autorizado); (4) dividir `nfscanner.html` em arquivos menores (sugerido).
+**Sorteios (v1.5):** resolvidos pela extensão — ver §20. `ordenarSorteios(p)` ordena do mais recente para o mais antigo (o comparador da v1.4 fazia o contrário e nunca devolvia 0 em empate).
+
+**Pendências:** (1) alerta de expiração de créditos do Nota Paraná (ideia); (3) itens em categoria errada no NFScanner (não autorizado); (4) dividir `nfscanner.html` em arquivos menores (sugerido).
 
 **Privacidade:** nunca guardar login/senha, CPF, nome completo ou endereço em memória/docs.
+
+---
+
+## 20. Extensão do Chrome — Sorteios (v1.2.0)
+
+`extensao-nfscanner/` já rodava em `https://notaparana.pr.gov.br/nfprweb/*` com
+`credentials: 'include'`, usando a sessão que o **usuário** abriu. O Claude nunca digita senha.
+
+**`sync.js`** — `init()` despacha por rota: `/nfprweb/Bilhete` → `initSorteios()`; `/nfprweb/Extrato` → fluxo antigo de notas.
+
+| Função | O que faz |
+|--------|-----------|
+| `colunasSorteio(tabela)` | Mapeia as colunas pelo **texto do `<th>`** (não por índice fixo). `premiados` é testado antes de `bilhetes`, senão "Qtde de Bilhetes Premiados" cai no lugar errado |
+| `lerSorteios()` | Lê `#sorteios tbody tr`. Confere o Nº da célula contra o atributo `rel` da `<tr>` e autocorrige offset de −1/+1 (há linhas em que o `<td class="sorteio">` do ícone pode não vir, deslocando tudo) |
+| `coletarSorteios()` | Lê a página atual, clica os links numéricos de `#pag-sorteio` e junta por Nº — imune a o plugin do portal **esconder** ou **remover** as linhas fora da página |
+| `periodoISO('AGO/2026')` | → `{inicio:'2026-08-01', fim:'2026-08-31'}` |
+
+Grava em `chrome.storage.local` → `nfs.sorteios[]` e `nfs.lastSyncSorteios`.
+
+**Colunas do portal:** Nº · Tipo · Período das Notas · Limite para adesão · Data Loteria Federal · Data do sorteio · Soma das Notas · Qtde de Bilhetes · Qtde de Bilhetes Premiados · Situação · Ver Notas. A coluna "Resultado" está comentada no HTML (em `thead` **e** `tbody`, então não desalinha).
+
+A tabela `#sorteios` vem **renderizada pelo servidor**. Só `#lista-bilhetes` (números dos bilhetes) vem por AJAX (`SorteioNFPR`, `urlAjax:'Bilhete'`, `paramPesquisa`) — e o modelo do app não usa isso.
+
+**`bridge.js`** — novo recado `NFS_GET_SORTEIOS` → `{type:'NFS_SORTEIOS', sorteios, lastSync}`. `NFS_PING` agora também devolve `sorteios` (contagem) e `lastSyncSorteios`. Escreve `nfs_last_sync_sorteios` no `localStorage` do site.
+
+**`js/beneficios.js`** — `nfsExtPergunta(type, extra, timeout)` (postMessage com `reqId` e timeout de 4 s), `nfsExtInstalada()`, `importarSorteiosDoPortal(id)`. O upsert casa por `nr`, com fallback em `inicio`+`fim` (pega sorteios lançados à mão antes), e **nunca** sobrescreve `premio` nem um `nome` editado à mão (`origem !== 'portal'`). O botão "🏆 Ganhei" só aparece quando `premiados == null || premiados > 0`.
+
+**Validação:** a fórmula `bilhetesPorValor()` (1 + ⌊valor/200⌋) foi conferida contra os 10 períodos já fechados do portal e acerta todos os 10.
+
+**Testes:** `/tmp/tsor/` — `test.js` (parser contra o HTML real), `e2e.js` (extensão → ponte → upsert → reimportação idempotente), `pagina.js` (pior caso: paginação que remove linhas do DOM). jsdom **não** preenche `ev.source` em `postMessage` da mesma janela, então `e2e.js` afrouxa só essa checagem do `bridge.js`.

@@ -1,16 +1,30 @@
-NFScanner – Nota Paraná (extensão do Chrome)
+NFScanner – Nota Paraná (extensão do Chrome) — v1.2.0
 
 INSTALAR (uma vez)
 1. Descompacte esta pasta.
 2. No Chrome abra chrome://extensions e ligue "Modo do desenvolvedor".
 3. Clique em "Carregar sem compactação" e escolha a pasta extensao-nfscanner.
+   (Se já tinha a v1.1, clique no ícone de recarregar no cartão da extensão.)
 
-USAR
-1. Entre no Nota Paraná (login normal) e abra o Extrato.
+USAR — NOTAS FISCAIS
+1. Entre no Nota Paraná (login normal) e abra MINHAS NOTAS (Extrato).
 2. Aparece o painel "NFScanner – Nota Paraná" no canto inferior direito.
    Clique em "Sincronizar agora" (ou espere a contagem automática, 1x por dia).
 3. No NFScanner (aba "Nota Paraná"), clique em "Importar".
 
+USAR — SORTEIOS (novo na v1.2)
+1. Ainda logado, abra a aba MEUS BILHETES.
+2. O painel "NFScanner – Sorteios" lê a tabela sozinho em ~1 segundo e percorre
+   a paginação. Confira no painel se o número de sorteios bate com o portal;
+   se precisar, clique em "Ler sorteios" de novo.
+3. No Dívidas Nunca Mais: Cashback e Pontos → cartão Nota Paraná → 🎰 Sorteios
+   → "📥 Importar do portal".
+   Reimportar é seguro: atualiza os sorteios existentes e nunca apaga um prêmio
+   que você já lançou à mão.
+4. Se algum sorteio tiver bilhete premiado, o app avisa e você lança o valor do
+   crédito no botão "🏆 Ganhei" (o portal não mostra o valor nessa tela).
+
 PRIVACIDADE
 - CPF, nome e endereço do consumidor são removidos antes de guardar.
+  Dos sorteios só saem números: Nº, período, datas, soma das notas e bilhetes.
 - Nenhuma senha é lida. Tudo fica no seu navegador e no seu Drive.

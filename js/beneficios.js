@@ -1084,6 +1084,18 @@ function diasAte(iso) {
   return Math.ceil((new Date(iso + 'T12:00:00') - new Date(hojeISO() + 'T12:00:00')) / 86400000);
 }
 
+// Mais recente primeiro (mesma ordem do portal). O comparador antigo devolvia
+// sempre 1 ou -1 e acabava ordenando do mais antigo para o mais novo.
+function ordenarSorteios(p) {
+  if (!p || !p.sorteios) return;
+  const chave = x => x.dataSorteio || x.fim || '0000-00-00';
+  p.sorteios.sort(function(a, b) {
+    const ka = chave(a), kb = chave(b);
+    if (ka === kb) return (b.nr || 0) - (a.nr || 0);
+    return ka < kb ? 1 : -1;
+  });
+}
+
 function renderSorteiosCard(p) {
   if (!ehNotaParana(p) || !p.sorteios || p.sorteios.length === 0) return '';
   const hoje = hojeISO();
@@ -1095,6 +1107,9 @@ function renderSorteiosCard(p) {
         const cor = dias <= 30 ? '#ef4444' : dias <= 90 ? '#f59e0b' : '#217346';
         linhas.push('<div style="font-size:11px;color:' + cor + ';margin-bottom:2px;">🏆 Prêmio ' + formatarMoeda(x.premio.valor) + ' — usar até ' + formatarData(x.premio.expira) + ' (' + dias + 'd)</div>');
       }
+    }
+    if ((x.premiados || 0) > 0 && !(x.premio && x.premio.valor > 0)) {
+      linhas.push('<div style="font-size:11px;color:#f59e0b;margin-bottom:2px;">🏆 ' + (x.nome || 'Sorteio') + ': ' + x.premiados + ' bilhete premiado — lance o valor</div>');
     }
     if (!x.dataSorteio || x.dataSorteio >= hoje) {
       linhas.push('<div style="font-size:11px;color:#666;margin-bottom:2px;">🎰 ' + (x.nome || 'Sorteio') + ': ' + (x.bilhetes || 0) + ' bilhete' + (x.bilhetes === 1 ? '' : 's') + (x.dataSorteio ? ' · sorteio em ' + formatarData(x.dataSorteio) : '') + '</div>');
@@ -1110,24 +1125,33 @@ function abrirModalSorteios(id) {
   const hoje = hojeISO();
   const lista = p.sorteios.map(function(x, i) {
     const feito = x.dataSorteio && x.dataSorteio < hoje;
-    const status = feito ? '✅ Realizado' : x.dataSorteio ? '⏳ Aguardando' : '📝 Em aberto';
+    const status = (feito ? '✅ Realizado' : x.dataSorteio ? '⏳ Aguardando' : '📝 Em aberto')
+      + (x.premiados != null ? ' · ' + x.premiados + ' premiado' + (x.premiados === 1 ? '' : 's') : '');
     let premio = '';
     if (x.premio && x.premio.valor > 0) {
       const dias = diasAte(x.premio.expira);
       premio = '<div style="font-size:12px;color:' + (dias < 0 ? 'var(--text-muted)' : dias <= 30 ? 'var(--red)' : 'var(--green)') + ';margin-top:4px;">🏆 Prêmio ' + formatarMoeda(x.premio.valor) + ' — ' + (dias < 0 ? 'cancelado em ' : 'usar até ') + formatarData(x.premio.expira) + (dias >= 0 ? ' (' + dias + 'd)' : '') + '</div>';
     }
-    const btnPremio = feito && !(x.premio && x.premio.valor > 0)
+    const podeTerGanho = (x.premiados == null || x.premiados > 0);
+    const btnPremio = feito && podeTerGanho && !(x.premio && x.premio.valor > 0)
       ? '<button onclick="registrarPremioSorteio(' + id + ',' + i + ')" style="background:var(--green);border:none;color:#000;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">🏆 Ganhei</button>' : '';
     return '<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">'
       + '<div><div style="font-weight:600;">' + (x.nome || 'Sorteio') + ' · ' + (x.bilhetes || 0) + ' bilhete' + (x.bilhetes === 1 ? '' : 's') + '</div>'
       + '<div style="font-size:11px;color:var(--text-secondary);">' + status
       + (x.inicio && x.fim ? ' · período ' + formatarData(x.inicio) + ' a ' + formatarData(x.fim) : '')
-      + (x.dataSorteio ? ' · sorteio ' + formatarData(x.dataSorteio) : '') + '</div></div>'
+      + (x.dataSorteio ? ' · sorteio ' + formatarData(x.dataSorteio) : '')
+      + (x.valorNotas ? ' · notas ' + formatarMoeda(x.valorNotas) : '') + '</div></div>'
       + '<div style="display:flex;gap:6px;align-items:center;">' + btnPremio
       + '<button onclick="removerSorteio(' + id + ',' + i + ')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button></div>'
       + '</div>' + premio + '</div>';
   }).join('') || '<p style="color:var(--text-muted);font-size:13px;">Nenhum sorteio registrado.</p>';
+
+  let ultLeitura = '';
+  try {
+    const t = parseInt(localStorage.getItem('nfs_last_sync_sorteios') || '0', 10);
+    if (t) ultLeitura = new Date(t).toLocaleString('pt-BR');
+  } catch (e) {}
 
   abrirModal('🎰 Sorteios — ' + p.nome, `
     <p style="color:var(--text-secondary);font-size:12px;margin-bottom:14px;line-height:1.5;">
@@ -1135,6 +1159,13 @@ function abrirModalSorteios(id) {
       + <strong>1 a cada R$ 200</strong> em notas registradas (até R$ 10.000 por nota). O bilhete vale só no sorteio do seu período.
       Prêmio não usado em <strong>1 ano</strong> é cancelado.
     </p>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:14px;">
+      <div style="font-size:11px;color:var(--text-secondary);line-height:1.4;">
+        Puxa Nº, período, soma das notas e bilhetes direto da aba <strong>MEUS BILHETES</strong> do portal.
+        ${ultLeitura ? 'Última leitura: ' + ultLeitura : 'Abra o Nota Paraná logado uma vez para a extensão ler.'}
+      </div>
+      <button class="btn-secondary btn-sm" onclick="importarSorteiosDoPortal(${id})" style="white-space:nowrap;">📥 Importar do portal</button>
+    </div>
     <div style="margin-bottom:16px;">${lista}</div>
     <div style="border-top:1px solid var(--border);padding-top:16px;">
       <h4 style="font-size:13px;margin-bottom:12px;">+ Registrar Sorteio</h4>
@@ -1178,7 +1209,7 @@ function adicionarSorteio(id) {
   const bilhetes = bilTxt !== '' ? Math.max(0, parseInt(bilTxt) || 0) : bilhetesPorValor(valor);
   if (!p.sorteios) p.sorteios = [];
   p.sorteios.push({ id: gerarId(), nome: nome, inicio: ini || null, fim: fim || null, dataSorteio: data || null, valorNotas: valor || null, bilhetes: bilhetes, premio: null });
-  p.sorteios.sort(function(a, b) { return (b.dataSorteio || b.fim || '9999') < (a.dataSorteio || a.fim || '9999') ? 1 : -1; });
+  ordenarSorteios(p);
   agendarSync();
   fecharModal();
   abrirModalSorteios(id);
@@ -1209,6 +1240,103 @@ function removerSorteio(id, idx) {
     abrirModalSorteios(id);
     renderBeneficios();
   }
+}
+
+// ===== PONTE COM A EXTENSÃO DO CHROME =====
+// A extensão (extensao-nfscanner) injeta bridge.js nesta página e responde por postMessage.
+function nfsExtInstalada() {
+  try { return localStorage.getItem('nfs_ext_installed') === '1'; } catch (e) { return false; }
+}
+
+function nfsExtPergunta(type, extra, timeoutMs) {
+  return new Promise(function(resolve, reject) {
+    const reqId = 'r' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    let respondeu = false;
+    function ouvir(ev) {
+      const m = ev.data;
+      if (!m || m.source !== 'nfs-extension' || m.reqId !== reqId) return;
+      respondeu = true;
+      window.removeEventListener('message', ouvir);
+      resolve(m);
+    }
+    window.addEventListener('message', ouvir);
+    window.postMessage(Object.assign({ source: 'nfscanner-app', type: type, reqId: reqId }, extra || {}), '*');
+    setTimeout(function() {
+      if (respondeu) return;
+      window.removeEventListener('message', ouvir);
+      reject(new Error('sem resposta da extensão'));
+    }, timeoutMs || 4000);
+  });
+}
+
+// ===== IMPORTAR SORTEIOS DO PORTAL =====
+function sorteioNomePortal(s) {
+  return 'Sorteio ' + (s.nr || '?') + (s.periodo ? ' · ' + s.periodo : '');
+}
+
+async function importarSorteiosDoPortal(id) {
+  const p = DB.programas.find(x => x.id === id);
+  if (!p) return;
+
+  let resp;
+  try {
+    resp = await nfsExtPergunta('NFS_GET_SORTEIOS');
+  } catch (e) {
+    showAlert('🧩', 'A extensão do NFScanner não respondeu. Confira em chrome://extensions se ela está instalada e ativa, e recarregue esta página.');
+    return;
+  }
+
+  const lista = (resp.sorteios || []).filter(s => s && s.nr);
+  if (!lista.length) {
+    showAlert('📭', 'A extensão ainda não leu nenhum sorteio. Entre no Nota Paraná, abra a aba MEUS BILHETES e clique em "Ler sorteios" no painel do canto.');
+    return;
+  }
+
+  if (!p.sorteios) p.sorteios = [];
+  let novos = 0, atualizados = 0;
+
+  lista.forEach(function(s) {
+    const existente = p.sorteios.find(function(x) {
+      if (s.nr && x.nr) return x.nr === s.nr;
+      return !!(s.inicio && x.inicio === s.inicio && x.fim === s.fim);
+    });
+    const dados = {
+      nr: s.nr,
+      nome: sorteioNomePortal(s),
+      inicio: s.inicio || null,
+      fim: s.fim || null,
+      dataSorteio: s.dataSorteio || null,
+      limiteAdesao: s.limiteAdesao || null,
+      dataLoteria: s.dataLoteria || null,
+      valorNotas: (s.valorNotas === undefined ? null : s.valorNotas),
+      bilhetes: s.bilhetes || 0,
+      premiados: (s.premiados === undefined ? null : s.premiados),
+      situacao: s.situacao || s.rotulo || '',
+      origem: 'portal'
+    };
+    if (existente) {
+      // o prêmio é lançado à mão (o portal não mostra o valor) — nunca sobrescrever
+      const premio = existente.premio || null;
+      const nomeManual = existente.origem !== 'portal' ? existente.nome : null;
+      Object.assign(existente, dados);
+      existente.premio = premio;
+      if (nomeManual) existente.nome = nomeManual;
+      atualizados++;
+    } else {
+      p.sorteios.push(Object.assign({ id: gerarId(), premio: null }, dados));
+      novos++;
+    }
+  });
+
+  ordenarSorteios(p);
+  agendarSync();
+  fecharModal();
+  abrirModalSorteios(id);
+  renderBeneficios();
+
+  const aLancar = p.sorteios.filter(x => (x.premiados || 0) > 0 && !(x.premio && x.premio.valor > 0)).length;
+  showAlert('✅', novos + ' sorteio(s) novo(s) e ' + atualizados + ' atualizado(s) a partir do portal.'
+    + (aLancar ? ' 🏆 ' + aLancar + ' com bilhete premiado — clique em "Ganhei" para lançar o valor do crédito.' : ''));
 }
 
 // ===== CUPONS & TICKETS =====

@@ -172,8 +172,161 @@
       (aviso.length ? '. Conferir: ' + aviso.join(', ') : '') + '. Abra o NFScanner para importar.');
   }
 
+  // ---------- Sorteios (página MEUS BILHETES) ----------
+  // A tabela #sorteios vem renderizada pelo servidor: todas as linhas estão no DOM
+  // mesmo com a paginação exibindo 5 por vez. Nada de AJAX aqui.
+  const MESNUM = { JAN:1, FEV:2, MAR:3, ABR:4, MAI:5, JUN:6, JUL:7, AGO:8, SET:9, OUT:10, NOV:11, DEZ:12 };
+  const txt = el => (el && el.textContent ? el.textContent : '').replace(/\s+/g, ' ').trim();
+  const semAcento = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  function isoData(br) {
+    const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(br || '');
+    return m ? m[3] + '-' + m[2] + '-' + m[1] : null;
+  }
+  function numero(s) {
+    if (!s || /^[-–—\s]*$/.test(s)) return null;
+    const v = s.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.');
+    const n = parseFloat(v);
+    return isNaN(n) ? null : n;
+  }
+  const inteiro = s => { const n = numero(s); return n === null ? null : Math.round(n); };
+
+  function periodoISO(label) {
+    const m = /^([A-Z]{3})\/(\d{4})$/.exec((label || '').trim().toUpperCase());
+    if (!m || !MESNUM[m[1]]) return { inicio: null, fim: null };
+    const mes = MESNUM[m[1]], ano = +m[2];
+    const mm = String(mes).padStart(2, '0');
+    const ultimo = String(new Date(ano, mes, 0).getDate()).padStart(2, '0');
+    return { inicio: ano + '-' + mm + '-01', fim: ano + '-' + mm + '-' + ultimo };
+  }
+
+  // Mapeia as colunas pelo texto do cabeçalho — resiste a reordenação do portal
+  function colunasSorteio(tabela) {
+    const ix = {};
+    Array.from(tabela.querySelectorAll('thead th')).forEach((th, i) => {
+      const t = semAcento(txt(th));
+      if (/^n[ºo°u]?\.?$/.test(t)) ix.nr = i;
+      else if (t.includes('tipo')) ix.tipo = i;
+      else if (t.includes('periodo')) ix.periodo = i;
+      else if (t.includes('adesao')) ix.limite = i;
+      else if (t.includes('loteria')) ix.loteria = i;
+      else if (t.includes('data do sorteio')) ix.dataSorteio = i;
+      else if (t.includes('soma')) ix.soma = i;
+      else if (t.includes('premiados')) ix.premiados = i; // antes de 'bilhetes'
+      else if (t.includes('bilhetes')) ix.bilhetes = i;
+      else if (t.includes('situacao')) ix.situacao = i;
+    });
+    return ix;
+  }
+
+  function lerSorteios() {
+    const tabela = document.getElementById('sorteios');
+    if (!tabela) return null;
+    const ix = colunasSorteio(tabela);
+    if (ix.nr == null && ix.periodo == null) return null;
+    const out = [];
+    Array.from(tabela.querySelectorAll('tbody tr')).forEach(tr => {
+      const tds = Array.from(tr.children);
+      if (!tds.length) return;
+      const rel = tr.getAttribute('rel');
+
+      // Algumas linhas podem não trazer o <td> do ícone de situação, o que desloca
+      // todas as colunas. Confere o Nº contra o atributo rel e corrige o offset.
+      let off = 0;
+      if (rel && ix.nr != null) {
+        const achado = [0, -1, 1].find(o => tds[ix.nr + o] && txt(tds[ix.nr + o]) === rel);
+        if (achado === undefined) return;
+        off = achado;
+      }
+      const cel = i => (i == null ? '' : txt(tds[i + off]));
+
+      const nr = cel(ix.nr) || rel || '';
+      if (!/^\d+$/.test(nr)) return;
+
+      const icone = tr.querySelector('td.sorteio');
+      const per = periodoISO(cel(ix.periodo));
+      out.push({
+        nr: +nr,
+        tipo: cel(ix.tipo),
+        periodo: cel(ix.periodo),
+        inicio: per.inicio,
+        fim: per.fim,
+        limiteAdesao: isoData(cel(ix.limite)),
+        dataLoteria: isoData(cel(ix.loteria)),
+        dataSorteio: isoData(cel(ix.dataSorteio)),
+        valorNotas: numero(cel(ix.soma)),
+        bilhetes: inteiro(cel(ix.bilhetes)),
+        premiados: inteiro(cel(ix.premiados)),
+        situacao: cel(ix.situacao),
+        marca: icone ? ((icone.className.match(/icon-sorteio-([a-z]+)/) || [])[1] || '') : '',
+        rotulo: txt(icone)
+      });
+    });
+    return out;
+  }
+
+  function criarPainelSorteios() {
+    panel = document.createElement('div');
+    panel.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:99999;width:300px;background:#12141a;color:#e5e7eb;font:13px/1.4 Arial,sans-serif;border:1px solid #2a2f3d;border-radius:10px;padding:12px;box-shadow:0 6px 24px rgba(0,0,0,.4)';
+    panel.innerHTML = '<div style="font-weight:700;margin-bottom:6px">\u{1F3B0} NFScanner – Sorteios</div>' +
+      '<div id="nfs-msg" style="margin-bottom:8px;color:#9ca3af">Lendo...</div>' +
+      '<button id="nfs-go" style="background:#22c55e;color:#04210f;border:0;border-radius:6px;padding:7px 12px;font-weight:700;cursor:pointer">Ler sorteios</button>';
+    document.body.appendChild(panel);
+    elMsg = panel.querySelector('#nfs-msg');
+    elBtn = panel.querySelector('#nfs-go');
+    elStop = { style: {} }; // não há o que parar nesta página
+    elBtn.onclick = () => coletarSorteios();
+  }
+
+  // Não sabemos se o plugin de paginação do portal esconde ou remove as linhas,
+  // então lemos a página atual e também percorremos a paginação, juntando por Nº.
+  async function coletarSorteios() {
+    const acc = {};
+    function absorver() {
+      const l = lerSorteios();
+      if (l === null) return false;
+      l.forEach(x => { acc[x.nr] = x; });
+      return true;
+    }
+    if (!absorver()) { msg('Não achei a tabela de sorteios. Recarregue a página.'); return; }
+
+    const pag = document.getElementById('pag-sorteio');
+    if (pag) {
+      const links = Array.from(pag.querySelectorAll('a')).filter(a => {
+        if (!/^\d+$/.test(txt(a))) return false;            // ignora «, », Próximo...
+        const href = a.getAttribute('href') || '';
+        return !/^https?:/i.test(href);                      // nunca sai da página
+      });
+      for (let i = 0; i < links.length && i < 60; i++) {
+        msg('Lendo página ' + txt(links[i]) + ' da lista...');
+        try { links[i].click(); } catch (e) {}
+        await sleep(250);
+        absorver();
+      }
+    }
+
+    const lista = Object.keys(acc).map(k => acc[k]).sort((a, b) => b.nr - a.nr);
+    if (!lista.length) { msg('A tabela de sorteios está vazia.'); return; }
+    const d = await get();
+    d.sorteios = lista;
+    d.lastSyncSorteios = Date.now();
+    await set(d);
+    const premiados = lista.filter(s => (s.premiados || 0) > 0).length;
+    msg('✅ ' + lista.length + ' sorteios lidos' + (premiados ? ', ' + premiados + ' com bilhete premiado' : '') +
+      '. Abra o Dívidas Nunca Mais → Cashback → 🎰 Sorteios → Importar do portal.');
+  }
+
+  async function initSorteios() {
+    criarPainelSorteios();
+    const d = await get();
+    if (d.lastSyncSorteios) msg('Última leitura: ' + new Date(d.lastSyncSorteios).toLocaleString('pt-BR'));
+    // a tabela já está no DOM, mas o plugin de paginação do portal mexe nas linhas
+    setTimeout(() => coletarSorteios(), 1200);
+  }
+
   // ---------- Início ----------
   async function init() {
+    if (/\/nfprweb\/Bilhete/i.test(location.pathname)) return initSorteios();
     if (!/\/nfprweb\/Extrato/i.test(location.pathname)) return;
     criarPainel();
     const d = await get();
