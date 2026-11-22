@@ -194,3 +194,12 @@ function renderSubcategorias(categoria, selectId) {
     sel.appendChild(opt);
   });
 }
+
+
+// ===== VERSÃO DO SITE =====
+// Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
+const SITE_VERSION = 'v1.0';
+function aplicarVersaoSite() {
+  document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
+}
+document.addEventListener('DOMContentLoaded', aplicarVersaoSite);

@@ -59,13 +59,42 @@ function construirFilaPopups() {
   if (popupFila.length > 0) setTimeout(() => mostrarProximoPopup(), 800);
 }
 
+// Programas de pontos podem ter dois saldos (pontos e cashback R$): o usuário escolhe qual está informando.
+let popupModo = 'pontos';
+let popupModoId = null;
+
+function popupSetModo(modo) {
+  popupModo = modo;
+  mostrarProximoPopup();
+}
+
+function popupSaldoBase(p, modo) {
+  if (p.tipo === 'cashback') return p.saldo || 0;
+  return modo === 'cashback' ? (p.saldoCashback || 0) : (p.saldo || 0);
+}
+
 function mostrarProximoPopup() {
   if (popupAtual >= popupFila.length) return;
   const p = popupFila[popupAtual];
   if (!p) return;
 
-  const saldoAnterior = p.saldo || 0;
-  const tipo = p.tipo === 'cashback' ? 'R$' : 'pts';
+  const doisSaldos = p.tipo === 'pontos';
+  if (doisSaldos && popupModoId !== p.id) {
+    popupModoId = p.id;
+    popupModo = p.popupModo || 'pontos'; // lembra a última escolha neste programa
+  }
+  const modo = doisSaldos ? popupModo : (p.tipo === 'cashback' ? 'cashback' : 'pontos');
+  const emReais = modo === 'cashback';
+  const saldoAnterior = popupSaldoBase(p, modo);
+
+  const fmtPts = n => (n || 0).toLocaleString('pt-BR') + ' pts';
+  const anteriorHtml = doisSaldos
+    ? `<div style="display:flex;justify-content:center;gap:18px;">
+         <div style="${!emReais ? 'opacity:1' : 'opacity:.45'}"><div style="font-size:11px;color:#666;">🎯 Pontos</div><div style="font-size:18px;font-weight:700;color:#217346;">${fmtPts(p.saldo)}</div></div>
+         <div style="${emReais ? 'opacity:1' : 'opacity:.45'}"><div style="font-size:11px;color:#666;">💰 Cashback</div><div style="font-size:18px;font-weight:700;color:#217346;">${formatarMoeda(p.saldoCashback)}</div></div>
+       </div>`
+    : `<div style="font-size:12px;color:#666;margin-bottom:2px;">Saldo anterior</div>
+       <div style="font-size:20px;font-weight:700;color:#217346;">${emReais ? formatarMoeda(saldoAnterior) : fmtPts(saldoAnterior)}</div>`;
 
   document.getElementById('ben-modal-overlay').style.display = 'flex';
   document.getElementById('ben-modal-body').innerHTML = `
@@ -75,31 +104,25 @@ function mostrarProximoPopup() {
       <div style="font-size:13px;color:#666;">Atualize seu saldo atual</div>
     </div>
     <div style="background:#f3f4f6;border-radius:8px;padding:12px;margin-bottom:16px;text-align:center;">
-      <div style="font-size:12px;color:#666;margin-bottom:2px;">Saldo anterior</div>
-      <div style="font-size:20px;font-weight:700;color:#217346;">
-        ${p.tipo === 'cashback' ? formatarMoeda(saldoAnterior) : saldoAnterior.toLocaleString('pt-BR') + ' pts'}
-      </div>
+      ${doisSaldos ? '<div style="font-size:12px;color:#666;margin-bottom:6px;">Saldos anteriores</div>' : ''}
+      ${anteriorHtml}
     </div>
+    ${doisSaldos ? `
+    <div style="font-size:12px;font-weight:600;color:#666;margin-bottom:6px;">Que tipo de saldo você vai informar?</div>
+    <div class="ben-tipo">
+      <button type="button" class="${!emReais ? 'on' : ''}" onclick="popupSetModo('pontos')">🎯 Pontos</button>
+      <button type="button" class="${emReais ? 'on' : ''}" onclick="popupSetModo('cashback')">💰 Cashback (R$)</button>
+    </div>` : ''}
     <div style="margin-bottom:16px;">
       <label style="display:block;font-size:13px;font-weight:600;color:#333;margin-bottom:6px;">
-        Novo saldo (${tipo})
+        Novo saldo em ${emReais ? 'cashback (R$)' : 'pontos (pts)'}
       </label>
-      <input id="popup-saldo" type="number" 
-        placeholder="${p.tipo === 'cashback' ? '0.00' : '0'}" 
-        min="0" step="${p.tipo === 'cashback' ? '0.01' : '1'}"
-        style="width:100%;padding:12px;border:2px solid #217346;border-radius:8px;font-size:16px;font-weight:600;text-align:center;outline:none;color:#333;"
+      <input id="popup-saldo" type="number"
+        placeholder="${emReais ? '0.00' : '0'}"
+        min="0" step="${emReais ? '0.01' : '1'}"
+        style="width:100%;padding:12px;border:2px solid #217346;border-radius:8px;font-size:16px;font-weight:600;text-align:center;outline:none;color:#333;background:#fff;"
         onkeydown="if(event.key==='Enter') salvarPopupSaldo(${p.id}, ${saldoAnterior})" />
     </div>
-    ${p.tipo === 'pontos' ? `
-    <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:12px;font-weight:600;color:#666;margin-bottom:6px;">
-        Saldo Cashback R$ (se houver)
-      </label>
-      <input id="popup-cashback" type="number" 
-        placeholder="0.00" min="0" step="0.01"
-        value="${p.saldoCashback || 0}"
-        style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;text-align:center;outline:none;color:#333;" />
-    </div>` : '<div id="popup-cashback-hidden"></div>'}
     ${p.expiracao ? `<div style="font-size:12px;color:#f59e0b;text-align:center;margin-bottom:12px;">⏰ Expira em ${formatarData(p.expiracao)}</div>` : ''}
     <div style="display:flex;gap:10px;">
       <button onclick="pularPopup()" style="flex:1;background:#fff;border:1px solid #ddd;color:#666;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;">Pular</button>
@@ -112,36 +135,84 @@ function mostrarProximoPopup() {
   setTimeout(() => document.getElementById('popup-saldo')?.focus(), 100);
 }
 
+// ===== PONTOS VENCIDOS =====
+function hojeISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function lotesVencidos(p) {
+  const hoje = hojeISO();
+  return (p.lotes || []).filter(l => l.expiracao && l.expiracao < hoje);
+}
+
+// Se há lotes já vencidos, mostra a conta (saldo anterior − vencido = esperado) e pede confirmação.
+// Retorna null se o usuário cancelar; senão { vencido, lotes }.
+function confirmarVencidos(p, saldoAnterior, novoSaldo) {
+  const lotes = lotesVencidos(p);
+  if (!lotes.length) return { vencido: 0, lotes: [] };
+  const fmt = n => (n || 0).toLocaleString('pt-BR');
+  const vencido = lotes.reduce((s, l) => s + (l.quantidade || 0), 0);
+  const esperado = saldoAnterior - vencido;
+  const dif = novoSaldo - esperado;
+  const msg = p.nome + ' — pontos já vencidos:\n'
+    + lotes.map(l => '• ' + fmt(l.quantidade) + ' pts (venceram em ' + formatarData(l.expiracao) + ')').join('\n')
+    + '\n\nSaldo anterior:  ' + fmt(saldoAnterior) + ' pts'
+    + '\n− vencido:  ' + fmt(vencido) + ' pts'
+    + '\n= esperado:  ' + fmt(esperado) + ' pts'
+    + '\n\nVocê informou:  ' + fmt(novoSaldo) + ' pts  '
+    + (Math.abs(dif) < 0.5 ? '✓ confere com a conta' : '⚠ difere em ' + fmt(dif) + ' pts')
+    + '\n\nConfirmar ' + fmt(novoSaldo) + ' pts como saldo atual? (o lote vencido será removido)';
+  if (!confirm(msg)) return null;
+  return { vencido, lotes };
+}
+
 function salvarPopupSaldo(id, saldoAnterior) {
   const input = document.getElementById('popup-saldo');
-  const novoSaldo = parseFloat(input?.value) || 0;
+  if (!input || input.value.trim() === '') { input?.focus(); return; } // evita zerar o saldo sem querer
+  const novoSaldo = parseFloat(input.value) || 0;
   const p = DB.programas.find(p => p.id === id);
   if (!p) { pularPopup(); return; }
 
-  // Salva histórico
-  if (!DB.historicoSaldo) DB.historicoSaldo = {};
-  if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
-  DB.historicoSaldo[id].push({
-    data: new Date().toISOString().split('T')[0],
-    saldo: novoSaldo
-  });
+  const hoje = new Date().toISOString().split('T')[0];
+  const emReais = p.tipo === 'cashback' || (p.tipo === 'pontos' && popupModo === 'cashback');
 
-  // Detecta resgate automático
-  if (novoSaldo < saldoAnterior && saldoAnterior > 0) {
-    const diff = saldoAnterior - novoSaldo;
-    if (!DB.resgates) DB.resgates = [];
-    DB.resgates.push({
-      id: gerarId(),
-      programaId: id,
-      quantidade: diff,
-      descricao: 'Resgate detectado automaticamente',
-      data: new Date().toISOString().split('T')[0]
-    });
+  if (p.tipo === 'pontos' && emReais) {
+    // Saldo de cashback de um programa de pontos: não mexe nos pontos nem no histórico de pontos
+    if (!DB.historicoCashback) DB.historicoCashback = {};
+    if (!DB.historicoCashback[id]) DB.historicoCashback[id] = [];
+    DB.historicoCashback[id].push({ data: hoje, saldo: novoSaldo });
+    p.saldoCashback = novoSaldo;
+  } else {
+    // Pontos vencidos: mostra a conta e pede confirmação antes de gravar
+    let vencido = 0, lotes = [];
+    if (p.tipo === 'pontos') {
+      const r = confirmarVencidos(p, saldoAnterior, novoSaldo);
+      if (!r) return; // cancelou: mantém o pop-up aberto para corrigir
+      vencido = r.vencido; lotes = r.lotes;
+    }
+
+    if (!DB.historicoSaldo) DB.historicoSaldo = {};
+    if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
+    DB.historicoSaldo[id].push({ data: hoje, saldo: novoSaldo });
+
+    // Queda de saldo = resgate, exceto a parte que foi vencimento de lote
+    const resgatado = (saldoAnterior - novoSaldo) - vencido;
+    if (resgatado > 0 && saldoAnterior > 0) {
+      if (!DB.resgates) DB.resgates = [];
+      DB.resgates.push({
+        id: gerarId(),
+        programaId: id,
+        quantidade: resgatado,
+        descricao: 'Resgate detectado automaticamente',
+        data: hoje
+      });
+    }
+    if (lotes.length) p.lotes = p.lotes.filter(l => !lotes.includes(l));
+    p.saldo = novoSaldo;
   }
 
-  p.saldo = novoSaldo;
-  const cashbackInput = document.getElementById('popup-cashback');
-  if (cashbackInput) p.saldoCashback = parseFloat(cashbackInput.value) || 0;
+  if (p.tipo === 'pontos') p.popupModo = popupModo;
   agendarSync();
   fecharBenModal();
   renderBeneficios();
@@ -444,15 +515,23 @@ function confirmarAtualizar(id) {
   if (!p) return;
   const novoSaldo = parseFloat(document.getElementById('upd-saldo').value) || 0;
   const saldoAnterior = p.saldo || 0;
+  let vencido = 0, lotesVenc = [];
+  if (p.tipo === 'pontos') {
+    const r = confirmarVencidos(p, saldoAnterior, novoSaldo);
+    if (!r) return;
+    vencido = r.vencido; lotesVenc = r.lotes;
+  }
 
   if (!DB.historicoSaldo) DB.historicoSaldo = {};
   if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
   DB.historicoSaldo[id].push({ data: new Date().toISOString().split('T')[0], saldo: novoSaldo });
 
-  if (novoSaldo < saldoAnterior && saldoAnterior > 0) {
+  const resgatado = (saldoAnterior - novoSaldo) - vencido;
+  if (resgatado > 0 && saldoAnterior > 0) {
     if (!DB.resgates) DB.resgates = [];
-    DB.resgates.push({ id: gerarId(), programaId: id, quantidade: saldoAnterior - novoSaldo, descricao: 'Resgate detectado automaticamente', data: new Date().toISOString().split('T')[0] });
+    DB.resgates.push({ id: gerarId(), programaId: id, quantidade: resgatado, descricao: 'Resgate detectado automaticamente', data: new Date().toISOString().split('T')[0] });
   }
+  if (lotesVenc.length) p.lotes = p.lotes.filter(l => !lotesVenc.includes(l));
 
   p.saldo = novoSaldo;
   p.saldoCashback = parseFloat(document.getElementById('upd-cashback')?.value) || 0;
@@ -681,6 +760,9 @@ function renderLotesCard(p) {
   if (!p.lotes || p.lotes.length === 0) return '';
   const items = p.lotes.map(l => {
     const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
+    if (l.expiracao < hojeISO()) {
+      return '<div style="font-size:11px;color:#999;margin-bottom:2px;" title="Vencido. Ao atualizar o saldo, o app confere a conta e remove este lote.">⛔ ' + l.quantidade.toLocaleString('pt-BR') + ' pts venceram em ' + formatarData(l.expiracao) + ' (há ' + Math.abs(dias) + 'd)</div>';
+    }
     const cor = dias <= 7 ? '#ef4444' : dias <= 30 ? '#f59e0b' : '#217346';
     return '<div style="font-size:11px;color:' + cor + ';margin-bottom:2px;">⏰ ' + l.quantidade.toLocaleString('pt-BR') + ' pts vencem em ' + formatarData(l.expiracao) + ' (' + dias + 'd)</div>';
   }).join('');
