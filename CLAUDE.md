@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.5 + Ext 1.2.0 | (a publicar) | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
+| Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
 | Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
 | Site v1.3 | `ae179e3` | Nota Paraná vira cashback (migração automática `migrarProgramas`) |
 | Site v1.2 | `5dcec24` | Botão 🔄 Atualizar (Dashboard), resgate de cashback, ⏳ Vencimentos |
