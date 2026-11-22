@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** v29.5 · commit `dccde96`
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.4 · commit `6c9450d`
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,16 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
+| Site v1.3 | `ae179e3` | Nota Paraná vira cashback (migração automática `migrarProgramas`) |
+| Site v1.2 | `5dcec24` | Botão 🔄 Atualizar (Dashboard), resgate de cashback, ⏳ Vencimentos |
+| Site v1.0–1.1 | `c7be890`…`0d769af` | Versão do site visível, Pontos/Cashback nos pop-ups, conferência de pontos vencidos |
+| v29.11 | `1b923fc` | Catálogo: "O nome da nota está bom" |
+| v29.10 | `220d970` | Catálogo mostra itens que faltam + nomes órfãos |
+| v29.9 | `1387c55` | Catálogo guia até itens sem nome |
+| v29.8 | `0d65cd7` | Corrige rolagem lateral em Cotações |
+| v29.7 | `7e03c7a` | Cotações: cards compactos + mapa de calor |
+| v29.6 | `d232d0b` | Nova aba Cotações |
 | v29.5 | `dccde96` | Gráficos com texto nítido (alta resolução `devicePixelRatio ≥ 2.5`) |
 | v29.4 | `1d91771` | Botões de categoria do Livro ao lado da busca |
 | v29.3 | `42f3c7e` | Barras de rolagem temáticas; Produtos mais comprados mais largo |
@@ -265,7 +275,7 @@ git push origin main
 
 ---
 
-## 15. Tarefa pendente: aba Cotações (gráficos estilo B3)
+## 15. Aba Cotações (CONCLUÍDA em v29.6–v29.8; plano original abaixo, só para referência)
 
 **Pedido literal do usuário:**
 > "é muito importante o NFScanner mostrar uma aba com os gráficos dos preços dos itens, como acontece na B3 bolsa de valores. Isso me ajudará a ver como está o desempenho do preço dos itens, desde a sua primeira compra até hoje. Devem ser cards pequenos horizontais para caber todos os itens já cadastrados pelas notas fiscais lidas."
@@ -348,3 +358,26 @@ git push origin main
 - **Duas ocorrências de `?v=`** em `js/app.js` — ambas precisam ser atualizadas.
 - **`killCharts()`** é chamada automaticamente em `go()` — mas ao criar gráficos fora de Chart.js (ex.: SVG sparklines), não precisa registrar em `CHARTS`.
 - **Nunca usar fundo claro** — todo CSS novo deve respeitar o tema escuro (#121212 base).
+
+---
+
+## 19. Site pai — Cashback e Pontos (`js/beneficios.js`, v1.4)
+
+App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js`; `css/main.css`). `DB` inteiro vai para o Drive (`dividas-nunca-mais-data.json`) e localStorage (`dnm_db`); `agendarSync()` com debounce de 1,5 s. Versão do site: const `SITE_VERSION` em `js/utils.js` (bumpar a cada publicação; aparece no logo e no cabeçalho do Cashback).
+
+**Programas** (`DB.programas`): `tipo` `'pontos'` (`saldo` em pts, opcional `saldoCashback` em R$, `lotes[{quantidade,expiracao}]`) ou `'cashback'` (`saldo` em R$). Históricos: `DB.historicoSaldo[id]`, `DB.historicoCashback[id]`. `DB.resgates` (campo `tipoSaldo`), `DB.vencimentos` ({id, programaId, quantidade, tipoSaldo, descricao, data}).
+
+**Regras já implementadas:**
+- Pop-ups de saldo têm escolha Pontos × Cashback (R$) (`popupModo`).
+- Ao atualizar saldo, `confirmarVencidos` confere lotes vencidos (subtração) e registra em Vencimentos; queda restante pergunta resgate × vencimento.
+- Resgatar tem escolha Pontos/Cashback; ⏳ Vencimentos lista e soma o que já expirou.
+- Botão 🔄 Atualizar só no Dashboard (`atualizarSite()`: envia pendências → `carregarDoDrive()` → `migrarProgramas()` → re-render).
+- **Nota Paraná é cashback do governo (R$), sem pontos**; `migrarProgramas()` corrige programas antigos (idempotente). Tem 🎰 Sorteios (`sorteios[]` no programa): 1 bilhete na primeira compra do período + 1 a cada R$ 200 em notas (até R$ 10.000/nota); bilhete só vale no sorteio do período; prêmio cancelado após 1 ano (`somaUmAno`). Prêmio **não** soma no saldo.
+
+**Testes:** Playwright em `/tmp/pw/` (`ben_test.js`, `ben_all.js`, `ben_mig.js`, `ben_sor.js`); carregar backup `dividas-nunca-mais-backup-2026-11-22-corrigido.json`, stub do OAuth Google. Proxy do sandbox bloqueia CDN/Google (inofensivo).
+
+**Commits:** trailers `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>` e `Claude-Session: …`.
+
+**Pendências:** (1) página `notaparana.pr.gov.br/nfprweb/Bilhete` exige login — o Claude **não** digita senha; o usuário cola texto/print dos sorteios e bilhetes para cadastrar; (2) alerta de expiração de créditos do Nota Paraná (ideia); (3) itens em categoria errada no NFScanner (não autorizado); (4) dividir `nfscanner.html` em arquivos menores (sugerido).
+
+**Privacidade:** nunca guardar login/senha, CPF, nome completo ou endereço em memória/docs.
