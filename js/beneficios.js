@@ -321,7 +321,7 @@ function renderBeneficios() {
                 const prog = DB.programas.find(p => p.id === r.programaId);
                 return `<tr style="border-bottom:1px solid #f3f4f6;">
                   <td style="padding:10px 12px;">${prog ? prog.logo + ' ' + prog.nome : '-'}</td>
-                  <td style="padding:10px 12px;font-weight:600;color:#217346;">${prog?.tipo === 'cashback' ? formatarMoeda(r.quantidade) : r.quantidade.toLocaleString('pt-BR') + ' pts'}</td>
+                  <td style="padding:10px 12px;font-weight:600;color:#217346;">${(prog?.tipo === 'cashback' || r.tipoSaldo === 'cashback') ? formatarMoeda(r.quantidade) : r.quantidade.toLocaleString('pt-BR') + ' pts'}</td>
                   <td style="padding:10px 12px;color:#666;">${r.descricao || '-'}</td>
                   <td style="padding:10px 12px;color:#666;">${formatarData(r.data)}</td>
                 </tr>`;
