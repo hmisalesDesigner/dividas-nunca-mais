@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.7 | (a publicar) | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
+| Site v1.7 | `7476b17` | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
 | Site v1.6 | `9938983` | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
 | Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
 | Site v1.4 | `6c9450d` | Nota Paraná: 🎰 Sorteios (bilhetes, prazo do prêmio) |
