@@ -198,8 +198,39 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.1';
+const SITE_VERSION = 'v1.2';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
 document.addEventListener('DOMContentLoaded', aplicarVersaoSite);
+
+// ===== BOTÃO ATUALIZAR (Dashboard) =====
+// Envia o que ainda não foi salvo, traz a versão mais recente do Drive e redesenha a tela.
+async function atualizarSite() {
+  const btn = document.getElementById('btn-atualizar');
+  if (!btn || btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Atualizando...';
+  let doDrive = false;
+  try {
+    if (syncPendente) { // não perde alterações recentes antes de recarregar
+      clearTimeout(syncTimeout);
+      salvarLocalStorage();
+      await salvarNoDrive();
+      syncPendente = false;
+    }
+    if (typeof accessToken !== 'undefined' && accessToken) doDrive = await carregarDoDrive();
+    salvarLocalStorage();
+    atualizarDatetime();
+    if (typeof renderizarAlertas === 'function') renderizarAlertas();
+    if (typeof atualizarBadgeBeneficios === 'function') atualizarBadgeBeneficios();
+    renderDashboard();
+    showAlert('✅', doDrive ? 'Dados atualizados com o Google Drive.' : 'Tela atualizada.');
+  } catch (e) {
+    console.warn('Erro ao atualizar:', e);
+    showAlert('❌', 'Não foi possível atualizar. Tente novamente.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄 Atualizar';
+  }
+}

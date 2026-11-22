@@ -26,6 +26,7 @@ function gerarId() {
 const DRIVE_FILENAME = 'dividas-nunca-mais-data.json';
 let driveFileId = null;
 let syncTimeout = null;
+let syncPendente = false; // há alteração local ainda não enviada ao Drive
 
 async function salvarNoDrive() {
   if (!accessToken) return;
@@ -82,11 +83,13 @@ async function carregarDoDrive() {
 
 function agendarSync() {
   clearTimeout(syncTimeout);
+  syncPendente = true;
   syncTimeout = setTimeout(() => {
     // Salva no localStorage imediatamente
     if (typeof salvarLocalStorage === 'function') salvarLocalStorage();
     // Tenta salvar no Drive
     salvarNoDrive();
+    syncPendente = false;
   }, 1500);
 }
 

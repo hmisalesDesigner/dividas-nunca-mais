@@ -64,6 +64,8 @@ function navigateTo(page, el) {
 
   };
   document.getElementById('page-title').textContent = titulos[page] || page;
+  const btnAtu = document.getElementById('btn-atualizar');
+  if (btnAtu) btnAtu.style.display = page === 'dashboard' ? '' : 'none';
 
   // Abre submenu se necessário
   abrirSubmenuSeNecessario(page);

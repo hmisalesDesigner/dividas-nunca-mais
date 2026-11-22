@@ -421,3 +421,8 @@ select.filter { width: auto; padding: 8px 12px; font-size: 12px; }
 .ben-tipo { display: flex; gap: 6px; margin-bottom: 14px; }
 .ben-tipo button { flex: 1; padding: 9px 6px; border-radius: 8px; border: 2px solid #d1d5db; background: #fff; color: #555; font-size: 13px; font-weight: 600; cursor: pointer; }
 .ben-tipo button.on { border-color: #217346; background: #217346; color: #fff; }
+
+/* Botão Atualizar (Dashboard) */
+.btn-atualizar { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); padding: 6px 12px; border-radius: 16px; font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--transition); white-space: nowrap; }
+.btn-atualizar:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+.btn-atualizar:disabled { opacity: .6; cursor: wait; }

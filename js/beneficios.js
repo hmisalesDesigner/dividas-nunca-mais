@@ -121,7 +121,12 @@ function mostrarProximoPopup() {
         placeholder="${emReais ? '0.00' : '0'}"
         min="0" step="${emReais ? '0.01' : '1'}"
         style="width:100%;padding:12px;border:2px solid #217346;border-radius:8px;font-size:16px;font-weight:600;text-align:center;outline:none;color:#333;background:#fff;"
+        oninput="popupCheckQueda(${saldoAnterior})"
         onkeydown="if(event.key==='Enter') salvarPopupSaldo(${p.id}, ${saldoAnterior})" />
+    </div>
+    <div id="popup-queda" style="display:none;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:600;color:#666;margin-bottom:6px;">O saldo diminuiu. O que aconteceu?</div>
+      ${motivoQuedaHtml('popup-motivo')}
     </div>
     ${p.expiracao ? `<div style="font-size:12px;color:#f59e0b;text-align:center;margin-bottom:12px;">⏰ Expira em ${formatarData(p.expiracao)}</div>` : ''}
     <div style="display:flex;gap:10px;">
@@ -133,6 +138,52 @@ function mostrarProximoPopup() {
     </div>
   `;
   setTimeout(() => document.getElementById('popup-saldo')?.focus(), 100);
+}
+
+// ===== QUEDA DE SALDO: RESGATE x VENCIMENTO =====
+// tipoSaldo: 'pontos' | 'cashback' (R$)
+function tipoSaldoDe(r) {
+  if (r.tipoSaldo) return r.tipoSaldo;
+  const prog = DB.programas.find(p => p.id === r.programaId);
+  return prog && prog.tipo === 'cashback' ? 'cashback' : 'pontos';
+}
+
+function fmtQtd(qtd, tipoSaldo) {
+  return tipoSaldo === 'cashback' ? formatarMoeda(qtd) : (qtd || 0).toLocaleString('pt-BR') + ' pts';
+}
+
+function registrarQueda(p, quantidade, motivo, tipoSaldo, data) {
+  quantidade = Math.round(quantidade * 100) / 100;
+  if (quantidade <= 0) return;
+  if (motivo === 'vencimento') {
+    if (!DB.vencimentos) DB.vencimentos = [];
+    DB.vencimentos.push({ id: gerarId(), programaId: p.id, quantidade, tipoSaldo, descricao: 'Vencimento', data });
+  } else {
+    if (!DB.resgates) DB.resgates = [];
+    DB.resgates.push({ id: gerarId(), programaId: p.id, quantidade, tipoSaldo, descricao: 'Resgate detectado automaticamente', data });
+  }
+}
+
+function registrarVencimentosLotes(p, lotes) {
+  if (!DB.vencimentos) DB.vencimentos = [];
+  lotes.forEach(l => DB.vencimentos.push({
+    id: gerarId(), programaId: p.id, quantidade: l.quantidade || 0, tipoSaldo: 'pontos',
+    descricao: 'Lote vencido', data: l.expiracao
+  }));
+}
+
+// Mostra o seletor "foi resgate ou vencimento?" quando o valor digitado é menor que o saldo anterior
+function popupCheckQueda(saldoAnterior) {
+  const v = parseFloat(document.getElementById('popup-saldo')?.value);
+  const box = document.getElementById('popup-queda');
+  if (box) box.style.display = (!isNaN(v) && v < saldoAnterior) ? 'block' : 'none';
+}
+
+function motivoQuedaHtml(idSelect, estilo) {
+  return `<select id="${idSelect}" style="${estilo || ''}width:100%;padding:9px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;background:#fff;color:#333;">
+      <option value="resgate">🎁 Usei / resgatei</option>
+      <option value="vencimento">⏳ Venceram (expiraram)</option>
+    </select>`;
 }
 
 // ===== PONTOS VENCIDOS =====
@@ -178,15 +229,18 @@ function salvarPopupSaldo(id, saldoAnterior) {
 
   const hoje = new Date().toISOString().split('T')[0];
   const emReais = p.tipo === 'cashback' || (p.tipo === 'pontos' && popupModo === 'cashback');
+  const tipoSaldo = emReais ? 'cashback' : 'pontos';
+  const motivo = document.getElementById('popup-motivo')?.value || 'resgate';
 
   if (p.tipo === 'pontos' && emReais) {
-    // Saldo de cashback de um programa de pontos: não mexe nos pontos nem no histórico de pontos
+    // Cashback (R$) de um programa de pontos: não mexe nos pontos nem no histórico de pontos
     if (!DB.historicoCashback) DB.historicoCashback = {};
     if (!DB.historicoCashback[id]) DB.historicoCashback[id] = [];
     DB.historicoCashback[id].push({ data: hoje, saldo: novoSaldo });
+    registrarQueda(p, saldoAnterior - novoSaldo, motivo, 'cashback', hoje);
     p.saldoCashback = novoSaldo;
   } else {
-    // Pontos vencidos: mostra a conta e pede confirmação antes de gravar
+    // Pontos vencidos (lotes): mostra a conta e pede confirmação antes de gravar
     let vencido = 0, lotes = [];
     if (p.tipo === 'pontos') {
       const r = confirmarVencidos(p, saldoAnterior, novoSaldo);
@@ -198,19 +252,9 @@ function salvarPopupSaldo(id, saldoAnterior) {
     if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
     DB.historicoSaldo[id].push({ data: hoje, saldo: novoSaldo });
 
-    // Queda de saldo = resgate, exceto a parte que foi vencimento de lote
-    const resgatado = (saldoAnterior - novoSaldo) - vencido;
-    if (resgatado > 0 && saldoAnterior > 0) {
-      if (!DB.resgates) DB.resgates = [];
-      DB.resgates.push({
-        id: gerarId(),
-        programaId: id,
-        quantidade: resgatado,
-        descricao: 'Resgate detectado automaticamente',
-        data: hoje
-      });
-    }
-    if (lotes.length) p.lotes = p.lotes.filter(l => !lotes.includes(l));
+    if (lotes.length) { registrarVencimentosLotes(p, lotes); p.lotes = p.lotes.filter(l => !lotes.includes(l)); }
+    // O que sobrar da queda (além dos lotes vencidos) segue o motivo escolhido
+    registrarQueda(p, (saldoAnterior - novoSaldo) - vencido, motivo, tipoSaldo, hoje);
     p.saldo = novoSaldo;
   }
 
@@ -290,6 +334,7 @@ function renderBeneficios() {
       <button onclick="abrirModalNovoPrograma()" style="background:#217346;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">+ Novo Programa</button>
       <button onclick="construirFilaPopups()" style="background:#fff;border:1px solid #217346;color:#217346;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">🔄 Atualizar Saldos</button>
       <button onclick="mostrarGraficos()" style="background:#fff;border:1px solid #217346;color:#217346;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">📊 Ver Gráficos</button>
+      <button onclick="abrirModalVencimentos()" style="background:#fff;border:1px solid #217346;color:#217346;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">${textoBotaoVencimentos()}</button>
     </div>
 
     <!-- Totais por categoria -->
@@ -321,7 +366,7 @@ function renderBeneficios() {
                 const prog = DB.programas.find(p => p.id === r.programaId);
                 return `<tr style="border-bottom:1px solid #f3f4f6;">
                   <td style="padding:10px 12px;">${prog ? prog.logo + ' ' + prog.nome : '-'}</td>
-                  <td style="padding:10px 12px;font-weight:600;color:#217346;">${(prog?.tipo === 'cashback' || r.tipoSaldo === 'cashback') ? formatarMoeda(r.quantidade) : r.quantidade.toLocaleString('pt-BR') + ' pts'}</td>
+                  <td style="padding:10px 12px;font-weight:600;color:#217346;">${fmtQtd(r.quantidade, tipoSaldoDe(r))}</td>
                   <td style="padding:10px 12px;color:#666;">${r.descricao || '-'}</td>
                   <td style="padding:10px 12px;color:#666;">${formatarData(r.data)}</td>
                 </tr>`;
@@ -505,6 +550,10 @@ function abrirModalAtualizar(id) {
       <label>Data de Expiração</label>
       <input id="upd-exp" type="date" value="${p.expiracao || ''}" />
     </div>
+    <div class="form-group">
+      <label>Se o saldo ${p.tipo === 'cashback' ? '(R$)' : 'de pontos'} diminuiu, o que aconteceu?</label>
+      ${motivoQuedaHtml('upd-motivo')}
+    </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
       <button class="btn-primary" onclick="confirmarAtualizar(${id})">💾 Salvar</button>
@@ -528,12 +577,11 @@ function confirmarAtualizar(id) {
   if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
   DB.historicoSaldo[id].push({ data: new Date().toISOString().split('T')[0], saldo: novoSaldo });
 
-  const resgatado = (saldoAnterior - novoSaldo) - vencido;
-  if (resgatado > 0 && saldoAnterior > 0) {
-    if (!DB.resgates) DB.resgates = [];
-    DB.resgates.push({ id: gerarId(), programaId: id, quantidade: resgatado, descricao: 'Resgate detectado automaticamente', data: new Date().toISOString().split('T')[0] });
+  const hojeStr = new Date().toISOString().split('T')[0];
+  if (lotesVenc.length) { registrarVencimentosLotes(p, lotesVenc); p.lotes = p.lotes.filter(l => !lotesVenc.includes(l)); }
+  if (saldoAnterior > 0) {
+    registrarQueda(p, (saldoAnterior - novoSaldo) - vencido, document.getElementById('upd-motivo')?.value || 'resgate', p.tipo === 'cashback' ? 'cashback' : 'pontos', hojeStr);
   }
-  if (lotesVenc.length) p.lotes = p.lotes.filter(l => !lotesVenc.includes(l));
 
   p.saldo = novoSaldo;
   p.saldoCashback = parseFloat(document.getElementById('upd-cashback')?.value) || 0;
@@ -544,20 +592,49 @@ function confirmarAtualizar(id) {
   showAlert('✅', 'Saldo atualizado!');
 }
 
+let resTipo = 'pontos';
+
+function resSaldoDe(p, tipo) {
+  return (p.tipo === 'cashback' || tipo === 'cashback') ? (p.tipo === 'cashback' ? (p.saldo || 0) : (p.saldoCashback || 0)) : (p.saldo || 0);
+}
+
+function resSetTipo(id, tipo) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p) return;
+  resTipo = tipo;
+  const emReais = p.tipo === 'cashback' || tipo === 'cashback';
+  const saldo = resSaldoDe(p, tipo);
+  document.querySelectorAll('#res-tipo button').forEach(b => b.classList.toggle('on', b.dataset.tipo === tipo));
+  document.getElementById('res-saldo-txt').textContent = fmtQtd(saldo, emReais ? 'cashback' : 'pontos');
+  const q = document.getElementById('res-qtd');
+  q.step = emReais ? '0.01' : '1'; q.max = saldo; q.value = '';
+  document.getElementById('res-qtd-lbl').textContent = emReais ? 'Valor (R$) *' : 'Quantidade (pontos) *';
+}
+
 function abrirModalResgatar(id) {
   const p = DB.programas.find(p => p.id === id);
   if (!p) return;
+  const doisSaldos = p.tipo === 'pontos';
+  resTipo = (doisSaldos && !(p.saldo > 0) && (p.saldoCashback > 0)) ? 'cashback' : 'pontos';
+  const emReais = p.tipo === 'cashback' || resTipo === 'cashback';
+  const saldo = resSaldoDe(p, resTipo);
   abrirModal(`🎁 Resgatar — ${p.nome}`, `
+    ${doisSaldos ? `
+    <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;">Resgatar de qual saldo?</div>
+    <div class="ben-tipo" id="res-tipo">
+      <button type="button" data-tipo="pontos" class="${resTipo === 'pontos' ? 'on' : ''}" onclick="resSetTipo(${id}, 'pontos')">🎯 Pontos (${(p.saldo || 0).toLocaleString('pt-BR')})</button>
+      <button type="button" data-tipo="cashback" class="${resTipo === 'cashback' ? 'on' : ''}" onclick="resSetTipo(${id}, 'cashback')">💰 Cashback (${formatarMoeda(p.saldoCashback || 0)})</button>
+    </div>` : ''}
     <p style="color:var(--text-secondary);margin-bottom:16px;">
-      Saldo: <strong>${p.tipo === 'cashback' ? formatarMoeda(p.saldo) : (p.saldo || 0).toLocaleString('pt-BR') + ' pts'}</strong>
+      Saldo: <strong id="res-saldo-txt">${fmtQtd(saldo, emReais ? 'cashback' : 'pontos')}</strong>
     </p>
     <div class="form-group">
-      <label>Quantidade *</label>
-      <input id="res-qtd" type="number" placeholder="0" min="0" step="${p.tipo === 'cashback' ? '0.01' : '1'}" max="${p.saldo}" />
+      <label id="res-qtd-lbl">${emReais ? 'Valor (R$) *' : 'Quantidade (pontos) *'}</label>
+      <input id="res-qtd" type="number" placeholder="0" min="0" step="${emReais ? '0.01' : '1'}" max="${saldo}" />
     </div>
     <div class="form-group">
       <label>Descrição</label>
-      <input id="res-desc" type="text" placeholder="Ex: Passagem aérea, desconto..." />
+      <input id="res-desc" type="text" placeholder="Ex: Passagem aérea, desconto, abastecimento..." />
     </div>
     <div style="border-top:1px solid var(--border);margin:16px 0;padding-top:16px;">
       <div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:12px;">🎟️ Cupom/Ticket gerado (opcional)</div>
@@ -584,14 +661,25 @@ function confirmarResgate(id) {
   const desc = document.getElementById('res-desc').value;
   const cupomCodigo = document.getElementById('res-cupom')?.value?.trim();
   const cupomValidade = document.getElementById('res-cupom-val')?.value;
+  const hoje = new Date().toISOString().split('T')[0];
+  const doCashbackDePontos = p.tipo === 'pontos' && resTipo === 'cashback';
+  const tipoSaldo = (p.tipo === 'cashback' || doCashbackDePontos) ? 'cashback' : 'pontos';
   if (!qtd || qtd <= 0) { showAlert('⚠️', 'Informe a quantidade.'); return; }
-  if (qtd > p.saldo) { showAlert('⚠️', 'Saldo insuficiente.'); return; }
-  p.saldo = Math.max(0, p.saldo - qtd);
-  if (!DB.historicoSaldo) DB.historicoSaldo = {};
-  if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
-  DB.historicoSaldo[id].push({ data: new Date().toISOString().split('T')[0], saldo: p.saldo });
+  if (qtd > resSaldoDe(p, resTipo) + 0.001) { showAlert('⚠️', 'Saldo insuficiente.'); return; }
+
+  if (doCashbackDePontos) {
+    p.saldoCashback = Math.max(0, Math.round(((p.saldoCashback || 0) - qtd) * 100) / 100);
+    if (!DB.historicoCashback) DB.historicoCashback = {};
+    if (!DB.historicoCashback[id]) DB.historicoCashback[id] = [];
+    DB.historicoCashback[id].push({ data: hoje, saldo: p.saldoCashback });
+  } else {
+    p.saldo = Math.max(0, Math.round(((p.saldo || 0) - qtd) * 100) / 100);
+    if (!DB.historicoSaldo) DB.historicoSaldo = {};
+    if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
+    DB.historicoSaldo[id].push({ data: hoje, saldo: p.saldo });
+  }
   if (!DB.resgates) DB.resgates = [];
-  DB.resgates.push({ id: gerarId(), programaId: id, quantidade: qtd, descricao: desc, data: new Date().toISOString().split('T')[0] });
+  DB.resgates.push({ id: gerarId(), programaId: id, quantidade: qtd, tipoSaldo, descricao: desc, data: hoje });
   // Salva cupom se informado
   if (cupomCodigo) {
     if (!p.cupons) p.cupons = [];
@@ -601,13 +689,121 @@ function confirmarResgate(id) {
       descricao: desc,
       validade: cupomValidade || null,
       usado: false,
-      criadoEm: new Date().toISOString().split('T')[0]
+      criadoEm: hoje
     });
   }
   agendarSync();
   fecharModal();
   renderBeneficios();
   showAlert('✅', cupomCodigo ? 'Resgate e cupom salvos!' : 'Resgate registrado!');
+}
+
+// ===== VENCIMENTOS (quanto já expirou) =====
+function totaisVencidos() {
+  const t = { pontos: 0, cashback: 0 };
+  (DB.vencimentos || []).forEach(v => { t[tipoSaldoDe(v)] += v.quantidade || 0; });
+  t.cashback = Math.round(t.cashback * 100) / 100;
+  return t;
+}
+
+function textoBotaoVencimentos() {
+  const t = totaisVencidos();
+  const partes = [];
+  if (t.pontos > 0) partes.push(t.pontos.toLocaleString('pt-BR') + ' pts');
+  if (t.cashback > 0) partes.push(formatarMoeda(t.cashback));
+  return '⏳ Vencimentos' + (partes.length ? ' · ' + partes.join(' · ') : '');
+}
+
+function abrirModalVencimentos() {
+  if (!DB.vencimentos) DB.vencimentos = [];
+  const t = totaisVencidos();
+  const lista = DB.vencimentos.slice().sort((a, b) => String(b.data).localeCompare(String(a.data)));
+  abrirModal('⏳ Vencimentos — o que já expirou', `
+    <div style="display:flex;gap:12px;margin-bottom:16px;">
+      <div style="flex:1;background:var(--bg-secondary);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text-secondary);">🎯 Pontos vencidos</div>
+        <div style="font-size:20px;font-weight:700;">${t.pontos.toLocaleString('pt-BR')} pts</div>
+      </div>
+      <div style="flex:1;background:var(--bg-secondary);border-radius:8px;padding:12px;text-align:center;">
+        <div style="font-size:11px;color:var(--text-secondary);">💰 Cashback vencido</div>
+        <div style="font-size:20px;font-weight:700;">${formatarMoeda(t.cashback)}</div>
+      </div>
+    </div>
+    <div style="max-height:240px;overflow-y:auto;margin-bottom:16px;">
+      ${lista.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">Nenhum vencimento registrado.</p>' : lista.map(v => {
+        const prog = DB.programas.find(p => p.id === v.programaId);
+        return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg-secondary);border-radius:8px;margin-bottom:6px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;font-size:13px;">${prog ? prog.logo + ' ' + prog.nome : '-'} — ${fmtQtd(v.quantidade, tipoSaldoDe(v))}</div>
+            <div style="font-size:11px;color:var(--text-secondary);">${formatarData(v.data)}${v.descricao ? ' · ' + v.descricao : ''}</div>
+          </div>
+          <button onclick="removerVencimento(${v.id})" title="Remover" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:14px;">
+      <h4 style="font-size:13px;margin-bottom:10px;">+ Registrar vencimento</h4>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Programa</label>
+          <select id="venc-prog" onchange="vencProgChange()">
+            ${DB.programas.map(p => `<option value="${p.id}">${p.logo} ${p.nome}</option>`).join('')}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="venc-tipo">
+            <option value="pontos">🎯 Pontos</option>
+            <option value="cashback">💰 Cashback (R$)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Quantidade / valor</label>
+          <input id="venc-qtd" type="number" min="0" step="0.01" placeholder="Ex: 200" />
+        </div>
+        <div class="form-group">
+          <label>Data do vencimento</label>
+          <input id="venc-data" type="date" value="${hojeISO()}" />
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">Isto só registra o histórico: não altera o saldo do programa.</p>
+      <button class="btn-primary btn-sm" onclick="adicionarVencimento()" style="width:100%;">+ Registrar</button>
+    </div>
+    <div class="modal-actions"><button class="btn-secondary" onclick="fecharModal()">Fechar</button></div>
+  `, '520px');
+  vencProgChange();
+}
+
+function vencProgChange() {
+  const p = DB.programas.find(p => p.id === parseInt(document.getElementById('venc-prog')?.value));
+  const sel = document.getElementById('venc-tipo');
+  if (!p || !sel) return;
+  if (p.tipo === 'cashback') { sel.value = 'cashback'; sel.disabled = true; } else { sel.disabled = false; }
+}
+
+function adicionarVencimento() {
+  const id = parseInt(document.getElementById('venc-prog').value);
+  const p = DB.programas.find(p => p.id === id);
+  const qtd = parseFloat(document.getElementById('venc-qtd').value);
+  const data = document.getElementById('venc-data').value;
+  if (!p) return;
+  if (!qtd || qtd <= 0) { showAlert('⚠️', 'Informe a quantidade.'); return; }
+  if (!data) { showAlert('⚠️', 'Informe a data.'); return; }
+  const tipoSaldo = p.tipo === 'cashback' ? 'cashback' : document.getElementById('venc-tipo').value;
+  if (!DB.vencimentos) DB.vencimentos = [];
+  DB.vencimentos.push({ id: gerarId(), programaId: id, quantidade: qtd, tipoSaldo, descricao: 'Registrado manualmente', data });
+  agendarSync();
+  abrirModalVencimentos();
+  renderBeneficios();
+}
+
+function removerVencimento(vid) {
+  DB.vencimentos = (DB.vencimentos || []).filter(v => v.id !== vid);
+  agendarSync();
+  abrirModalVencimentos();
+  renderBeneficios();
 }
 
 function editarPrograma(id) {
