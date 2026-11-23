@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.8 | (a publicar) | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
+| Site v1.8 | `127eaa0` | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
 | Site v1.7 | `7476b17` | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
 | Site v1.6 | `9938983` | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
 | Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
