@@ -81,6 +81,7 @@ function renderConfiguracoes() {
       <div style="display:flex;gap:12px;flex-wrap:wrap;">
         <button class="btn-secondary" onclick="exportarJSON()">📦 Exportar Backup (JSON)</button>
         <button class="btn-secondary" onclick="document.getElementById('import-file').click()">📥 Importar Backup</button>
+        ${existeEstadoPreImportacao() ? '<button class="btn-secondary" onclick="desfazerUltimaImportacao()">↩️ Desfazer importação</button>' : ''}
         <button class="btn-secondary" onclick="exportarExcel()">📊 Exportar Excel</button>
         <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importarBackup(this)" />
       </div>
@@ -160,17 +161,86 @@ function alternarTema(escuro) {
   agendarSync();
 }
 
+// Nunca aplica direto: mostra o que vai mudar e espera confirmacao.
+// Um arquivo parcial (so algumas listas) e um backup completo entram pelo mesmo
+// botao, entao o usuario precisa ver qual dos dois esta carregando.
 function importarBackup(input) {
   const file = input.files[0];
   if (!file) return;
-  importarJSON(file).then(() => {
-    showAlert('✅', 'Backup importado com sucesso!');
-    renderizarAlertas();
-    navigateTo('dashboard', document.querySelector('.nav-item'));
-  }).catch(e => {
-    showAlert('❌', 'Erro ao importar: ' + e.message);
+  const nome = file.name;
+  lerJSONImportacao(file).then(function(data) {
+    window._importPendente = data;
+    mostrarPreviaImportacao(data, nome);
+  }).catch(function(e) {
+    showAlert('❌', 'Erro ao ler: ' + e.message);
   });
   input.value = '';
+}
+
+function mostrarPreviaImportacao(data, nomeArquivo) {
+  const a = analisarImportacao(data);
+
+  const linhas = a.mudancas.map(function(m) {
+    const n = (v) => (v === null ? '—' : v);
+    const cor = m.perde > 0 ? 'var(--red)' : 'var(--text-primary)';
+    const nota = m.perde > 0
+      ? '<span style="color:var(--red);">substitui, perde ' + m.perde + '</span>'
+      : (m.agora === null ? 'novo' : 'substitui');
+    return '<tr><td style="padding:6px 8px;">' + esc(m.rotulo) + '</td>'
+      + '<td style="padding:6px 8px;text-align:center;color:var(--text-secondary);">' + n(m.agora) + '</td>'
+      + '<td style="padding:6px 8px;text-align:center;color:' + cor + ';font-weight:600;">' + n(m.depois) + '</td>'
+      + '<td style="padding:6px 8px;font-size:11px;">' + nota + '</td></tr>';
+  }).join('');
+
+  const aviso = a.completo
+    ? '<div style="background:rgba(34,197,94,0.1);border:1px solid var(--green);border-radius:8px;padding:12px;margin-bottom:14px;">'
+      + '<strong style="color:var(--green);">📦 Backup completo</strong>'
+      + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">O arquivo traz todas as áreas principais. Serve para restaurar o app inteiro.</div></div>'
+    : '<div style="background:rgba(245,158,11,0.1);border:1px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:14px;">'
+      + '<strong style="color:#f59e0b;">⚠️ Importação parcial</strong>'
+      + '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Este arquivo <strong>não é um backup completo</strong>. Ele traz só algumas listas e vai <strong>substituir</strong> cada uma delas por inteiro. O resto continua como está.</div></div>';
+
+  const intactas = a.intactas.length
+    ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:12px;">Não será tocado: ' + a.intactas.map(esc).join(', ') + '.</div>'
+    : '';
+
+  abrirModal('Conferir antes de importar', ''
+    + '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">Arquivo: <strong>' + esc(nomeArquivo) + '</strong></div>'
+    + aviso
+    + '<table style="width:100%;border-collapse:collapse;font-size:13px;">'
+    + '<thead><tr style="border-bottom:1px solid var(--border);font-size:11px;color:var(--text-secondary);">'
+    + '<th style="text-align:left;padding:6px 8px;">Lista</th><th style="padding:6px 8px;">Agora</th>'
+    + '<th style="padding:6px 8px;">Depois</th><th style="text-align:left;padding:6px 8px;">Efeito</th></tr></thead>'
+    + '<tbody>' + linhas + '</tbody></table>'
+    + intactas
+    + '<div style="font-size:11px;color:var(--text-secondary);margin-top:12px;">O estado atual fica guardado e você pode desfazer logo depois.</div>'
+    + '<div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+    + '<button class="btn-secondary" onclick="cancelarImportacao()">Cancelar</button>'
+    + '<button class="btn-primary" onclick="confirmarImportacao()">Importar</button></div>', '560px');
+}
+
+function cancelarImportacao() {
+  window._importPendente = null;
+  fecharModal();
+}
+
+function confirmarImportacao() {
+  const data = window._importPendente;
+  if (!data) { fecharModal(); return; }
+  aplicarImportacao(data);
+  window._importPendente = null;
+  fecharModal();
+  renderizarAlertas();
+  navigateTo('dashboard', document.querySelector('.nav-item'));
+  showAlert('✅', 'Importado. Se não era o que você esperava, volte em Configurações e clique em Desfazer importação.');
+}
+
+function desfazerUltimaImportacao() {
+  if (!desfazerImportacao()) { showAlert('⚠️', 'Não há importação recente para desfazer.'); return; }
+  renderConfiguracoes();
+  renderizarAlertas();
+  navigateTo('dashboard', document.querySelector('.nav-item'));
+  showAlert('↩️', 'Importação desfeita. Os dados voltaram ao estado anterior.');
 }
 
 function adicionarOrigem() {

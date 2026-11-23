@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.7 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.8 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.8 | (a publicar) | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
 | Site v1.7 | `7476b17` | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
 | Site v1.6 | `9938983` | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
 | Site v1.5 + Ext 1.2.0 | `b1e9845` | Sorteios do Nota Paraná lidos pela extensão na aba MEUS BILHETES + botão "📥 Importar do portal"; corrige ordenação dos sorteios |
@@ -386,6 +387,46 @@ App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js
 **Pendências:** (1) alerta de expiração de créditos do Nota Paraná (ideia); (3) itens em categoria errada no NFScanner (não autorizado); (4) dividir `nfscanner.html` em arquivos menores (sugerido).
 
 **Privacidade:** nunca guardar login/senha, CPF, nome completo ou endereço em memória/docs.
+
+---
+
+## 22. Importação de backup com prévia (v1.8)
+
+O botão "Importar Backup" chamava `importarJSON()`, que fazia `Object.assign(DB, data)`
+direto e dizia "Backup importado com sucesso!" fosse o que fosse. Dois problemas: nao
+distinguia **backup completo** de **arquivo parcial**, e um arquivo parcial substitui a
+lista inteira sem aviso. O usuario apontou o risco: achar um arquivo parcial velho na
+pasta de downloads, achar que e backup e perder dados.
+
+Fluxo agora: `importarBackup()` -> `lerJSONImportacao()` (so le e valida) ->
+`analisarImportacao()` -> `mostrarPreviaImportacao()` -> o usuario confirma ->
+`aplicarImportacao()`.
+
+| Funcao (`js/data.js`) | O que faz |
+|---|---|
+| `lerJSONImportacao(file)` | So parseia e valida. Nao altera nada. Rejeita o que nao for objeto JSON |
+| `analisarImportacao(data)` | Compara o arquivo com o DB atual: `{completo, mudancas:[{chave, rotulo, agora, depois, perde}], intactas}`. `completo` = tem `usuario`, `dividas` e `programas` (`CHAVES_BACKUP_COMPLETO`) |
+| `aplicarImportacao(data)` | Grava o DB atual em `localStorage.dnm_pre_import` antes do `Object.assign` |
+| `desfazerImportacao()` | Restaura esse estado. Apaga tambem as chaves que a importacao criou |
+
+`mostrarPreviaImportacao()` (`js/configuracoes.js`) mostra uma tabela Lista / Agora /
+Depois / Efeito, com a perda em vermelho, faixa verde para backup completo e laranja
+para parcial, e lista o que **nao** sera tocado. O botao "↩️ Desfazer importação" so
+aparece em Configuracoes quando `existeEstadoPreImportacao()`.
+
+**Testes:** `/tmp/tass/imp2.js` — 18 casos: parcial x completo, aviso de perda, preview
+que nao aplica, confirmar, desfazer, cancelar e JSON quebrado.
+
+### Armadilha de teste em jsdom
+
+`js/data.js` declara `DB` com **`const`**. No navegador os `<script>` dividem o mesmo
+escopo lexical global, mas **cada `w.eval()` do jsdom cria um escopo novo** — entao
+carregar `data.js` e `configuracoes.js` em evals separados faz cada arquivo enxergar um
+`DB` diferente, e os testes falham de um jeito que parece bug de logica. Carregue todos
+os arquivos **num unico `eval`**, concatenados (ver `montar()` em `imp2.js`), e exponha
+uma ponte (`window.ver`, `window.rodar`) para o teste alcançar o escopo. Vale a mesma
+regra de sempre: stubs de funcoes que os arquivos declaram (`abrirModal`, `agendarSync`,
+`showAlert`, `hojeISO`) sao sobrescritos **depois** da carga.
 
 ---
 

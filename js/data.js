@@ -359,19 +359,85 @@ function exportarJSON() {
   a.click();
 }
 
-function importarJSON(file) {
+// Só lê e valida o arquivo. Não altera nada — quem aplica é aplicarImportacao().
+function lerJSONImportacao(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
       try {
         const data = JSON.parse(e.target.result);
-        Object.assign(DB, data);
-        agendarSync();
-        resolve(true);
-      } catch { reject(new Error('Arquivo inválido')); }
+        if (!data || typeof data !== 'object' || Array.isArray(data)) {
+          reject(new Error('O arquivo não parece um backup do Dívidas Nunca Mais.'));
+          return;
+        }
+        resolve(data);
+      } catch { reject(new Error('Arquivo inválido — não é um JSON legível.')); }
     };
+    reader.onerror = () => reject(new Error('Não consegui ler o arquivo.'));
     reader.readAsText(file);
   });
+}
+
+// Chaves que um backup completo sempre tem. Serve para distinguir backup de arquivo parcial.
+const CHAVES_BACKUP_COMPLETO = ['usuario', 'dividas', 'programas'];
+
+const ROTULO_CHAVE = {
+  usuario: 'Perfil', dividas: 'Dívidas', pagamentos: 'Pagamentos',
+  orcamentos: 'Orçamentos', programas: 'Programas de pontos e cashback',
+  resgates: 'Resgates', assinaturas: 'Assinaturas', vencimentos: 'Vencimentos',
+  origensPagamento: 'Origens de pagamento', faturas: 'Faturas de concessionária',
+  unidadesConsumidoras: 'Unidades consumidoras', contas: 'Contas',
+  historicoSaldo: 'Histórico de saldo', historicoCashback: 'Histórico de cashback',
+  _nextId: 'Contador de IDs'
+};
+
+function contarItens(v) {
+  if (Array.isArray(v)) return v.length;
+  if (v && typeof v === 'object') return Object.keys(v).length;
+  return null;
+}
+
+// Compara o arquivo com o DB atual e devolve o que vai mudar, sem aplicar nada.
+function analisarImportacao(data) {
+  const chaves = Object.keys(data);
+  const completo = CHAVES_BACKUP_COMPLETO.every(k => chaves.indexOf(k) !== -1);
+  const mudancas = chaves.map(function(k) {
+    const agora = contarItens(DB[k]);
+    const depois = contarItens(data[k]);
+    return {
+      chave: k,
+      rotulo: ROTULO_CHAVE[k] || k,
+      agora: agora,
+      depois: depois,
+      perde: (agora !== null && depois !== null && depois < agora) ? agora - depois : 0
+    };
+  });
+  const intactas = Object.keys(DB).filter(k => chaves.indexOf(k) === -1).map(k => ROTULO_CHAVE[k] || k);
+  return { completo: completo, mudancas: mudancas, intactas: intactas };
+}
+
+// Guarda o estado atual para permitir desfazer, depois aplica.
+function aplicarImportacao(data) {
+  try { localStorage.setItem('dnm_pre_import', JSON.stringify(DB)); } catch (e) {}
+  Object.assign(DB, data);
+  agendarSync();
+  return true;
+}
+
+function existeEstadoPreImportacao() {
+  try { return !!localStorage.getItem('dnm_pre_import'); } catch (e) { return false; }
+}
+
+function desfazerImportacao() {
+  let bruto = null;
+  try { bruto = localStorage.getItem('dnm_pre_import'); } catch (e) {}
+  if (!bruto) return false;
+  const anterior = JSON.parse(bruto);
+  Object.keys(DB).forEach(function(k) { if (!(k in anterior)) delete DB[k]; });
+  Object.assign(DB, anterior);
+  try { localStorage.removeItem('dnm_pre_import'); } catch (e) {}
+  agendarSync();
+  return true;
 }
 
 function exportarExcel() {
