@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.11 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.12 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.12 | `HASH112` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
 | Site v1.11 | `f4f3fcb` | Corrige erro de gráfico ao redesenhar Contas (helper `novoGrafico`); folha da Sanepar: serviços e faixas viram tabelas com linhas e cabeçalho alinhado |
 | Site v1.10 | `9b5473b` | Tema claro/escuro passa a funcionar (antes só gravava a preferência); folha da Sanepar e demais formulários de fatura sem valores/exemplos pré-preenchidos |
 | Site v1.9 | `4927f77` | Contas Recorrentes: modal da Sanepar no layout da fatura impressa (tema escuro), conferências automáticas e gráfico Gasto × Consumo |
@@ -581,3 +582,14 @@ Os formulários de fatura (`abrirModalNovaFatura`, folha da Sanepar) **não traz
 Sempre criar com `novoGrafico(canvas, cfg)` (`js/utils.js`), não `new Chart(...)`: ele destrói o gráfico anterior do mesmo canvas. Sem isso, redesenhar a página (ex.: ✅ marcar fatura como paga) dava "Canvas is already in use".
 
 **Varredura de botões:** `/tmp/pw/varredura.py` (clica todo `[onclick]` de cada página com dados fictícios e lista erros de JS) e `/tmp/pw/ben2.py` (Cashback e Pontos, container `#beneficios-app`). Última rodada: 0 falhas.
+
+## Proteção contra perda de preenchimento (v1.12)
+
+Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser desfeitas**:
+
+- `modalTemFormulario()` / `fecharModal(e)` (`js/utils.js`): modal com `input/textarea/select` **não fecha** por clique no fundo nem por Esc — só por ✕ / Cancelar / Salvar (chamadas sem evento). Modais só de leitura continuam fechando com Esc/clique fora.
+- Atalhos Ctrl+N/F/E/I só valem com nenhum modal aberto e fora de campos de digitação; Ctrl+Z/Y nunca são bloqueados. (Antes, Ctrl+N substituía a fatura aberta pelo modal "Nova Dívida".)
+- `beforeunload` pergunta antes de fechar/recarregar a aba se há campo preenchido no modal.
+- **Rascunho automático** (`js/contas.js`, fim do arquivo): cada `input`/`change` no modal de fatura grava (300 ms) `localStorage.dnm_rascunho_fatura` = `{tipo, quando, serv, fx, v[]}` (valores na ordem dos campos; `serv`/`fx` = nº de linhas dinâmicas da Sanepar). `abrirModalNovaFatura(tipo)` chama `rascunhoFaturaRestaurar(tipo)` e mostra faixa amarela "Rascunho recuperado" com botão "Descartar". `fecharModal()` explícito, Cancelar e Salvar apagam o rascunho. Se o nº de campos do formulário mudar entre versões, o rascunho é ignorado (não arrisca preencher campo errado).
+- **Se mexer no formulário de fatura**, rode `/tmp/pw/rascunho_test.py` (13 verificações).
+- Limite conhecido: o site não guarda sessão — recarregar a aba exige novo login, mas o rascunho volta ao reabrir a fatura.

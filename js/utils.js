@@ -98,8 +98,20 @@ function abrirModal(titulo, htmlContent, largura = '600px') {
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 
+// Modal com campos para preencher nunca fecha sozinho: nem por clique fora, nem por Esc.
+// Só fecha pelos botões ✕ / Cancelar / Salvar (chamadas sem evento).
+function modalVisivel() {
+  const m = document.getElementById('modal-overlay');
+  return !!m && m.style.display !== 'none';
+}
+function modalTemFormulario() {
+  return modalVisivel() && !!document.querySelector('#modal-body input:not([type=hidden]), #modal-body textarea, #modal-body select');
+}
 function fecharModal(e) {
+  if (e && modalTemFormulario()) return;   // clique no fundo escuro: ignorado em formulários
   if (!e || e.target === document.getElementById('modal-overlay')) {
+    // Fechar de propósito descarta o rascunho da fatura (Cancelar / Salvar / ✕)
+    if (document.getElementById('fatura-tipo') && typeof rascunhoFaturaLimpar === 'function') rascunhoFaturaLimpar();
     document.getElementById('modal-overlay').style.display = 'none';
   }
 }
@@ -141,25 +153,38 @@ function renderizarAlertas() {
 }
 
 // Keyboard shortcuts
+// Não disparam com modal aberto nem enquanto se digita em um campo, e nunca bloqueiam
+// Ctrl+Z / Ctrl+Y (desfazer/refazer do navegador).
+function atalhosLiberados() {
+  if (modalVisivel()) return false;
+  const a = document.activeElement;
+  return !(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable));
+}
 document.addEventListener('keydown', e => {
-  if (e.ctrlKey) {
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && atalhosLiberados()) {
     switch(e.key) {
       case 'n': e.preventDefault(); abrirModalNovaDivida(); break;
       case 'f': e.preventDefault(); focarBusca(); break;
       case 'e': e.preventDefault(); exportarExcel(); break;
       case 'i': e.preventDefault(); document.getElementById('import-file')?.click(); break;
-      case 'z': e.preventDefault(); break; // desfazer - TODO
-      case 'y': e.preventDefault(); break; // refazer - TODO
     }
   }
   if (e.key === 'Escape') {
-    fecharModal();
+    if (!modalTemFormulario()) fecharModal();
     fecharAlert();
     document.getElementById('alertas-panel').style.display = 'none';
   }
   if (e.key === 'Delete' && document.activeElement.dataset.dividaId) {
     moverParaLixeira(parseInt(document.activeElement.dataset.dividaId));
   }
+});
+
+// Fechar/recarregar a aba com formulário preenchido: o navegador pergunta antes.
+window.addEventListener('beforeunload', e => {
+  if (!modalTemFormulario()) return;
+  const sujo = [...document.querySelectorAll('#modal-body input:not([type=hidden]), #modal-body textarea')]
+    .some(el => (el.value || '').trim() !== '');
+  if (sujo) { e.preventDefault(); e.returnValue = ''; }
 });
 
 function focarBusca() {
@@ -205,7 +230,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.11';
+const SITE_VERSION = 'v1.12';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }

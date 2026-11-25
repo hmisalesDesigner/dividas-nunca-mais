@@ -248,6 +248,7 @@ function abrirModalNovaFatura(tipo) {
   `, tipo === 'sanepar' ? '720px' : '640px');
 
   if (tipo === 'sanepar') iniciarFolhaSanepar();
+  rascunhoFaturaRestaurar(tipo);
 
   if (tipo === 'copel') {
     const sel = document.getElementById('fatura-uc');
@@ -1707,3 +1708,75 @@ function preencherFormulario(dados, tipo) {
   // Feedback visual
   showAlert('✅', 'PDF lido com sucesso! Revise os campos antes de salvar.');
 }
+
+
+// ===== RASCUNHO AUTOMÁTICO DA FATURA =====
+// Cada digitação no formulário de fatura é guardada (localStorage `dnm_rascunho_fatura`).
+// Se a aba fechar, recarregar ou o modal sumir, o rascunho volta ao reabrir "Nova Fatura"
+// do mesmo tipo. Salvar, Cancelar ou ✕ descartam o rascunho de propósito.
+const RASCUNHO_FATURA_KEY = 'dnm_rascunho_fatura';
+let _rascunhoTimer = null;
+let _rascunhoPausado = false;
+
+function camposRascunho() {
+  return [...document.querySelectorAll('#modal-body input:not([type=hidden]):not([type=file]), #modal-body textarea, #modal-body select')];
+}
+
+function rascunhoFaturaSalvar() {
+  if (_rascunhoPausado) return;
+  const tipo = document.getElementById('fatura-tipo')?.value;
+  if (!tipo || !modalVisivel()) return;
+  const campos = camposRascunho();
+  const v = campos.map(el => el.value);
+  if (!v.some(x => String(x).trim() !== '')) { rascunhoFaturaLimpar(); return; }
+  try {
+    localStorage.setItem(RASCUNHO_FATURA_KEY, JSON.stringify({
+      tipo, quando: Date.now(),
+      serv: document.querySelectorAll('#san-serv-lista .row').length,
+      fx: document.querySelectorAll('#san-faixas-lista .row').length,
+      v
+    }));
+  } catch (e) {}
+}
+
+function rascunhoFaturaLimpar() {
+  clearTimeout(_rascunhoTimer);
+  try { localStorage.removeItem(RASCUNHO_FATURA_KEY); } catch (e) {}
+}
+
+function rascunhoFaturaRestaurar(tipo) {
+  let r = null;
+  try { r = JSON.parse(localStorage.getItem(RASCUNHO_FATURA_KEY) || 'null'); } catch (e) {}
+  if (!r || r.tipo !== tipo || !Array.isArray(r.v)) return;
+  _rascunhoPausado = true;
+  try {
+    if (tipo === 'sanepar') {
+      while (document.querySelectorAll('#san-serv-lista .row').length < (r.serv || 0)) sanAddServico();
+      while (document.querySelectorAll('#san-faixas-lista .row').length < (r.fx || 0)) sanAddFaixa();
+    }
+    const campos = camposRascunho();
+    if (campos.length !== r.v.length) { _rascunhoPausado = false; return; }   // formulário mudou: não arrisca
+    campos.forEach((el, i) => { el.value = r.v[i]; });
+    if (tipo === 'sanepar') { calcularSan(); }
+    else if (typeof calcularValorPagar === 'function') calcularValorPagar();
+    const hora = new Date(r.quando).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const aviso = document.createElement('div');
+    aviso.style.cssText = 'margin-bottom:12px;padding:10px 12px;border:1px solid var(--yellow);border-radius:8px;background:var(--bg-primary);font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;';
+    aviso.innerHTML = '<span>↩️ Rascunho recuperado (salvo em ' + hora + '). Seus preenchimentos estão de volta.</span>'
+      + '<button type="button" class="btn-secondary btn-sm" onclick="rascunhoFaturaDescartar(\'' + tipo + '\')">Descartar rascunho</button>';
+    const corpo = document.getElementById('modal-body');
+    const h2 = corpo.querySelector('h2');
+    if (h2) h2.insertAdjacentElement('afterend', aviso);
+  } finally { _rascunhoPausado = false; }
+}
+
+function rascunhoFaturaDescartar(tipo) {
+  rascunhoFaturaLimpar();
+  abrirModalNovaFatura(tipo);
+}
+
+['input', 'change'].forEach(ev => document.addEventListener(ev, e => {
+  if (!e.target.closest || !e.target.closest('#modal-body') || !document.getElementById('fatura-tipo')) return;
+  clearTimeout(_rascunhoTimer);
+  _rascunhoTimer = setTimeout(rascunhoFaturaSalvar, 300);
+}));
