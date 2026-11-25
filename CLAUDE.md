@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.12 | `HASH112` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
+| Site v1.12 | `2e41325` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
 | Site v1.11 | `f4f3fcb` | Corrige erro de gráfico ao redesenhar Contas (helper `novoGrafico`); folha da Sanepar: serviços e faixas viram tabelas com linhas e cabeçalho alinhado |
 | Site v1.10 | `9b5473b` | Tema claro/escuro passa a funcionar (antes só gravava a preferência); folha da Sanepar e demais formulários de fatura sem valores/exemplos pré-preenchidos |
 | Site v1.9 | `4927f77` | Contas Recorrentes: modal da Sanepar no layout da fatura impressa (tema escuro), conferências automáticas e gráfico Gasto × Consumo |
