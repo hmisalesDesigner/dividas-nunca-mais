@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.8 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.9 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.9 | _(ver commit seguinte)_ | Contas Recorrentes: modal da Sanepar no layout da fatura impressa (tema escuro), conferências automáticas e gráfico Gasto × Consumo |
 | Site v1.8 | `127eaa0` | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
 | Site v1.7 | `7476b17` | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
 | Site v1.6 | `9938983` | Sorteios: importação automática ao iniciar e no 🔄 Atualizar + pop-up de lembrete quando a data do sorteio chega sem resultado; formulário manual recolhido |
@@ -507,3 +508,51 @@ O formulário "+ Registrar Sorteio" virou um `<details>` recolhido ("✏️ Lan�
 **Validação:** a fórmula `bilhetesPorValor()` (1 + ⌊valor/200⌋) foi conferida contra os 10 períodos já fechados do portal e acerta todos os 10.
 
 **Testes:** `/tmp/tsor/` — `test.js` (parser contra o HTML real), `e2e.js` (extensão → ponte → upsert → reimportação idempotente), `pagina.js` (pior caso: paginação que remove linhas do DOM), `lembrete.js` (9 cenários do pop-up: futuro, hoje, passado, já conferido, adiado, tela ocupada, manual, plural). jsdom **não** preenche `ev.source` em `postMessage` da mesma janela, então `e2e.js` afrouxa só essa checagem do `bridge.js`.
+
+---
+
+## 23. Contas Recorrentes — modal da Sanepar (`js/contas.js`, v1.9)
+
+O modal "Nova Fatura — Sanepar" reproduz **célula por célula** a fatura impressa (modelo anterior a out/2026),
+em tema escuro (`.fol*` em `css/main.css`). Os outros tipos (Copel, Inova, Sercomtel, Outra) continuam com
+`formBasico()` + `formDetalhes()`; a Sanepar passou a usar `formFolhaSanepar()` (o ramo antigo foi removido).
+
+**Ordem das células (igual à fatura):** CONTA → nome/matrícula → endereço/número/lado-frente → CEP/local →
+roteiro/hidrômetro/CAT-RES-COM-IND-UTP-POP → qualidade da água (3 linhas × 5 colunas + conclusão) → histórico de
+pagamentos (2 anos × 12 meses: PAGO / X / ---) → serviços lançados (lista) → faixas de consumo (lista) → histórico de
+consumo (11 meses) → dias/data leitura/leitura anterior/atual/consumo/**referência** → motivo ausência/média 5 meses/**vencimento**
+→ previsão próxima leitura/água/esgoto/serviços/**total** → mensagens → tributos federais → parte destacável (CTRL, código de barras).
+"Campos do sistema" (desconto, NF cashback, observações, valor a pagar) ficam **fora** da folha.
+
+| Função | O que faz |
+|---|---|
+| `formFolhaSanepar()` / `iniciarFolhaSanepar()` | Monta a folha; o init cria as 5 faixas padrão e 1 linha de serviço |
+| `sanAddFaixa()` / `sanAddServico()` | Linhas dinâmicas (a tarifa pode ter mais faixas que 5) |
+| `calcularSan()` | Conferências: leitura atual − anterior = consumo; volume das faixas = consumo; faixas água/esgoto; serviços; água+esgoto+serviços = total. Também espelha os campos na parte destacável |
+| `coletarFolhaSanepar()` | Lê a folha e devolve os campos da fatura (`salvarFatura()` faz o resto) |
+| `sanBrParaISO` / `sanISOParaBr` / `sanRefParaISO` / `sanISOParaRef` | Datas e referência são **digitadas como na fatura** (`dd/mm/aaaa`, `mm/aaaa`, com máscara) e guardadas em ISO (`AAAA-MM-DD`, `AAAA-MM`) |
+| `sanPreencherMesesHist()` | Ao digitar a referência, preenche os 11 meses anteriores no histórico de consumo |
+| `sanClassificarServicos()` | Converte a lista de serviços nas categorias de `extras` (`atMonet`, `multaAtraso`, `jurosMoratorios`, `taxaLixo`, `outros`) que os cards de "Cobranças Extras" usam |
+
+**Modelo salvo (campos novos além dos antigos):** `nomeCliente`, `endereco`, `numero`, `ladoFrente`, `cep`, `local`, `roteiro`,
+`categoria`, `qualidadeAgua{colunas,exigidas,realizadas,atenderam,conclusao}`, `historicoPagamentos[{ano,meses[12]}]`,
+`servicos[{descricao,valor}]`, `faixas[{nome,volume,precoM3,totalAgua,totalEsgoto}]` (`nome` é novo), `historicoConsumo[{mes:'MM/AA',m3}]`,
+`valorAgua`, `valorEsgoto`, `valorServicos`, `motivoAusenciaLeitura`, `mensagens`, `tributosFederais`, `codigoBarras`.
+Faturas antigas continuam válidas (os cards tratam os campos novos como opcionais; `ROTULOS_EXTRAS` dá nome legível às chaves de `extras`).
+Na fatura real **não existe** "Multa água / Multa esgoto": são duas linhas "MULTA POR ATRASO" — por isso virou lista.
+
+**Gráfico Gasto × Consumo:** `renderChartGastoConsumo(canvasId, faturas, unidade, cor)` (barras = R$ no eixo esquerdo, linha = consumo no
+direito; tooltip mostra o custo por unidade). `serieGastoConsumo()` junta as faturas com o `historicoConsumo` impresso nelas, então o gráfico já
+nasce com 11 meses de consumo mesmo com uma só fatura cadastrada. Hoje só a aba Sanepar usa; a Copel é a mesma chamada com `'kWh'`.
+
+**Pendências:**
+1. **Parser de PDF (`parsearSanepar`) não foi validado contra um PDF real** — a Sanepar estava fora do ar. Ele procura "RÓTULO valor" em texto corrido, mas na fatura os
+   rótulos ficam numa linha e os valores na linha de baixo; provavelmente falha em leituras, consumo e datas. `preencherFormulario()` já sabe preencher a folha nova com o que o parser devolver.
+2. **Modelo novo de fatura (emitidas a partir de 01/10/2026):** traz Emissão, Consumo Faturado/Apurado/Medido, Avisos, tarifa, retenção federal e 25% de desconto
+   automático na tarifa mínima. A folha atual segue o modelo anterior; adaptar quando houver uma fatura nova em mãos.
+3. **Dados pessoais já no código público:** `DB.unidadesConsumidoras` (padrão, no topo de `contas.js`) tem titular e UCs reais. Não são dados novos, mas convém tirar do repositório.
+4. Copel: aplicar o mesmo layout de fatura e o gráfico Gasto × kWh (ainda não pedido).
+
+**Testes:** Playwright (`/tmp/pw/san_test.py`, `san_test2.py`) com o Chart.js do npm servido no lugar do CDN (o proxy bloqueia CDN/Google). Preencher o modal, salvar,
+checar `DB.faturas[0]`, a série do gráfico e que os outros tipos de fatura seguem abrindo com `<details>`. Dados de teste sempre fictícios — nunca valores reais de fatura.
+

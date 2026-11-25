@@ -232,7 +232,7 @@ function abrirModalNovaFatura(tipo) {
       <span style="font-size:13px;color:var(--text-secondary);">📎 Importar dados automaticamente do PDF</span>
       <button onclick="importarPDF('${tipo}')" style="background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);padding:8px 16px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">📎 Selecionar PDF</button>
     </div>
-    ${formBasico(tipo)}
+    ${tipo === 'sanepar' ? formFolhaSanepar() : `${formBasico(tipo)}
     <details style="margin-bottom:16px;">
       <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);padding:10px;background:var(--bg-primary);border-radius:8px;">
         + Detalhes (opcional)
@@ -240,12 +240,14 @@ function abrirModalNovaFatura(tipo) {
       <div style="margin-top:12px;">
         ${formDetalhes(tipo)}
       </div>
-    </details>
+    </details>`}
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
       <button class="btn-primary" onclick="salvarFatura()">💾 Salvar Fatura</button>
     </div>
-  `, '640px');
+  `, tipo === 'sanepar' ? '720px' : '640px');
+
+  if (tipo === 'sanepar') iniciarFolhaSanepar();
 
   if (tipo === 'copel') {
     const sel = document.getElementById('fatura-uc');
@@ -271,7 +273,6 @@ function formBasico(tipo) {
       </div>
     </div>
     ${tipo === 'copel' ? '<div class="form-group"><label>Unidade Consumidora</label><select id="fatura-uc"><option value="">Selecionar...</option></select></div>' : ''}
-    ${tipo === 'sanepar' ? '<div class="form-group"><label>Matrícula</label><input id="san-matricula" type="text" placeholder="Ex: 2187.9436" /></div>' : ''}
     <div class="form-row">
       <div class="form-group">
         <label>Valor Original (R$) *</label>
@@ -368,63 +369,6 @@ function formDetalhes(tipo) {
     </div>
   `;
 
-  if (tipo === 'sanepar') return `
-    <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">💧 Descrição dos Serviços Lançados</h4>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
-      ${['AT. Monet. p/ Atraso','Multa Água','Multa Esgoto','Juros Moratórios','Taxa Coleta Lixo'].map((s,i) =>
-        '<div class="form-group"><label style="font-size:11px;">' + s + '</label><input type="text" id="san-extra-' + i + '" placeholder="R$ 0,00" oninput="formatMoney(this)" /></div>'
-      ).join('')}
-    </div>
-    <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">💰 Faixas de Consumo (Valor m³/R$)</h4>
-    <div style="background:var(--bg-primary);border-radius:8px;overflow:hidden;margin-bottom:16px;">
-      <div style="display:grid;grid-template-columns:1.5fr 80px 100px 100px 100px;gap:0;padding:8px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--text-secondary);font-weight:600;">
-        <span>Faixa</span><span>Volume m³</span><span>Preço m³ Água</span><span>Total Água</span><span>Total Esgoto</span>
-      </div>
-      ${['Res. Mínimo','De 6 a 10m³','De 11 a 15m³','De 16 a 20m³','Acima 20m³'].map((f,i) =>
-        '<div style="display:grid;grid-template-columns:1.5fr 80px 100px 100px 100px;gap:0;padding:6px 12px;border-bottom:1px solid var(--border);align-items:center;">'
-        + '<span style="font-size:12px;">' + f + '</span>'
-        + '<input type="number" id="san-fx-vol-' + i + '" placeholder="0" style="background:transparent;border:none;color:var(--text-primary);font-size:12px;padding:2px;" />'
-        + '<input type="text" id="san-fx-preco-' + i + '" placeholder="0,00" style="background:transparent;border:none;color:var(--yellow);font-size:12px;padding:2px;" />'
-        + '<input type="text" id="san-fx-agua-' + i + '" placeholder="0,00" style="background:transparent;border:none;color:var(--text-primary);font-size:12px;padding:2px;" />'
-        + '<input type="text" id="san-fx-esgoto-' + i + '" placeholder="0,00" style="background:transparent;border:none;color:var(--text-secondary);font-size:12px;padding:2px;" />'
-        + '</div>'
-      ).join('')}
-    </div>
-    <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">📊 Leituras</h4>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Hidrômetro</label>
-        <input id="san-hidrometro" type="text" placeholder="Ex: Y25LN0176138-4-1" />
-      </div>
-      <div class="form-group">
-        <label>Leitura Anterior (m³)</label>
-        <input id="san-leit-ant" type="number" oninput="calcularConsumoSan()" />
-      </div>
-      <div class="form-group">
-        <label>Leitura Atual (m³)</label>
-        <input id="san-leit-atual" type="number" oninput="calcularConsumoSan()" />
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label>Data da Leitura</label>
-        <input id="san-data-leit" type="date" />
-      </div>
-      <div class="form-group">
-        <label>Próxima Leitura</label>
-        <input id="san-prox-leit" type="date" />
-      </div>
-      <div class="form-group">
-        <label>Média m³ (5 meses)</label>
-        <input id="san-media" type="number" placeholder="19" />
-      </div>
-    </div>
-    <div class="form-group">
-      <label>CTRL</label>
-      <input id="san-ctrl" type="text" placeholder="Ex: 2187.9436.0726.3100" style="font-family:monospace;" />
-    </div>
-  `;
-
   if (tipo === 'inova') return `
     <div class="form-row">
       <div class="form-group">
@@ -503,13 +447,311 @@ function calcularPrazoInova() {
   }
 }
 
+// ===== FOLHA SANEPAR (mesmo arranjo das células da fatura impressa) =====
+const SAN_MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const SAN_QA_COLS = ['Turbidez','Cor','Cloro','Flúor','Coliformes Totais'];
+const SAN_QA_LINHAS = ['Nº mínimo de amostras exigidas','Nº amostras realizadas','Nº amostras que atenderam à legislação'];
+const SAN_FAIXAS_PADRAO = ['RES MÍNIMO','DE 6 A 10M3','DE 11 A 15M3','DE 16 A 20M3','DE 21 A 30M3'];
+
+// datas digitadas como na fatura (dd/mm/aaaa e mm/aaaa) <-> formato interno (ISO)
+function sanBrParaISO(s) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || '');
+  if (!m) return '';
+  const iso = m[3] + '-' + m[2] + '-' + m[1];
+  const d = new Date(iso + 'T12:00:00');
+  return !isNaN(d) && d.toISOString().slice(0, 10) === iso ? iso : '';
+}
+function sanISOParaBr(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+}
+function sanRefParaISO(s) {
+  const m = /^(\d{2})\/(\d{4})$/.exec(s || '');
+  return m && +m[1] >= 1 && +m[1] <= 12 ? m[2] + '-' + m[1] : '';
+}
+function sanISOParaRef(iso) {
+  const m = /^(\d{4})-(\d{2})/.exec(iso || '');
+  return m ? m[2] + '/' + m[1] : '';
+}
+function sanMascaraData(el) {
+  const d = el.value.replace(/\D/g, '').slice(0, 8);
+  el.value = d.length > 4 ? d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4) : d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+  calcularSan();
+}
+function sanMascaraRef(el) {
+  const d = el.value.replace(/\D/g, '').slice(0, 6);
+  el.value = d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+  if (el.value.length === 7) sanPreencherMesesHist();
+  calcularSan();
+}
+
+// os 11 meses que a fatura mostra no histórico de consumo são os anteriores à referência
+function sanPreencherMesesHist() {
+  const ref = sanRefParaISO(document.getElementById('fatura-referencia')?.value);
+  if (!ref) return;
+  const cels = [...document.querySelectorAll('.san-hm')];
+  if (cels.some(c => c.value)) return;
+  let ano = +ref.slice(0, 4), mes = +ref.slice(5, 7);
+  for (let i = cels.length - 1; i >= 0; i--) {
+    mes--; if (mes === 0) { mes = 12; ano--; }
+    cels[i].value = String(mes).padStart(2, '0') + '/' + String(ano).slice(2);
+  }
+}
+
+function formFolhaSanepar() {
+  const anoAtual = new Date().getFullYear();
+  const cel = (label, inner, cls) => '<div class="fol-c' + (cls ? ' ' + cls : '') + '"><label>' + label + '</label>' + inner + '</div>';
+  const qa = '<div class="fol-th">Qualidade da água distribuída</div>' + SAN_QA_COLS.map(c => '<div class="fol-th ctr">' + c + '</div>').join('')
+    + SAN_QA_LINHAS.map((l, i) => '<div class="fol-c"><label style="text-transform:none;font-size:8.5px;">' + l + '</label></div>'
+      + SAN_QA_COLS.map((c, j) => '<div class="fol-c"><input class="san-qa-' + i + ' ctr" data-j="' + j + '" inputmode="numeric" /></div>').join('')).join('');
+  const hp = '<div class="fol-th ctr">Ano</div>' + SAN_MESES.map(m => '<div class="fol-th ctr">' + m + '</div>').join('')
+    + [anoAtual - 1, anoAtual].map(a => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hp-ano ctr" style="font-size:11px;" value="' + a + '" /></div>'
+      + SAN_MESES.map(() => '<div class="fol-c" style="padding:1px 0;"><select class="san-hp-m">'
+        + ['', 'PAGO', 'X', '---'].map(o => '<option>' + o + '</option>').join('') + '</select></div>').join('')).join('');
+  const hist = Array.from({ length: 11 }, (_, i) => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hm ctr" style="font-size:9px;color:var(--fol-lbl);" placeholder="MM/AA" maxlength="5" />'
+    + '<input class="san-hv ctr b" type="number" min="0" /></div>').join('');
+
+  return `
+    <div class="fol">
+      <div class="fol-title">CONTA</div>
+      <div class="fol-grid" style="grid-template-columns:1fr 150px;">
+        ${cel('Nome do cliente', '<input id="san-nome" />', 'hl')}
+        ${cel('Matrícula', '<input id="san-matricula" class="r big" placeholder="0000.0000" oninput="calcularSan()" />', 'hl')}
+      </div>
+      <div class="fol-grid" style="grid-template-columns:2.2fr .7fr 1.1fr;">
+        ${cel('Endereço', '<textarea id="san-endereco" rows="2"></textarea>')}
+        ${cel('Número', '<input id="san-numero" />')}
+        ${cel('Nº lado · Nº frente', '<input id="san-lado" />')}
+      </div>
+      <div class="fol-grid" style="grid-template-columns:130px 1fr;">
+        ${cel('CEP', '<input id="san-cep" placeholder="00.000-000" />')}
+        ${cel('Local', '<input id="san-local" />')}
+      </div>
+      <div class="fol-grid" style="grid-template-columns:1.25fr 1.2fr 1.3fr;">
+        ${cel('Roteiro de leitura', '<input id="san-roteiro" placeholder="000-00-00-000-00000" />')}
+        ${cel('Hidrômetro', '<input id="san-hidrometro" />')}
+        ${cel('CAT · RES · COM · IND · UTP · POP', '<input id="san-categoria" placeholder="000 000 000 000 000 000" />')}
+      </div>
+
+      <div class="fol-scroll fol-sp"><div class="fol-grid" style="grid-template-columns:1.7fr repeat(5,.75fr);">${qa}</div></div>
+      <div class="fol-grid fol-join" style="grid-template-columns:70px 1fr;">
+        <div class="fol-th">Conclusão</div>
+        <div class="fol-c" style="padding:1px 6px;"><input id="san-qa-conclusao" class="nc" /></div>
+      </div>
+
+      <span class="fol-cap">Histórico de pagamentos</span>
+      <div class="fol-scroll"><div class="fol-grid" style="grid-template-columns:44px repeat(12,1fr);">${hp}</div></div>
+
+      <div class="fol-plain fol-serv">
+        <div class="hd"><span>DESCRIÇÃO DOS SERVIÇOS LANÇADOS</span><span style="text-align:right;">VALORES</span><span></span></div>
+        <div id="san-serv-lista"></div>
+        <button type="button" class="fol-add" onclick="sanAddServico()">+ linha</button>
+      </div>
+
+      <div class="fol-plain fol-fx">
+        <div class="hd" style="grid-template-columns:1.5fr .55fr .8fr 1.7fr 22px;"><span>FAIXAS DE CONSUMO</span><span class="r">VOLUME</span><span class="r">VALOR M3/R$</span><span style="text-align:center;">TOTAIS</span><span></span></div>
+        <div class="hd" style="font-weight:400;color:var(--text-secondary);"><span></span><span></span><span class="r">ÁGUA</span><span class="r">ÁGUA</span><span class="r">ESGOTO</span><span></span></div>
+        <div id="san-faixas-lista"></div>
+        <button type="button" class="fol-add" onclick="sanAddFaixa()">+ faixa</button>
+      </div>
+
+      <span class="fol-cap" style="margin-top:12px;">Histórico de consumo/m³</span>
+      <div class="fol-scroll"><div class="fol-grid" style="grid-template-columns:repeat(11,1fr);">${hist}</div></div>
+
+      <div class="fol-grid fol-sp" style="grid-template-columns:.8fr 1.2fr 1fr 1fr .9fr 1.2fr;">
+        ${cel('Dias de consumo', '<input id="fatura-dias" type="number" class="ctr" />')}
+        ${cel('Data leitura', '<input id="san-data-leit" class="ctr" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />')}
+        ${cel('Leitura anterior', '<input id="san-leit-ant" type="number" class="ctr" oninput="calcularConsumoSan();calcularSan()" />')}
+        ${cel('Leitura atual', '<input id="san-leit-atual" type="number" class="ctr" oninput="calcularConsumoSan();calcularSan()" />')}
+        ${cel('Consumo/m³', '<input id="fatura-consumo" type="number" min="0" class="ctr" oninput="calcularSan()" />')}
+        ${cel('Referência *', '<input id="fatura-referencia" class="r b" placeholder="mm/aaaa" maxlength="7" oninput="sanMascaraRef(this)" />', 'hl')}
+      </div>
+      <div class="fol-grid fol-join" style="grid-template-columns:2fr 1.5fr 1.3fr;">
+        ${cel('Motivo da ausência de leitura', '<input id="san-motivo" placeholder="--" />')}
+        ${cel('Média de consumo/m³ últimos 5 meses', '<input id="san-media" type="number" class="ctr" />')}
+        ${cel('Vencimento *', '<input id="fatura-vencimento" class="r b" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />', 'hl')}
+      </div>
+      <div class="fol-grid fol-join" style="grid-template-columns:1.25fr 1fr 1fr 1fr 1.3fr;">
+        ${cel('Previsão próxima leitura', '<input id="san-prox-leit" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />')}
+        ${cel('Água', '<input id="san-valor-agua" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
+        ${cel('Esgoto', '<input id="san-valor-esgoto" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
+        ${cel('Serviços', '<input id="san-valor-serv" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
+        ${cel('Total *', '<input id="fatura-valor" class="r big" placeholder="0,00" oninput="calcularSan()" />', 'hl')}
+      </div>
+
+      <textarea id="san-mensagens" class="fol-msgs" rows="3" placeholder="Mensagens impressas na fatura"></textarea>
+      <div class="fol-trib">TRIBUTOS FEDERAIS - LEI 12.741 - VALOR APROXIMADO R$ <input id="san-tributos" placeholder="0,00" /></div>
+
+      <div class="fol-cut"></div>
+      <div class="fol-grid" style="grid-template-columns:1.2fr 1fr 1.1fr 1.1fr;">
+        ${cel('Matrícula', '<div class="fol-ro" id="san-dm-mat">—</div>')}
+        ${cel('Referência', '<div class="fol-ro" id="san-dm-ref">—</div>')}
+        ${cel('Vencimento', '<div class="fol-ro" id="san-dm-venc">—</div>')}
+        ${cel('Valor', '<div class="fol-ro b" id="san-dm-valor">—</div>')}
+      </div>
+      <div class="fol-grid fol-join" style="grid-template-columns:1fr 1.6fr;">
+        ${cel('CTRL', '<input id="san-ctrl" placeholder="0000.0000.0000.0000" />')}
+        ${cel('Código de barras', '<input id="san-codbarras" placeholder="parte destacável" />')}
+      </div>
+    </div>
+
+    <div class="fol-sys">
+      <h4>Campos do sistema (não fazem parte da fatura)</h4>
+      <div class="form-row-3">
+        <div class="form-group" style="margin-bottom:0;"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" placeholder="R$ 0,00" oninput="formatMoney(this);calcularValorPagar();calcularSan()" style="color:var(--green);" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label>🧾 Nº NF para cashback</label><input id="fatura-nf-cashback" type="text" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label>Observações</label><input id="fatura-obs" type="text" placeholder="Ex: inclui consumo da edícula" /></div>
+      </div>
+      <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:13px;color:var(--text-secondary);">💰 Valor a pagar:</span>
+        <span id="valor-pagar-preview" style="font-size:20px;font-weight:700;color:var(--text-primary);">R$ 0,00</span>
+      </div>
+      <div class="fol-checks" id="san-checks"></div>
+    </div>
+  `;
+}
+
+function iniciarFolhaSanepar() {
+  SAN_FAIXAS_PADRAO.forEach(n => sanAddFaixa([n, '', '', '', '']));
+  sanAddServico();
+  calcularSan();
+}
+
+function sanAddFaixa(v) {
+  v = Array.isArray(v) ? v : ['', '', '', '', ''];
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<input class="fx-nome" placeholder="DE 31 A 50M3" value="' + esc(v[0]) + '" />'
+    + '<input class="fx-vol r" type="number" min="0" value="' + esc(v[1]) + '" oninput="calcularSan()" />'
+    + '<input class="fx-preco r" placeholder="0,00" value="' + esc(v[2]) + '" />'
+    + '<input class="fx-ag r" placeholder="0,00" value="' + esc(v[3]) + '" oninput="calcularSan()" />'
+    + '<input class="fx-es r" placeholder="0,00" value="' + esc(v[4]) + '" oninput="calcularSan()" />'
+    + '<button type="button" class="fol-x" title="Remover" onclick="this.parentNode.remove();calcularSan()">×</button>';
+  document.getElementById('san-faixas-lista').appendChild(d);
+}
+
+function sanAddServico(v) {
+  v = Array.isArray(v) ? v : ['', ''];
+  const d = document.createElement('div');
+  d.className = 'row';
+  d.innerHTML = '<input class="sv-desc" placeholder="DESCRIÇÃO" value="' + esc(v[0]) + '" />'
+    + '<input class="sv-val r" placeholder="0,00" value="' + esc(v[1]) + '" oninput="calcularSan()" />'
+    + '<button type="button" class="fol-x" title="Remover" onclick="this.parentNode.remove();calcularSan()">×</button>';
+  document.getElementById('san-serv-lista').appendChild(d);
+}
+
+// serviços lançados -> as categorias que os cards de "Cobranças Extras" já usam
+function sanClassificarServicos(servicos) {
+  const ex = { atMonet: 0, multaAtraso: 0, jurosMoratorios: 0, taxaLixo: 0, outros: 0 };
+  servicos.forEach(s => {
+    const d = s.descricao.toUpperCase();
+    if (/MONET/.test(d)) ex.atMonet += s.valor;
+    else if (/MULTA/.test(d)) ex.multaAtraso += s.valor;
+    else if (/JUROS/.test(d)) ex.jurosMoratorios += s.valor;
+    else if (/LIXO|COLETA/.test(d)) ex.taxaLixo += s.valor;
+    else ex.outros += s.valor;
+  });
+  Object.keys(ex).forEach(k => ex[k] = Math.round(ex[k] * 100) / 100);
+  return ex;
+}
+
+// conferências automáticas: o que foi digitado precisa fechar com a própria fatura
+function calcularSan() {
+  const el = id => document.getElementById(id);
+  if (!el('san-checks')) return;
+  const r2 = n => Math.round(n * 100) / 100;
+  const fmtN = n => r2(n).toFixed(2).replace('.', ',');
+  let vol = 0, ag = 0, es = 0;
+  document.querySelectorAll('#san-faixas-lista .row').forEach(r => {
+    vol += parseFloat(r.querySelector('.fx-vol').value) || 0;
+    ag += parseMoney(r.querySelector('.fx-ag').value);
+    es += parseMoney(r.querySelector('.fx-es').value);
+  });
+  ag = r2(ag); es = r2(es);
+  const sv = r2([...document.querySelectorAll('#san-serv-lista .sv-val')].reduce((s, i) => s + parseMoney(i.value), 0));
+  const consumo = parseFloat(el('fatura-consumo').value) || 0;
+  const lant = parseFloat(el('san-leit-ant').value) || 0, latu = parseFloat(el('san-leit-atual').value) || 0;
+  const pAg = parseMoney(el('san-valor-agua').value), pEs = parseMoney(el('san-valor-esgoto').value), pSv = parseMoney(el('san-valor-serv').value);
+  const total = parseMoney(el('fatura-valor').value);
+  const eq = (a, b) => Math.abs(a - b) < 0.005;
+  const chip = (ok, t) => '<span class="fol-chip ' + (ok ? 'ok' : 'bad') + '">' + (ok ? '✓ ' : '⚠ ') + t + '</span>';
+
+  const temFaixas = vol > 0 || ag > 0 || es > 0;
+  const partes = [];
+  partes.push(chip(!!sanRefParaISO(el('fatura-referencia').value) && !!sanBrParaISO(el('fatura-vencimento').value), 'referência e vencimento válidos'));
+  if (lant && latu) partes.push(chip(eq(latu - lant, consumo), 'leitura atual − anterior = consumo (' + (latu - lant) + ' m³)'));
+  if (temFaixas) {
+    partes.push(chip(eq(vol, consumo), 'volume das faixas = consumo (' + vol + ' m³)'));
+    partes.push(chip(eq(ag, pAg), 'faixas água = ' + fmtN(ag)));
+    partes.push(chip(eq(es, pEs), 'faixas esgoto = ' + fmtN(es)));
+  }
+  if (sv || pSv) partes.push(chip(eq(sv, pSv), 'serviços lançados = ' + fmtN(sv)));
+  if (pAg || pEs || pSv) partes.push(chip(eq(pAg + pEs + pSv, total), 'água + esgoto + serviços = total (' + fmtN(pAg + pEs + pSv) + ')'));
+  el('san-checks').innerHTML = partes.join('');
+
+  el('san-dm-mat').textContent = el('san-matricula').value || '—';
+  el('san-dm-ref').textContent = el('fatura-referencia').value || '—';
+  el('san-dm-venc').textContent = el('fatura-vencimento').value || '—';
+  el('san-dm-valor').textContent = total ? fmtN(total) : '—';
+  calcularValorPagar();
+}
+
+// lê a folha e devolve os campos extras da fatura (o restante é montado em salvarFatura)
+function coletarFolhaSanepar() {
+  const get = id => (document.getElementById(id)?.value || '').trim();
+  const col = sel => [...document.querySelectorAll(sel)].map(e => e.value);
+  const servicos = [...document.querySelectorAll('#san-serv-lista .row')]
+    .map(r => ({ descricao: r.querySelector('.sv-desc').value.trim(), valor: parseMoney(r.querySelector('.sv-val').value) }))
+    .filter(s => s.descricao || s.valor);
+  const faixas = [...document.querySelectorAll('#san-faixas-lista .row')].map(r => ({
+    nome: r.querySelector('.fx-nome').value.trim(),
+    volume: parseFloat(r.querySelector('.fx-vol').value) || 0,
+    precoM3: r.querySelector('.fx-preco').value,
+    totalAgua: r.querySelector('.fx-ag').value,
+    totalEsgoto: r.querySelector('.fx-es').value
+  })).filter(f => f.volume > 0);
+  const anos = col('.san-hp-ano'), meses = col('.san-hp-m');
+  const hm = col('.san-hm'), hv = col('.san-hv');
+  return {
+    nomeCliente: get('san-nome'),
+    matricula: get('san-matricula'),
+    endereco: get('san-endereco'), numero: get('san-numero'), ladoFrente: get('san-lado'),
+    cep: get('san-cep'), local: get('san-local'),
+    roteiro: get('san-roteiro'), hidrometro: get('san-hidrometro'), categoria: get('san-categoria'),
+    qualidadeAgua: {
+      colunas: SAN_QA_COLS,
+      exigidas: col('.san-qa-0'), realizadas: col('.san-qa-1'), atenderam: col('.san-qa-2'),
+      conclusao: get('san-qa-conclusao')
+    },
+    historicoPagamentos: anos.map((a, i) => ({ ano: a, meses: meses.slice(i * 12, i * 12 + 12) })),
+    servicos,
+    extras: sanClassificarServicos(servicos),
+    faixas,
+    historicoConsumo: hm.map((m, i) => ({ mes: m, m3: parseFloat(hv[i]) || 0 })).filter(h => h.mes && h.m3),
+    leituraAnterior: get('san-leit-ant'), leituraAtual: get('san-leit-atual'),
+    dataLeitura: sanBrParaISO(get('san-data-leit')),
+    motivoAusenciaLeitura: get('san-motivo'),
+    media: get('san-media'),
+    proximaLeitura: sanBrParaISO(get('san-prox-leit')),
+    valorAgua: parseMoney(get('san-valor-agua')),
+    valorEsgoto: parseMoney(get('san-valor-esgoto')),
+    valorServicos: parseMoney(get('san-valor-serv')),
+    mensagens: get('san-mensagens'),
+    tributosFederais: parseMoney(get('san-tributos')),
+    ctrl: get('san-ctrl'),
+    codigoBarras: get('san-codbarras')
+  };
+}
+
 // ===== SALVAR =====
 function salvarFatura() {
   const tipo = document.getElementById('fatura-tipo')?.value;
-  const vencimento = document.getElementById('fatura-vencimento')?.value;
+  let vencimento = document.getElementById('fatura-vencimento')?.value;
+  if (tipo === 'sanepar') vencimento = sanBrParaISO(vencimento);
   const valor = parseMoney(document.getElementById('fatura-valor')?.value);
-  if (!vencimento) { showAlert('⚠️', 'Informe o vencimento.'); return; }
+  if (!vencimento) { showAlert('⚠️', 'Informe o vencimento' + (tipo === 'sanepar' ? ' (dd/mm/aaaa).' : '.')); return; }
   if (!valor || valor <= 0) { showAlert('⚠️', 'Informe o valor.'); return; }
+  if (tipo === 'sanepar' && !sanRefParaISO(document.getElementById('fatura-referencia')?.value)) { showAlert('⚠️', 'Informe a referência (mm/aaaa).'); return; }
 
   const desconto = parseMoney(document.getElementById('fatura-desconto')?.value) || 0;
   const valorPagar = Math.max(0, valor - desconto);
@@ -540,29 +782,7 @@ function salvarFatura() {
       }
     };
   } else if (tipo === 'sanepar') {
-    extras = {
-      matricula: get('san-matricula'),
-      hidrometro: get('san-hidrometro'),
-      leituraAnterior: get('san-leit-ant'),
-      leituraAtual: get('san-leit-atual'),
-      dataLeitura: get('san-data-leit'),
-      proximaLeitura: get('san-prox-leit'),
-      media: get('san-media'),
-      ctrl: get('san-ctrl'),
-      extras: {
-        atMonet: getMoney('san-extra-0'),
-        multaAgua: getMoney('san-extra-1'),
-        multaEsgoto: getMoney('san-extra-2'),
-        jurosMoratorios: getMoney('san-extra-3'),
-        taxaLixo: getMoney('san-extra-4')
-      },
-      faixas: [0,1,2,3,4].map(i => ({
-        volume: parseFloat(document.getElementById('san-fx-vol-'+i)?.value) || 0,
-        precoM3: document.getElementById('san-fx-preco-'+i)?.value || '',
-        totalAgua: document.getElementById('san-fx-agua-'+i)?.value || '',
-        totalEsgoto: document.getElementById('san-fx-esgoto-'+i)?.value || ''
-      })).filter(f => f.volume > 0)
-    };
+    extras = coletarFolhaSanepar();
   } else if (tipo === 'inova') {
     extras = {
       periodo: get('inova-periodo'),
@@ -579,7 +799,7 @@ function salvarFatura() {
     id: gerarId(),
     tipo,
     apelido: get('fatura-apelido'),
-    referencia: get('fatura-referencia'),
+    referencia: tipo === 'sanepar' ? sanRefParaISO(get('fatura-referencia')) : get('fatura-referencia'),
     vencimento,
     valor,
     desconto,
@@ -632,12 +852,19 @@ function verDetalhesFatura(id) {
 
   if (f.consumo) html += '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-bottom:12px;display:flex;gap:20px;font-size:13px;"><span>Consumo: <strong>' + f.consumo + ' ' + (conc.unidade || '') + '</strong></span>' + (f.dias ? '<span>Dias: <strong>' + f.dias + '</strong></span>' : '') + '</div>';
 
+  if (f.valorAgua || f.valorEsgoto || f.valorServicos) {
+    html += '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-bottom:12px;display:flex;gap:20px;font-size:13px;flex-wrap:wrap;">'
+      + '<span>Água: <strong>' + formatarMoeda(f.valorAgua) + '</strong></span>'
+      + '<span>Esgoto: <strong>' + formatarMoeda(f.valorEsgoto) + '</strong></span>'
+      + '<span>Serviços: <strong>' + formatarMoeda(f.valorServicos) + '</strong></span></div>';
+  }
+
   if (f.extras) {
     const itens = Object.entries(f.extras).filter(([k,v]) => v > 0);
     if (itens.length > 0) {
       html += '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:12px;margin-bottom:12px;">'
         + '<div style="font-size:12px;font-weight:600;color:var(--red);margin-bottom:8px;">⚠️ Cobranças Adicionais</div>'
-        + itens.map(([k,v]) => '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--text-secondary);">' + k + '</span><span style="color:var(--red);font-weight:600;">' + formatarMoeda(v) + '</span></div>').join('')
+        + itens.map(([k,v]) => '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span style="color:var(--text-secondary);">' + rotuloExtra(k) + '</span><span style="color:var(--red);font-weight:600;">' + formatarMoeda(v) + '</span></div>').join('')
         + '<div style="border-top:1px solid rgba(239,68,68,0.2);margin-top:6px;padding-top:6px;display:flex;justify-content:space-between;font-size:13px;font-weight:700;"><span>Total Extras</span><span style="color:var(--red);">' + formatarMoeda(itens.reduce((s,[k,v]) => s+v, 0)) + '</span></div>'
         + '</div>';
     }
@@ -646,7 +873,7 @@ function verDetalhesFatura(id) {
   if (f.faixas && f.faixas.length > 0) {
     html += '<div style="background:var(--bg-secondary);border-radius:8px;padding:12px;margin-bottom:12px;">'
       + '<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:8px;">💧 Faixas de Consumo</div>'
-      + f.faixas.map(fx => '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>' + fx.volume + ' m³ × ' + (fx.precoM3 || '-') + '</span><span style="color:var(--blue);">R$ ' + (fx.totalAgua || '0') + ' água / R$ ' + (fx.totalEsgoto || '0') + ' esgoto</span></div>').join('')
+      + f.faixas.map(fx => '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;"><span>' + (fx.nome ? esc(fx.nome) + ' · ' : '') + fx.volume + ' m³ × ' + (fx.precoM3 || '-') + '</span><span style="color:var(--blue);">R$ ' + (fx.totalAgua || '0') + ' água / R$ ' + (fx.totalEsgoto || '0') + ' esgoto</span></div>').join('')
       + '</div>';
   }
 
@@ -799,6 +1026,12 @@ function renderSanepar() {
       </div>
     </div>` : ''}
 
+    <!-- Gasto × Consumo -->
+    <div class="chart-card" style="margin-bottom:16px;">
+      <h3>Gasto (R$) × Consumo (m³) por Mês</h3>
+      <canvas id="chart-san-gasto-consumo" height="110"></canvas>
+    </div>
+
     <!-- Gráficos -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
       <div class="chart-card">
@@ -848,6 +1081,14 @@ function renderSanepar() {
   setTimeout(() => renderChartsSanepar(faturas), 100);
 }
 
+const ROTULOS_EXTRAS = {
+  multaAtraso: 'Multa por atraso', atMonet: 'Atualização monetária', jurosMoratorios: 'Juros moratórios',
+  taxaLixo: 'Taxa de coleta de lixo', multaAgua: 'Multa água', multaEsgoto: 'Multa esgoto', outros: 'Outros',
+  jurosConta: 'Juros conta anterior', acrescimoMoratorio: 'Acréscimo moratório', contIlumin: 'Cont. ilum. pública',
+  energiaBanda: 'Energia (banda)', usoSistema: 'Uso do sistema'
+};
+const rotuloExtra = k => ROTULOS_EXTRAS[k] || k;
+
 function renderExtrasCard(extras, icon) {
   const itens = Object.entries(extras).filter(([k,v]) => v > 0);
   if (itens.length === 0) return '';
@@ -855,7 +1096,7 @@ function renderExtrasCard(extras, icon) {
   return '<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:16px;margin-bottom:20px;">'
     + '<div style="font-size:13px;font-weight:600;color:var(--red);margin-bottom:12px;">' + icon + ' Cobranças Extras — Última Fatura</div>'
     + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">'
-    + itens.map(([k,v]) => '<div style="background:var(--bg-card);border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-secondary);">' + k + '</div><div style="font-size:15px;font-weight:700;color:var(--red);">' + formatarMoeda(v) + '</div></div>').join('')
+    + itens.map(([k,v]) => '<div style="background:var(--bg-card);border-radius:8px;padding:10px;"><div style="font-size:11px;color:var(--text-secondary);">' + rotuloExtra(k) + '</div><div style="font-size:15px;font-weight:700;color:var(--red);">' + formatarMoeda(v) + '</div></div>').join('')
     + '</div>'
     + '<div style="margin-top:10px;font-size:13px;font-weight:700;color:var(--red);text-align:right;">Total extras: ' + formatarMoeda(totalExtras) + '</div>'
     + '</div>';
@@ -893,7 +1134,62 @@ function renderChartsCopel(faturas) {
   });
 }
 
+// Série mensal gasto × consumo. As faturas mandam; o histórico de consumo impresso nelas
+// completa os meses anteriores (só consumo, sem valor).
+function serieGastoConsumo(faturas) {
+  const mapa = {};
+  const chaveHist = mes => { const m = /^(\d{2})\/(\d{2})$/.exec(mes || ''); return m ? '20' + m[2] + '-' + m[1] : ''; };
+  faturas.forEach(f => (f.historicoConsumo || []).forEach(h => {
+    const k = chaveHist(h.mes);
+    if (k && h.m3 && !mapa[k]) mapa[k] = { consumo: h.m3, valor: null };
+  }));
+  faturas.forEach(f => {
+    const k = (f.referencia || f.vencimento || '').slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(k)) return;
+    mapa[k] = { consumo: f.consumo != null ? f.consumo : (mapa[k] ? mapa[k].consumo : null), valor: f.valorPagar || f.valor || null };
+  });
+  return Object.keys(mapa).sort().map(k => ({ rotulo: k.slice(5, 7) + '/' + k.slice(2, 4), consumo: mapa[k].consumo, valor: mapa[k].valor }));
+}
+
+// Barras = gasto (eixo esquerdo, R$) · linha = consumo (eixo direito). Serve para qualquer concessionária.
+function renderChartGastoConsumo(canvasId, faturas, unidade, corBarra) {
+  const el = document.getElementById(canvasId);
+  if (!el) return;
+  const serie = serieGastoConsumo(faturas);
+  if (serie.length === 0) { el.parentNode.insertAdjacentHTML('beforeend', '<p style="font-size:12px;color:var(--text-muted);">Cadastre uma fatura para ver o gráfico.</p>'); return; }
+  const grade = 'rgba(255,255,255,0.06)', texto = '#9a9a9a';
+  new Chart(el, {
+    data: {
+      labels: serie.map(p => p.rotulo),
+      datasets: [
+        { type: 'bar', label: 'Gasto (R$)', data: serie.map(p => p.valor), backgroundColor: corBarra + '99', borderColor: corBarra, borderWidth: 1, borderRadius: 4, yAxisID: 'y', order: 2 },
+        { type: 'line', label: 'Consumo (' + unidade + ')', data: serie.map(p => p.consumo), borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.3, pointRadius: 3, spanGaps: true, yAxisID: 'y1', order: 1 }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: texto, boxWidth: 12 } },
+        tooltip: { callbacks: {
+          label: c => c.dataset.yAxisID === 'y' ? 'Gasto: ' + formatarMoeda(c.parsed.y) : 'Consumo: ' + c.parsed.y + ' ' + unidade,
+          footer: items => {
+            const p = serie[items[0].dataIndex];
+            return p && p.valor && p.consumo ? 'Custo: ' + formatarMoeda(p.valor / p.consumo) + ' por ' + unidade : '';
+          }
+        } }
+      },
+      scales: {
+        x: { ticks: { color: texto, font: { size: 10 } }, grid: { color: grade } },
+        y: { position: 'left', beginAtZero: true, ticks: { color: texto, callback: v => 'R$' + v }, grid: { color: grade } },
+        y1: { position: 'right', beginAtZero: true, ticks: { color: '#f59e0b', callback: v => v + ' ' + unidade }, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+}
+
 function renderChartsSanepar(faturas) {
+  renderChartGastoConsumo('chart-san-gasto-consumo', faturas, 'm³', '#0077b6');
   const labels = faturas.map(f => f.referencia || formatarData(f.vencimento));
   const m3 = faturas.map(f => f.consumo || 0);
   const valores = faturas.map(f => f.valorPagar || f.valor || 0);
@@ -1337,9 +1633,10 @@ function preencherFormulario(dados, tipo) {
     }
   };
 
-  // Campos comuns
-  set('fatura-vencimento', dados.vencimento);
-  set('fatura-referencia', dados.referencia);
+  // Campos comuns (na folha da Sanepar as datas são digitadas como na fatura: dd/mm/aaaa e mm/aaaa)
+  const ehSan = tipo === 'sanepar';
+  set('fatura-vencimento', ehSan ? sanISOParaBr(dados.vencimento) : dados.vencimento);
+  set('fatura-referencia', ehSan ? sanISOParaRef(dados.referencia) : dados.referencia);
   if (dados.valor) setMoney('fatura-valor', dados.valor);
   if (dados.consumo) set('fatura-consumo', dados.consumo);
   set('fatura-nf-cashback', dados.nfCashback);
@@ -1381,16 +1678,19 @@ function preencherFormulario(dados, tipo) {
     set('san-hidrometro', dados.hidrometro);
     set('san-leit-ant', dados.leituraAnterior);
     set('san-leit-atual', dados.leituraAtual);
-    set('san-prox-leit', dados.proximaLeitura);
+    set('san-prox-leit', sanISOParaBr(dados.proximaLeitura));
     set('san-ctrl', dados.ctrl);
-    if (dados.multaAgua) setMoney('san-extra-1', dados.multaAgua);
-    if (dados.multaEsgoto) setMoney('san-extra-2', dados.multaEsgoto);
-    if (dados.jurosMoratorios) setMoney('san-extra-3', dados.jurosMoratorios);
-
-    if (dados.matricula || dados.leituraAnterior) {
-      const det = document.querySelector('details');
-      if (det) det.open = true;
-    }
+    if (dados.valor) set('fatura-valor', Number(dados.valor).toFixed(2).replace('.', ','));
+    // multas e juros viram linhas da lista "serviços lançados" (a primeira linha vazia é reaproveitada)
+    [['MULTA ÁGUA', dados.multaAgua], ['MULTA ESGOTO', dados.multaEsgoto], ['JUROS MORATORIOS', dados.jurosMoratorios]].forEach(([desc, val]) => {
+      if (!val) return;
+      let linha = [...document.querySelectorAll('#san-serv-lista .row')].find(r => !r.querySelector('.sv-desc').value && !r.querySelector('.sv-val').value);
+      if (!linha) { sanAddServico(); linha = [...document.querySelectorAll('#san-serv-lista .row')].pop(); }
+      linha.querySelector('.sv-desc').value = desc;
+      linha.querySelector('.sv-val').value = Number(val).toFixed(2).replace('.', ',');
+    });
+    sanPreencherMesesHist();
+    calcularSan();
   }
 
   // Campos Inova
