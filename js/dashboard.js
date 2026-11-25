@@ -104,7 +104,7 @@ function renderCharts(dividas) {
 
   const chartOpts = {
     responsive: true,
-    plugins: { legend: { labels: { color: '#9a9a9a', font: { size: 11 } } } }
+    plugins: { legend: { labels: { color: coresGrafico().texto, font: { size: 11 } } } }
   };
 
   // PIZZA - Por categoria
@@ -146,7 +146,7 @@ function renderCharts(dividas) {
         labels: meses,
         datasets: [{ label: 'R$', data: valoresMeses, backgroundColor: '#3b82f6', borderRadius: 4 }]
       },
-      options: { ...chartOpts, scales: { x: { ticks: { color: '#666' }, grid: { color: '#2e2f33' } }, y: { ticks: { color: '#666', callback: v => 'R$' + v }, grid: { color: '#2e2f33' } } }, plugins: { legend: { display: false } } }
+      options: { ...chartOpts, scales: { x: { ticks: { color: coresGrafico().textoFraco }, grid: { color: coresGrafico().grade } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v }, grid: { color: coresGrafico().grade } } }, plugins: { legend: { display: false } } }
     });
   }
 
@@ -169,7 +169,7 @@ function renderCharts(dividas) {
         labels: meses,
         datasets: [{ label: 'Juros', data: jurosData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: true, tension: 0.4, pointBackgroundColor: '#ef4444' }]
       },
-      options: { ...chartOpts, scales: { x: { ticks: { color: '#666' }, grid: { color: '#2e2f33' } }, y: { ticks: { color: '#666', callback: v => 'R$' + v.toFixed(0) }, grid: { color: '#2e2f33' } } }, plugins: { legend: { display: false } } }
+      options: { ...chartOpts, scales: { x: { ticks: { color: coresGrafico().textoFraco }, grid: { color: coresGrafico().grade } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v.toFixed(0) }, grid: { color: coresGrafico().grade } } }, plugins: { legend: { display: false } } }
     });
   }
 
@@ -182,7 +182,7 @@ function renderCharts(dividas) {
       data: {
         datasets: [{
           data: [porcQuitada, 100 - porcQuitada],
-          backgroundColor: [porcQuitada > 50 ? '#22c55e' : porcQuitada > 25 ? '#eab308' : '#ef4444', '#2e2f33'],
+          backgroundColor: [porcQuitada > 50 ? '#22c55e' : porcQuitada > 25 ? '#eab308' : '#ef4444', coresGrafico().fundo],
           borderWidth: 0, circumference: 180, rotation: 270
         }]
       },

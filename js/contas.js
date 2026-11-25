@@ -150,8 +150,8 @@ function renderGastosConc() {
       responsive: true,
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#666', font: { size: 11 } }, grid: { color: '#2e2f33' } },
-        y: { ticks: { color: '#666', callback: v => 'R$' + v }, grid: { color: '#2e2f33' } }
+        x: { ticks: { color: coresGrafico().textoFraco, font: { size: 11 } }, grid: { color: coresGrafico().grade } },
+        y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v }, grid: { color: coresGrafico().grade } }
       }
     }
   });
@@ -276,13 +276,13 @@ function formBasico(tipo) {
     <div class="form-row">
       <div class="form-group">
         <label>Valor Original (R$) *</label>
-        <input id="fatura-valor" type="text" placeholder="R$ 0,00" oninput="formatMoney(this);calcularValorPagar()" style="font-size:15px;font-weight:700;" />
+        <input id="fatura-valor" type="text" oninput="formatMoney(this);calcularValorPagar()" style="font-size:15px;font-weight:700;" />
       </div>
       ${tipo === 'inova' ? `
       <div class="form-group">
         <label>Desconto até Vencimento (R$)</label>
-        <input id="fatura-desconto" type="text" value="R$ 20,00" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" />
-      </div>` : '<div class="form-group"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" placeholder="R$ 0,00" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" /></div>'}
+        <input id="fatura-desconto" type="text" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" />
+      </div>` : '<div class="form-group"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" oninput="formatMoney(this);calcularValorPagar()" style="color:var(--green);" /></div>'}
     </div>
     <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:13px;color:var(--text-secondary);">💰 Valor a pagar:</span>
@@ -292,20 +292,20 @@ function formBasico(tipo) {
     <div class="form-row">
       <div class="form-group">
         <label>Consumo (${conc.unidade}) *</label>
-        <input id="fatura-consumo" type="number" placeholder="0" min="0" />
+        <input id="fatura-consumo" type="number" min="0" />
       </div>
       <div class="form-group">
         <label>Nº Dias</label>
-        <input id="fatura-dias" type="number" placeholder="30" />
+        <input id="fatura-dias" type="number" />
       </div>
     </div>` : ''}
     <div class="form-group">
       <label>🧾 Nº NF para Cashback (Nota Paraná / Dinheiro na Nota)</label>
-      <input id="fatura-nf-cashback" type="text" placeholder="Nº da Nota Fiscal" />
+      <input id="fatura-nf-cashback" type="text" />
     </div>
     <div class="form-group">
       <label>Observações</label>
-      <textarea id="fatura-obs" placeholder="Ex: Inclui consumo da edícula" style="min-height:60px;"></textarea>
+      <textarea id="fatura-obs" style="min-height:60px;"></textarea>
     </div>
   `;
 }
@@ -315,30 +315,31 @@ function formDetalhes(tipo) {
     <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">⚡ Valores Cobrados a Mais</h4>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
       ${['Multa por Atraso','Juros Conta Anterior','Acréscimo Moratório','Cont. Ilum. Pública','Energia Cons. B.Amarela','Uso Sistema'].map((s,i) =>
-        '<div class="form-group"><label style="font-size:11px;">' + s + '</label><input type="text" id="cop-extra-' + i + '" placeholder="R$ 0,00" oninput="formatMoney(this)" /></div>'
+        '<div class="form-group"><label style="font-size:11px;">' + s + '</label><input type="text" id="cop-extra-' + i + '" oninput="formatMoney(this)" /></div>'
       ).join('')}
     </div>
     <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">📊 Leituras</h4>
     <div class="form-row">
       <div class="form-group">
         <label>Medidor</label>
-        <input id="cop-medidor" type="text" placeholder="Ex: 0760801802" />
+        <input id="cop-medidor" type="text" />
       </div>
       <div class="form-group">
         <label>Leitura Anterior (KWh)</label>
-        <input id="cop-leit-ant" type="number" placeholder="9494" oninput="calcularConsumo()" />
+        <input id="cop-leit-ant" type="number" oninput="calcularConsumo()" />
       </div>
       <div class="form-group">
         <label>Leitura Atual (KWh)</label>
-        <input id="cop-leit-atual" type="number" placeholder="9790" oninput="calcularConsumo()" />
+        <input id="cop-leit-atual" type="number" oninput="calcularConsumo()" />
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
         <label>Banda Tarifária</label>
         <select id="cop-banda">
+          <option value="" selected></option>
           <option value="Verde">🟢 Verde</option>
-          <option value="Amarela" selected>🟡 Amarela</option>
+          <option value="Amarela">🟡 Amarela</option>
           <option value="Vermelha 1">🔴 Vermelha 1</option>
           <option value="Vermelha 2">🔴 Vermelha 2</option>
         </select>
@@ -349,23 +350,23 @@ function formDetalhes(tipo) {
       </div>
       <div class="form-group">
         <label>Classificação</label>
-        <input id="cop-classif" type="text" placeholder="Ex: B1 Residencial" />
+        <input id="cop-classif" type="text" />
       </div>
     </div>
     <h4 style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;text-transform:uppercase;">🧾 Nota Fiscal</h4>
     <div class="form-row">
       <div class="form-group">
         <label>Nº Nota Fiscal</label>
-        <input id="cop-nf" type="text" placeholder="Ex: 242425413" />
+        <input id="cop-nf" type="text" />
       </div>
       <div class="form-group">
         <label>Chave de Acesso</label>
-        <input id="cop-chave" type="text" placeholder="4126 0704..." style="font-family:monospace;font-size:11px;" />
+        <input id="cop-chave" type="text" style="font-family:monospace;font-size:11px;" />
       </div>
     </div>
     <div class="form-group">
       <label>Linha Digitável</label>
-      <input id="cop-linha-dig" type="text" placeholder="23790.04902..." style="font-family:monospace;font-size:11px;" />
+      <input id="cop-linha-dig" type="text" style="font-family:monospace;font-size:11px;" />
     </div>
   `;
 
@@ -373,11 +374,11 @@ function formDetalhes(tipo) {
     <div class="form-row">
       <div class="form-group">
         <label>Período do Serviço</label>
-        <input id="inova-periodo" type="text" placeholder="Ex: 16/07/2026 a 15/08/2026" />
+        <input id="inova-periodo" type="text" />
       </div>
       <div class="form-group">
         <label>Contrato</label>
-        <input id="inova-contrato" type="text" placeholder="Ex: 23639" />
+        <input id="inova-contrato" type="text" />
       </div>
     </div>
     <div class="form-group">
@@ -386,11 +387,11 @@ function formDetalhes(tipo) {
     </div>
     <div class="form-group">
       <label>PIX Copia e Cola</label>
-      <textarea id="inova-pix" placeholder="00020126910014br.gov.bcb.pix..." style="font-family:monospace;font-size:11px;min-height:60px;"></textarea>
+      <textarea id="inova-pix" style="font-family:monospace;font-size:11px;min-height:60px;"></textarea>
     </div>
     <div class="form-group">
       <label>Linha Digitável</label>
-      <input id="inova-linha-dig" type="text" placeholder="74891.12636..." style="font-family:monospace;font-size:11px;" />
+      <input id="inova-linha-dig" type="text" style="font-family:monospace;font-size:11px;" />
     </div>
   `;
 
@@ -398,11 +399,11 @@ function formDetalhes(tipo) {
     <div class="form-row">
       <div class="form-group">
         <label>Nº da Fatura</label>
-        <input id="sercom-nr" type="text" placeholder="Número da fatura" />
+        <input id="sercom-nr" type="text" />
       </div>
       <div class="form-group">
         <label>Linha Digitável</label>
-        <input id="sercom-linha" type="text" placeholder="Código de barras" style="font-family:monospace;" />
+        <input id="sercom-linha" type="text" style="font-family:monospace;" />
       </div>
     </div>
   `;
@@ -451,7 +452,7 @@ function calcularPrazoInova() {
 const SAN_MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 const SAN_QA_COLS = ['Turbidez','Cor','Cloro','Flúor','Coliformes Totais'];
 const SAN_QA_LINHAS = ['Nº mínimo de amostras exigidas','Nº amostras realizadas','Nº amostras que atenderam à legislação'];
-const SAN_FAIXAS_PADRAO = ['RES MÍNIMO','DE 6 A 10M3','DE 11 A 15M3','DE 16 A 20M3','DE 21 A 30M3'];
+const SAN_FAIXAS_PADRAO = ['', '', '', '', ''];
 
 // datas digitadas como na fatura (dd/mm/aaaa e mm/aaaa) <-> formato interno (ISO)
 function sanBrParaISO(s) {
@@ -505,10 +506,10 @@ function formFolhaSanepar() {
     + SAN_QA_LINHAS.map((l, i) => '<div class="fol-c"><label style="text-transform:none;font-size:8.5px;">' + l + '</label></div>'
       + SAN_QA_COLS.map((c, j) => '<div class="fol-c"><input class="san-qa-' + i + ' ctr" data-j="' + j + '" inputmode="numeric" /></div>').join('')).join('');
   const hp = '<div class="fol-th ctr">Ano</div>' + SAN_MESES.map(m => '<div class="fol-th ctr">' + m + '</div>').join('')
-    + [anoAtual - 1, anoAtual].map(a => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hp-ano ctr" style="font-size:11px;" value="' + a + '" /></div>'
+    + [anoAtual - 1, anoAtual].map(a => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hp-ano ctr" style="font-size:11px;" /></div>'
       + SAN_MESES.map(() => '<div class="fol-c" style="padding:1px 0;"><select class="san-hp-m">'
         + ['', 'PAGO', 'X', '---'].map(o => '<option>' + o + '</option>').join('') + '</select></div>').join('')).join('');
-  const hist = Array.from({ length: 11 }, (_, i) => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hm ctr" style="font-size:9px;color:var(--fol-lbl);" placeholder="MM/AA" maxlength="5" />'
+  const hist = Array.from({ length: 11 }, (_, i) => '<div class="fol-c" style="padding:1px 2px;"><input class="san-hm ctr" style="font-size:9px;color:var(--fol-lbl);" maxlength="5" />'
     + '<input class="san-hv ctr b" type="number" min="0" /></div>').join('');
 
   return `
@@ -516,7 +517,7 @@ function formFolhaSanepar() {
       <div class="fol-title">CONTA</div>
       <div class="fol-grid" style="grid-template-columns:1fr 150px;">
         ${cel('Nome do cliente', '<input id="san-nome" />', 'hl')}
-        ${cel('Matrícula', '<input id="san-matricula" class="r big" placeholder="0000.0000" oninput="calcularSan()" />', 'hl')}
+        ${cel('Matrícula', '<input id="san-matricula" class="r big" oninput="calcularSan()" />', 'hl')}
       </div>
       <div class="fol-grid" style="grid-template-columns:2.2fr .7fr 1.1fr;">
         ${cel('Endereço', '<textarea id="san-endereco" rows="2"></textarea>')}
@@ -524,13 +525,13 @@ function formFolhaSanepar() {
         ${cel('Nº lado · Nº frente', '<input id="san-lado" />')}
       </div>
       <div class="fol-grid" style="grid-template-columns:130px 1fr;">
-        ${cel('CEP', '<input id="san-cep" placeholder="00.000-000" />')}
+        ${cel('CEP', '<input id="san-cep" />')}
         ${cel('Local', '<input id="san-local" />')}
       </div>
       <div class="fol-grid" style="grid-template-columns:1.25fr 1.2fr 1.3fr;">
-        ${cel('Roteiro de leitura', '<input id="san-roteiro" placeholder="000-00-00-000-00000" />')}
+        ${cel('Roteiro de leitura', '<input id="san-roteiro" />')}
         ${cel('Hidrômetro', '<input id="san-hidrometro" />')}
-        ${cel('CAT · RES · COM · IND · UTP · POP', '<input id="san-categoria" placeholder="000 000 000 000 000 000" />')}
+        ${cel('CAT · RES · COM · IND · UTP · POP', '<input id="san-categoria" />')}
       </div>
 
       <div class="fol-scroll fol-sp"><div class="fol-grid" style="grid-template-columns:1.7fr repeat(5,.75fr);">${qa}</div></div>
@@ -560,27 +561,27 @@ function formFolhaSanepar() {
 
       <div class="fol-grid fol-sp" style="grid-template-columns:.8fr 1.2fr 1fr 1fr .9fr 1.2fr;">
         ${cel('Dias de consumo', '<input id="fatura-dias" type="number" class="ctr" />')}
-        ${cel('Data leitura', '<input id="san-data-leit" class="ctr" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />')}
+        ${cel('Data leitura', '<input id="san-data-leit" class="ctr" maxlength="10" oninput="sanMascaraData(this)" />')}
         ${cel('Leitura anterior', '<input id="san-leit-ant" type="number" class="ctr" oninput="calcularConsumoSan();calcularSan()" />')}
         ${cel('Leitura atual', '<input id="san-leit-atual" type="number" class="ctr" oninput="calcularConsumoSan();calcularSan()" />')}
         ${cel('Consumo/m³', '<input id="fatura-consumo" type="number" min="0" class="ctr" oninput="calcularSan()" />')}
-        ${cel('Referência *', '<input id="fatura-referencia" class="r b" placeholder="mm/aaaa" maxlength="7" oninput="sanMascaraRef(this)" />', 'hl')}
+        ${cel('Referência *', '<input id="fatura-referencia" class="r b" maxlength="7" oninput="sanMascaraRef(this)" />', 'hl')}
       </div>
       <div class="fol-grid fol-join" style="grid-template-columns:2fr 1.5fr 1.3fr;">
-        ${cel('Motivo da ausência de leitura', '<input id="san-motivo" placeholder="--" />')}
+        ${cel('Motivo da ausência de leitura', '<input id="san-motivo" />')}
         ${cel('Média de consumo/m³ últimos 5 meses', '<input id="san-media" type="number" class="ctr" />')}
-        ${cel('Vencimento *', '<input id="fatura-vencimento" class="r b" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />', 'hl')}
+        ${cel('Vencimento *', '<input id="fatura-vencimento" class="r b" maxlength="10" oninput="sanMascaraData(this)" />', 'hl')}
       </div>
       <div class="fol-grid fol-join" style="grid-template-columns:1.25fr 1fr 1fr 1fr 1.3fr;">
-        ${cel('Previsão próxima leitura', '<input id="san-prox-leit" placeholder="dd/mm/aaaa" maxlength="10" oninput="sanMascaraData(this)" />')}
-        ${cel('Água', '<input id="san-valor-agua" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
-        ${cel('Esgoto', '<input id="san-valor-esgoto" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
-        ${cel('Serviços', '<input id="san-valor-serv" class="ctr" placeholder="0,00" oninput="calcularSan()" />')}
-        ${cel('Total *', '<input id="fatura-valor" class="r big" placeholder="0,00" oninput="calcularSan()" />', 'hl')}
+        ${cel('Previsão próxima leitura', '<input id="san-prox-leit" maxlength="10" oninput="sanMascaraData(this)" />')}
+        ${cel('Água', '<input id="san-valor-agua" class="ctr" oninput="calcularSan()" />')}
+        ${cel('Esgoto', '<input id="san-valor-esgoto" class="ctr" oninput="calcularSan()" />')}
+        ${cel('Serviços', '<input id="san-valor-serv" class="ctr" oninput="calcularSan()" />')}
+        ${cel('Total *', '<input id="fatura-valor" class="r big" oninput="calcularSan()" />', 'hl')}
       </div>
 
-      <textarea id="san-mensagens" class="fol-msgs" rows="3" placeholder="Mensagens impressas na fatura"></textarea>
-      <div class="fol-trib">TRIBUTOS FEDERAIS - LEI 12.741 - VALOR APROXIMADO R$ <input id="san-tributos" placeholder="0,00" /></div>
+      <textarea id="san-mensagens" class="fol-msgs" rows="3"></textarea>
+      <div class="fol-trib">TRIBUTOS FEDERAIS - LEI 12.741 - VALOR APROXIMADO R$ <input id="san-tributos" /></div>
 
       <div class="fol-cut"></div>
       <div class="fol-grid" style="grid-template-columns:1.2fr 1fr 1.1fr 1.1fr;">
@@ -590,17 +591,17 @@ function formFolhaSanepar() {
         ${cel('Valor', '<div class="fol-ro b" id="san-dm-valor">—</div>')}
       </div>
       <div class="fol-grid fol-join" style="grid-template-columns:1fr 1.6fr;">
-        ${cel('CTRL', '<input id="san-ctrl" placeholder="0000.0000.0000.0000" />')}
-        ${cel('Código de barras', '<input id="san-codbarras" placeholder="parte destacável" />')}
+        ${cel('CTRL', '<input id="san-ctrl" />')}
+        ${cel('Código de barras', '<input id="san-codbarras" />')}
       </div>
     </div>
 
     <div class="fol-sys">
       <h4>Campos do sistema (não fazem parte da fatura)</h4>
       <div class="form-row-3">
-        <div class="form-group" style="margin-bottom:0;"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" placeholder="R$ 0,00" oninput="formatMoney(this);calcularValorPagar();calcularSan()" style="color:var(--green);" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label>Desconto (R$)</label><input id="fatura-desconto" type="text" oninput="formatMoney(this);calcularValorPagar();calcularSan()" style="color:var(--green);" /></div>
         <div class="form-group" style="margin-bottom:0;"><label>🧾 Nº NF para cashback</label><input id="fatura-nf-cashback" type="text" /></div>
-        <div class="form-group" style="margin-bottom:0;"><label>Observações</label><input id="fatura-obs" type="text" placeholder="Ex: inclui consumo da edícula" /></div>
+        <div class="form-group" style="margin-bottom:0;"><label>Observações</label><input id="fatura-obs" type="text" /></div>
       </div>
       <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
         <span style="font-size:13px;color:var(--text-secondary);">💰 Valor a pagar:</span>
@@ -621,11 +622,11 @@ function sanAddFaixa(v) {
   v = Array.isArray(v) ? v : ['', '', '', '', ''];
   const d = document.createElement('div');
   d.className = 'row';
-  d.innerHTML = '<input class="fx-nome" placeholder="DE 31 A 50M3" value="' + esc(v[0]) + '" />'
+  d.innerHTML = '<input class="fx-nome" value="' + esc(v[0]) + '" />'
     + '<input class="fx-vol r" type="number" min="0" value="' + esc(v[1]) + '" oninput="calcularSan()" />'
-    + '<input class="fx-preco r" placeholder="0,00" value="' + esc(v[2]) + '" />'
-    + '<input class="fx-ag r" placeholder="0,00" value="' + esc(v[3]) + '" oninput="calcularSan()" />'
-    + '<input class="fx-es r" placeholder="0,00" value="' + esc(v[4]) + '" oninput="calcularSan()" />'
+    + '<input class="fx-preco r" value="' + esc(v[2]) + '" />'
+    + '<input class="fx-ag r" value="' + esc(v[3]) + '" oninput="calcularSan()" />'
+    + '<input class="fx-es r" value="' + esc(v[4]) + '" oninput="calcularSan()" />'
     + '<button type="button" class="fol-x" title="Remover" onclick="this.parentNode.remove();calcularSan()">×</button>';
   document.getElementById('san-faixas-lista').appendChild(d);
 }
@@ -634,8 +635,8 @@ function sanAddServico(v) {
   v = Array.isArray(v) ? v : ['', ''];
   const d = document.createElement('div');
   d.className = 'row';
-  d.innerHTML = '<input class="sv-desc" placeholder="DESCRIÇÃO" value="' + esc(v[0]) + '" />'
-    + '<input class="sv-val r" placeholder="0,00" value="' + esc(v[1]) + '" oninput="calcularSan()" />'
+  d.innerHTML = '<input class="sv-desc" value="' + esc(v[0]) + '" />'
+    + '<input class="sv-val r" value="' + esc(v[1]) + '" oninput="calcularSan()" />'
     + '<button type="button" class="fol-x" title="Remover" onclick="this.parentNode.remove();calcularSan()">×</button>';
   document.getElementById('san-serv-lista').appendChild(d);
 }
@@ -1123,14 +1124,14 @@ function renderChartsCopel(faturas) {
   if (el1) new Chart(el1, {
     type: 'bar',
     data: { labels, datasets: [{ label: 'KWh', data: kwh, backgroundColor: '#003399', borderRadius: 4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', font: { size: 10 } } }, y: { ticks: { color: '#666' } } } }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco } } } }
   });
 
   const el2 = document.getElementById('chart-copel-valor');
   if (el2) new Chart(el2, {
     type: 'line',
     data: { labels, datasets: [{ label: 'R$', data: valores, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', font: { size: 10 } } }, y: { ticks: { color: '#666', callback: v => 'R$' + v } } } }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v } } } }
   });
 }
 
@@ -1157,7 +1158,7 @@ function renderChartGastoConsumo(canvasId, faturas, unidade, corBarra) {
   if (!el) return;
   const serie = serieGastoConsumo(faturas);
   if (serie.length === 0) { el.parentNode.insertAdjacentHTML('beforeend', '<p style="font-size:12px;color:var(--text-muted);">Cadastre uma fatura para ver o gráfico.</p>'); return; }
-  const grade = 'rgba(255,255,255,0.06)', texto = '#9a9a9a';
+  const grade = coresGrafico().grade, texto = coresGrafico().texto;
   new Chart(el, {
     data: {
       labels: serie.map(p => p.rotulo),
@@ -1198,14 +1199,14 @@ function renderChartsSanepar(faturas) {
   if (el1) new Chart(el1, {
     type: 'bar',
     data: { labels, datasets: [{ label: 'm³', data: m3, backgroundColor: '#0077b6', borderRadius: 4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', font: { size: 10 } } }, y: { ticks: { color: '#666' } } } }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco } } } }
   });
 
   const el2 = document.getElementById('chart-san-valor');
   if (el2) new Chart(el2, {
     type: 'line',
     data: { labels, datasets: [{ label: 'R$', data: valores, borderColor: '#0077b6', backgroundColor: 'rgba(0,119,182,0.1)', fill: true, tension: 0.4 }] },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#666', font: { size: 10 } } }, y: { ticks: { color: '#666', callback: v => 'R$' + v } } } }
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v } } } }
   });
 }
 

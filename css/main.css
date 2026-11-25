@@ -24,6 +24,8 @@
   --transition: 0.2s ease;
 }
 
+html { color-scheme: dark; }
+html[data-tema="claro"] { color-scheme: light; }
 html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; }
 
 /* ===== LOGIN ===== */
@@ -429,7 +431,7 @@ select.filter { width: auto; padding: 8px 12px; font-size: 12px; }
 
 /* ===== FOLHA DA FATURA (modal Sanepar) =====
    Mesmo arranjo das células da fatura impressa, em tema escuro. */
-.fol { --fol-line:#34506f; --fol-lbl:#6f9bd6; --fol-hl:rgba(0,102,204,.24); background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:14px 14px 10px; font-family:Arial,Helvetica,sans-serif; color-scheme:dark; }
+.fol { --fol-line:#34506f; --fol-lbl:#6f9bd6; --fol-hl:rgba(0,102,204,.24); background:var(--bg-primary); border:1px solid var(--border); border-radius:8px; padding:14px 14px 10px; font-family:Arial,Helvetica,sans-serif;  }
 .fol-title { font-weight:700; color:#5aa0f0; font-size:15px; letter-spacing:.03em; margin-bottom:4px; }
 .fol-cap { display:block; font-size:8px; letter-spacing:.04em; text-transform:uppercase; color:var(--fol-lbl); line-height:1.5; margin-top:10px; }
 .fol-grid { display:grid; border-top:1px solid var(--fol-line); border-left:1px solid var(--fol-line); }
@@ -471,3 +473,34 @@ select.filter { width: auto; padding: 8px 12px; font-size: 12px; }
 .fol-chip { font-size:11px; padding:4px 9px; border-radius:99px; border:1px solid; }
 .fol-chip.ok { color:var(--green); border-color:#22c55e55; background:#22c55e12; }
 .fol-chip.bad { color:var(--yellow); border-color:#eab30855; background:#eab30812; }
+
+/* ===== TEMA CLARO (opcional; o padrão continua escuro) ===== */
+html[data-tema="claro"] {
+  --bg-primary: #f3f4f6;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #eef0f3;
+  --border: #d9dce1;
+  --text-primary: #1f2328;
+  --text-secondary: #4b5563;
+  --text-muted: #6b7280;
+  --green: #15803d;
+  --green-bg: #dcfce7;
+  --yellow: #a16207;
+  --yellow-bg: #fef9c3;
+  --red: #dc2626;
+  --red-bg: #fee2e2;
+  --blue: #2563eb;
+}
+html[data-tema="claro"] .login-screen { background: radial-gradient(ellipse at center, #ffffff 0%, #e5e7eb 100%); }
+html[data-tema="claro"] .login-box, html[data-tema="claro"] .alerta-popup { box-shadow: 0 16px 48px rgba(0,0,0,0.15); }
+html[data-tema="claro"] ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+html[data-tema="claro"] .btn-primary { color: #fff; }
+html[data-tema="claro"] .btn-primary:hover { background: #166534; }
+html[data-tema="claro"] .badge.urgente { color: #111; }
+html[data-tema="claro"] .modal-overlay { background: rgba(17,24,39,0.45); }
+html[data-tema="claro"] .fol {
+  --fol-line:#9db4cf; --fol-lbl:#2f5f9e; --fol-hl:rgba(0,102,204,.10);
+}
+html[data-tema="claro"] .fol-title { color:#1d4f91; }
+html[data-tema="claro"] .fol input::placeholder, html[data-tema="claro"] .fol textarea::placeholder { color:#9ca3af; }

@@ -157,6 +157,7 @@ function salvarConfiguracoes() {
 
 function alternarTema(escuro) {
   DB.usuario.tema = escuro ? 'escuro' : 'claro';
+  aplicarTema(DB.usuario.tema);
   salvarLocalStorage();
   agendarSync();
 }

@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.9 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.10 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.10 | `HASH110` | Tema claro/escuro passa a funcionar (antes só gravava a preferência); folha da Sanepar e demais formulários de fatura sem valores/exemplos pré-preenchidos |
 | Site v1.9 | `4927f77` | Contas Recorrentes: modal da Sanepar no layout da fatura impressa (tema escuro), conferências automáticas e gráfico Gasto × Consumo |
 | Site v1.8 | `127eaa0` | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
 | Site v1.7 | `7476b17` | Nova aba **Assinaturas Recorrentes** com detecção de duplicidade por fornecedor; `esc()` no site pai; Sicoob nas subcategorias de cartão |
@@ -556,3 +557,20 @@ nasce com 11 meses de consumo mesmo com uma só fatura cadastrada. Hoje só a ab
 **Testes:** Playwright (`/tmp/pw/san_test.py`, `san_test2.py`) com o Chart.js do npm servido no lugar do CDN (o proxy bloqueia CDN/Google). Preencher o modal, salvar,
 checar `DB.faturas[0]`, a série do gráfico e que os outros tipos de fatura seguem abrindo com `<details>`. Dados de teste sempre fictícios — nunca valores reais de fatura.
 
+---
+
+## 24. Tema claro/escuro do site pai (v1.10)
+
+Até a v1.9 o toggle "Tema Claro / Escuro" (Configurações) só gravava `DB.usuario.tema`; nada aplicava. Agora:
+
+- `aplicarTema(tema)` (`js/utils.js`) põe/tira `data-tema="claro"` no `<html>` e guarda `dnm_tema` no localStorage. `temaAtual()` lê o atributo.
+- Chamada em `alternarTema()`, em `carregarLocalStorage()` e depois de cada `Object.assign(DB, …)` (Drive, `aplicarImportacao`, `desfazerImportacao`). Um `<script>` no `<head>` do `index.html` lê `dnm_tema` antes da pintura (evita flash).
+- `css/main.css`: **escuro é o padrão** (`:root`); o claro é só um bloco `html[data-tema="claro"]` que redefine as variáveis (`--bg-*`, `--text-*`, `--border`, `--green/--red/--yellow/--blue`) e ajusta `.fol*`, login, scrollbar.
+- Gráficos (canvas não lê variáveis CSS): usar `coresGrafico()` (`{texto, textoFraco, grade, fundo}`) em vez de hex fixo. Os gráficos são recriados ao trocar de página, então pegam o tema novo.
+- **Regra para CSS/JS novo:** usar `var(--…)` e `coresGrafico()`; nada de `#111`/`#fff` fixo em fundo ou texto de tela. (A regra "NUNCA fundo claro" do NFScanner, `nfscanner.html`, continua valendo — o iframe tem tema próprio.) A página Cashback e Pontos mantém o visual verde/Excel nos dois temas.
+
+## Campos em branco (v1.10)
+
+Os formulários de fatura (`abrirModalNovaFatura`, folha da Sanepar) **não trazem placeholders de exemplo nem valores padrão** (faixas, anos do histórico, desconto da Inova, bandeira da Copel). Motivo: exemplos como `0000.0000` ou `9494` pareciam dados preenchidos. Não reintroduzir.
+
+**Testes:** `/tmp/pw/tema_test.py` (alterna tema, confere persistência e que a folha abre sem nenhum campo preenchido).

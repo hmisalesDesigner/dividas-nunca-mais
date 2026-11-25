@@ -233,10 +233,10 @@ function renderChartFluxo() {
     },
     options: {
       responsive: true,
-      plugins: { legend: { labels: { color: '#9a9a9a', font: { size: 11 } } } },
+      plugins: { legend: { labels: { color: coresGrafico().texto, font: { size: 11 } } } },
       scales: {
-        x: { ticks: { color: '#666' }, grid: { color: '#2e2f33' } },
-        y: { ticks: { color: '#666', callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid: { color: '#2e2f33' } }
+        x: { ticks: { color: coresGrafico().textoFraco }, grid: { color: coresGrafico().grade } },
+        y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v.toLocaleString('pt-BR') }, grid: { color: coresGrafico().grade } }
       }
     }
   });

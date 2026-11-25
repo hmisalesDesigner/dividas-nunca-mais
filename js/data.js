@@ -72,6 +72,7 @@ async function carregarDoDrive() {
         headers: { Authorization: `Bearer ${accessToken}` }
       }).then(r => r.json());
       Object.assign(DB, data);
+      if (typeof aplicarTema === 'function') aplicarTema(DB.usuario && DB.usuario.tema);
       console.log('Drive load OK');
       return true;
     }
@@ -420,6 +421,7 @@ function analisarImportacao(data) {
 function aplicarImportacao(data) {
   try { localStorage.setItem('dnm_pre_import', JSON.stringify(DB)); } catch (e) {}
   Object.assign(DB, data);
+  if (typeof aplicarTema === 'function') aplicarTema(DB.usuario && DB.usuario.tema);
   agendarSync();
   return true;
 }
@@ -435,6 +437,7 @@ function desfazerImportacao() {
   const anterior = JSON.parse(bruto);
   Object.keys(DB).forEach(function(k) { if (!(k in anterior)) delete DB[k]; });
   Object.assign(DB, anterior);
+  if (typeof aplicarTema === 'function') aplicarTema(DB.usuario && DB.usuario.tema);
   try { localStorage.removeItem('dnm_pre_import'); } catch (e) {}
   agendarSync();
   return true;

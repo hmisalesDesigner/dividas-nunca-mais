@@ -94,6 +94,7 @@ function carregarLocalStorage() {
     if (saved) {
       const data = JSON.parse(saved);
       Object.assign(DB, data);
+      if (typeof aplicarTema === 'function') aplicarTema(DB.usuario && DB.usuario.tema);
     }
   } catch(e) {}
 }

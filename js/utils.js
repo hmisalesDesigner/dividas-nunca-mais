@@ -205,7 +205,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.9';
+const SITE_VERSION = 'v1.10';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
@@ -242,4 +242,26 @@ async function atualizarSite() {
     btn.disabled = false;
     btn.textContent = '🔄 Atualizar';
   }
+}
+
+
+// ===== TEMA CLARO / ESCURO =====
+// Escuro é o padrão. O tema é aplicado como atributo data-tema no <html>;
+// as variáveis de cor em css/main.css fazem o resto.
+function aplicarTema(tema) {
+  const claro = tema === 'claro';
+  if (claro) document.documentElement.setAttribute('data-tema', 'claro');
+  else document.documentElement.removeAttribute('data-tema');
+  try { localStorage.setItem('dnm_tema', claro ? 'claro' : 'escuro'); } catch (e) {}
+}
+
+function temaAtual() {
+  return document.documentElement.getAttribute('data-tema') === 'claro' ? 'claro' : 'escuro';
+}
+
+// Cores para Chart.js (canvas não lê variáveis CSS).
+function coresGrafico() {
+  return temaAtual() === 'claro'
+    ? { texto: '#4b5563', textoFraco: '#6b7280', grade: 'rgba(0,0,0,0.08)', fundo: '#e5e7eb' }
+    : { texto: '#9a9a9a', textoFraco: '#666', grade: '#2e2f33', fundo: '#2e2f33' };
 }
