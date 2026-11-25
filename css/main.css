@@ -452,9 +452,15 @@ select.filter { width: auto; padding: 8px 12px; font-size: 12px; }
 .fol-scroll { overflow-x:auto; }
 .fol-scroll > .fol-grid { min-width:540px; }
 .fol-plain { margin-top:10px; }
-.fol-plain .hd { display:grid; font-size:10.5px; font-weight:700; color:var(--text-primary); padding:2px 0; }
-.fol-plain .row { display:grid; align-items:center; gap:6px; margin:1px 0; }
-.fol-plain input { border-bottom:1px dotted var(--fol-line); padding:2px; font-size:12.5px; }
+.fol-plain .hd { display:grid; font-size:8px; letter-spacing:.04em; text-transform:uppercase; font-weight:600; color:var(--fol-lbl); }
+.fol-plain .hd span { padding:3px 6px; border-bottom:1px solid var(--fol-line); border-top:1px solid var(--fol-line); border-left:1px solid var(--fol-line); border-right:1px solid var(--fol-line); }
+.fol-plain .hd.sub span { border-top:0; font-weight:400; }
+.fol-plain .hd:not(.sub) + .hd.sub span, .fol-plain .hd:has(+ .hd.sub) span { border-bottom:0; }
+.fol-plain .hd .r { text-align:right; } .fol-plain .hd .ctr { text-align:center; }
+.fol-plain .hd span.nb { border:0; padding:0; }
+.fol-plain .row { display:grid; align-items:stretch; gap:0; margin:0; }
+.fol-plain .row input { border:0; border-left:1px solid var(--fol-line); border-bottom:1px solid var(--fol-line); border-right:1px solid var(--fol-line); border-radius:0; padding:4px 6px; font-size:12.5px; min-width:0; }
+.fol-plain .row .fol-x { align-self:center; }
 .fol-serv .hd, .fol-serv .row { grid-template-columns:1fr 110px 22px; }
 .fol-fx .hd, .fol-fx .row { grid-template-columns:1.5fr .55fr .8fr .85fr .85fr 22px; }
 .fol-x { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:15px; padding:0; line-height:1; width:auto; }

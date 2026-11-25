@@ -938,7 +938,7 @@ function renderGrafPizza() {
     if (p.taxaConversao) return (p.saldo || 0) * p.taxaConversao;
     return 0;
   });
-  new Chart(el, {
+  novoGrafico(el, {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: ['#217346','#34a85a','#52c77e','#85e0a3','#b3edcb','#d4f5e0','#e8f8ee','#f0faf4'], borderWidth: 0 }] },
     options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
@@ -948,7 +948,7 @@ function renderGrafPizza() {
 function renderGrafBarras() {
   const el = document.getElementById('graf-barras');
   if (!el) return;
-  new Chart(el, {
+  novoGrafico(el, {
     type: 'bar',
     data: {
       labels: DB.programas.map(p => p.nome.substring(0, 10)),
@@ -967,7 +967,7 @@ function renderGrafLinha() {
   const p = DB.programas.find(p => p.id === id);
 
   if (window._chartLinha) window._chartLinha.destroy();
-  window._chartLinha = new Chart(el, {
+  window._chartLinha = novoGrafico(el, {
     type: 'line',
     data: {
       labels: historico.length > 0 ? historico.map(h => formatarData(h.data)) : ['Sem dados'],

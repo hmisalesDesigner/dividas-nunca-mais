@@ -205,7 +205,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.10';
+const SITE_VERSION = 'v1.11';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
@@ -264,4 +264,12 @@ function coresGrafico() {
   return temaAtual() === 'claro'
     ? { texto: '#4b5563', textoFraco: '#6b7280', grade: 'rgba(0,0,0,0.08)', fundo: '#e5e7eb' }
     : { texto: '#9a9a9a', textoFraco: '#666', grade: '#2e2f33', fundo: '#2e2f33' };
+}
+
+// Cria um gráfico Chart.js destruindo antes o que já estiver no mesmo canvas.
+// Evita "Canvas is already in use" quando a página é redesenhada (ex.: marcar fatura como paga).
+function novoGrafico(el, cfg) {
+  const existente = (typeof Chart.getChart === 'function') ? Chart.getChart(el) : null;
+  if (existente) existente.destroy();
+  return new Chart(el, cfg);
 }

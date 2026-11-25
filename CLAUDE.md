@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.10 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.11 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.11 | `HASH111` | Corrige erro de gráfico ao redesenhar Contas (helper `novoGrafico`); folha da Sanepar: serviços e faixas viram tabelas com linhas e cabeçalho alinhado |
 | Site v1.10 | `9b5473b` | Tema claro/escuro passa a funcionar (antes só gravava a preferência); folha da Sanepar e demais formulários de fatura sem valores/exemplos pré-preenchidos |
 | Site v1.9 | `4927f77` | Contas Recorrentes: modal da Sanepar no layout da fatura impressa (tema escuro), conferências automáticas e gráfico Gasto × Consumo |
 | Site v1.8 | `127eaa0` | Importação com prévia do que vai mudar, distinção backup completo x parcial e botão Desfazer |
@@ -574,3 +575,9 @@ Até a v1.9 o toggle "Tema Claro / Escuro" (Configurações) só gravava `DB.usu
 Os formulários de fatura (`abrirModalNovaFatura`, folha da Sanepar) **não trazem placeholders de exemplo nem valores padrão** (faixas, anos do histórico, desconto da Inova, bandeira da Copel). Motivo: exemplos como `0000.0000` ou `9494` pareciam dados preenchidos. Não reintroduzir.
 
 **Testes:** `/tmp/pw/tema_test.py` (alterna tema, confere persistência e que a folha abre sem nenhum campo preenchido).
+
+## Gráficos Chart.js no site pai (v1.11)
+
+Sempre criar com `novoGrafico(canvas, cfg)` (`js/utils.js`), não `new Chart(...)`: ele destrói o gráfico anterior do mesmo canvas. Sem isso, redesenhar a página (ex.: ✅ marcar fatura como paga) dava "Canvas is already in use".
+
+**Varredura de botões:** `/tmp/pw/varredura.py` (clica todo `[onclick]` de cada página com dados fictícios e lista erros de JS) e `/tmp/pw/ben2.py` (Cashback e Pontos, container `#beneficios-app`). Última rodada: 0 falhas.

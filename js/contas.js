@@ -136,7 +136,7 @@ function renderGastosConc() {
 
   if (Object.keys(totais).length === 0) return;
 
-  new Chart(el, {
+  novoGrafico(el, {
     type: 'bar',
     data: {
       labels: Object.keys(totais),
@@ -544,14 +544,14 @@ function formFolhaSanepar() {
       <div class="fol-scroll"><div class="fol-grid" style="grid-template-columns:44px repeat(12,1fr);">${hp}</div></div>
 
       <div class="fol-plain fol-serv">
-        <div class="hd"><span>DESCRIÇÃO DOS SERVIÇOS LANÇADOS</span><span style="text-align:right;">VALORES</span><span></span></div>
+        <div class="hd"><span>DESCRIÇÃO DOS SERVIÇOS LANÇADOS</span><span class="r">VALORES</span><span class="nb"></span></div>
         <div id="san-serv-lista"></div>
         <button type="button" class="fol-add" onclick="sanAddServico()">+ linha</button>
       </div>
 
       <div class="fol-plain fol-fx">
-        <div class="hd" style="grid-template-columns:1.5fr .55fr .8fr 1.7fr 22px;"><span>FAIXAS DE CONSUMO</span><span class="r">VOLUME</span><span class="r">VALOR M3/R$</span><span style="text-align:center;">TOTAIS</span><span></span></div>
-        <div class="hd" style="font-weight:400;color:var(--text-secondary);"><span></span><span></span><span class="r">ÁGUA</span><span class="r">ÁGUA</span><span class="r">ESGOTO</span><span></span></div>
+        <div class="hd"><span>FAIXAS DE CONSUMO</span><span class="r">VOLUME</span><span class="r">VALOR M³/R$</span><span class="ctr" style="grid-column:span 2;">TOTAIS</span><span class="nb"></span></div>
+        <div class="hd sub"><span></span><span></span><span class="r">ÁGUA</span><span class="r">ÁGUA</span><span class="r">ESGOTO</span><span class="nb"></span></div>
         <div id="san-faixas-lista"></div>
         <button type="button" class="fol-add" onclick="sanAddFaixa()">+ faixa</button>
       </div>
@@ -1121,14 +1121,14 @@ function renderChartsCopel(faturas) {
   const valores = faturas.map(f => f.valorPagar || f.valor || 0);
 
   const el1 = document.getElementById('chart-copel-kwh');
-  if (el1) new Chart(el1, {
+  if (el1) novoGrafico(el1, {
     type: 'bar',
     data: { labels, datasets: [{ label: 'KWh', data: kwh, backgroundColor: '#003399', borderRadius: 4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco } } } }
   });
 
   const el2 = document.getElementById('chart-copel-valor');
-  if (el2) new Chart(el2, {
+  if (el2) novoGrafico(el2, {
     type: 'line',
     data: { labels, datasets: [{ label: 'R$', data: valores, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v } } } }
@@ -1159,7 +1159,7 @@ function renderChartGastoConsumo(canvasId, faturas, unidade, corBarra) {
   const serie = serieGastoConsumo(faturas);
   if (serie.length === 0) { el.parentNode.insertAdjacentHTML('beforeend', '<p style="font-size:12px;color:var(--text-muted);">Cadastre uma fatura para ver o gráfico.</p>'); return; }
   const grade = coresGrafico().grade, texto = coresGrafico().texto;
-  new Chart(el, {
+  novoGrafico(el, {
     data: {
       labels: serie.map(p => p.rotulo),
       datasets: [
@@ -1196,14 +1196,14 @@ function renderChartsSanepar(faturas) {
   const valores = faturas.map(f => f.valorPagar || f.valor || 0);
 
   const el1 = document.getElementById('chart-san-m3');
-  if (el1) new Chart(el1, {
+  if (el1) novoGrafico(el1, {
     type: 'bar',
     data: { labels, datasets: [{ label: 'm³', data: m3, backgroundColor: '#0077b6', borderRadius: 4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco } } } }
   });
 
   const el2 = document.getElementById('chart-san-valor');
-  if (el2) new Chart(el2, {
+  if (el2) novoGrafico(el2, {
     type: 'line',
     data: { labels, datasets: [{ label: 'R$', data: valores, borderColor: '#0077b6', backgroundColor: 'rgba(0,119,182,0.1)', fill: true, tension: 0.4 }] },
     options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: coresGrafico().textoFraco, font: { size: 10 } } }, y: { ticks: { color: coresGrafico().textoFraco, callback: v => 'R$' + v } } } }
