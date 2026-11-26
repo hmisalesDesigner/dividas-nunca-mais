@@ -1297,11 +1297,11 @@ function abrirModalLotes(id) {
       <button class="btn-primary btn-sm" onclick="registrarCodigos(${id})" style="width:100%;">+ Registrar códigos</button>
     </div>
     <details style="margin-bottom:14px;">
-      <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);">📋 Colar histórico do portal (ganhos e expirados)</summary>
-      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">No portal, copie o histórico ("+100 Pontos · Adicionado…" e "-100 Pontos · Expirado…") e cole aqui. Ganhos viram lotes com o vencimento do portal; expirados entram em ⏳ Vencimentos. Repetir a colagem não duplica.</p>
+      <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);">📋 Colar histórico do portal</summary>
+      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">Copie o extrato inteiro no portal e cole aqui de uma vez. Cada linha vai para o seu lugar: ganhos ainda válidos viram lotes com o vencimento do portal, expirados entram em ⏳ Vencimentos, "Utilizado" vira resgate e as caixas já gastas ficam só como registro. Repetir a colagem não duplica.</p>
       <textarea id="hist-texto" rows="5" oninput="previaColarHistorico(${id})" style="width:100%;font-size:12px;"></textarea>
       <div id="hist-previa" style="font-size:12px;color:var(--text-secondary);min-height:16px;margin:6px 0;"></div>
-      <button id="hist-btn" class="btn-secondary btn-sm" disabled onclick="lancarHistoricoColado(${id})" style="width:100%;">Lançar vencimentos</button>
+      <button id="hist-btn" class="btn-secondary btn-sm" disabled onclick="lancarHistoricoColado(${id})" style="width:100%;">Lançar histórico</button>
     </details>` : ''}
     <div style="border-top:1px solid var(--border);padding-top:16px;">
       <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar lote manual</h4>
