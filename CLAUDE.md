@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.16 | `(este)` | Colar histórico aceita o extrato inteiro de uma vez: ganhos vivos, ganhos já gastos ("Points used"), expirados e resgates (`-N Pontos Utilizado:`); prévia em 4 linhas dizendo o que cada parte faz |
+| Site v1.16 | `3a357ca` | Colar histórico aceita o extrato inteiro de uma vez: ganhos vivos, ganhos já gastos ("Points used"), expirados e resgates (`-N Pontos Utilizado:`); prévia em 4 linhas dizendo o que cada parte faz |
 | Site v1.15 | `85a14d6` | `lerGanhosPortal` aceita **"Vence em:"** (rótulo real do portal brasileiro) além de "Expiration Date" — antes lia 0 ganhos do histórico colado |
 | Site v1.14 | `2cf99a6` | Modal rápido do código sem o campo "Nº de códigos" (1 caixa por vez); `?v=` nas tags de `index.html` para o GitHub Pages não servir JS antigo do cache |
 | Site v1.13 | `8b13f1d` | Dolce Gusto CLUB: botão ☕ + Registrar código no card (100 pts, vence em 12 meses), lotes com vencimento, importação do histórico do portal (ganhos e expirados) |
