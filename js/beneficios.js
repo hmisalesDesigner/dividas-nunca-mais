@@ -1030,7 +1030,8 @@ function adicionarPontosLote(p, qtd, dataGanhoISO, estimado) {
 
 function previaCodigos(id) {
   const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
-  const n = parseInt(document.getElementById('cod-qtd').value) || 0;
+  const elQtd = document.getElementById('cod-qtd');
+  const n = elQtd ? (parseInt(elQtd.value) || 0) : 1;
   const data = document.getElementById('cod-data').value;
   const el = document.getElementById('cod-previa'); if (!el) return;
   if (n <= 0 || !data) { el.textContent = ''; return; }
@@ -1045,11 +1046,8 @@ function abrirModalCodigo(id) {
   const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
   abrirModal('☕ Registrar código — ' + p.nome, `
     <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">${p.regraCodigo.pontosPorCodigo} pontos por código · vencem em ${p.regraCodigo.validadeMeses} meses. Registre aqui o que você já inseriu no site da Nescafé.</p>
-    <div class="form-row">
-      <div class="form-group"><label>Nº de códigos</label><input id="cod-qtd" type="number" min="1" max="500" value="1" oninput="previaCodigos(${id})" /></div>
-      <div class="form-group"><label>Data do escaneamento</label><input id="cod-data" type="date" max="${hojeISO()}" value="${hojeISO()}" oninput="previaCodigos(${id})" /></div>
-    </div>
     <div class="form-group"><label>Código da caixa (opcional — evita registrar o mesmo duas vezes)</label><input id="cod-caixa" type="text" maxlength="20" autocomplete="off" /></div>
+    <div class="form-group"><label>Data do escaneamento</label><input id="cod-data" type="date" max="${hojeISO()}" value="${hojeISO()}" oninput="previaCodigos(${id})" /></div>
     <div id="cod-previa" style="font-size:13px;color:var(--green);min-height:18px;margin-bottom:12px;"></div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
@@ -1061,7 +1059,8 @@ function abrirModalCodigo(id) {
 
 function registrarCodigos(id, rapido) {
   const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
-  const n = parseInt(document.getElementById('cod-qtd').value);
+  const elQtd = document.getElementById('cod-qtd');
+  const n = elQtd ? parseInt(elQtd.value) : 1;
   const caixa = normCodigo(document.getElementById('cod-caixa') && document.getElementById('cod-caixa').value);
   if (caixa) {
     if (caixa.length < 6) { showAlert('⚠️', 'Código muito curto. Confira ou deixe em branco.'); return; }
@@ -1082,7 +1081,7 @@ function registrarCodigos(id, rapido) {
   DB.historicoSaldo[id].push({ data: hojeISO(), saldo: p.saldo });
   agendarSync();
   fecharModal(); if (!rapido) abrirModalLotes(id); renderBeneficios();
-  showAlert('☕', n + ' código(s) registrado(s): +' + pts.toLocaleString('pt-BR') + ' pts, vencem em ' + formatarData(exp));
+  showAlert('☕', (n === 1 ? 'Código registrado' : n + ' códigos registrados') + ': +' + pts.toLocaleString('pt-BR') + ' pts, vencem em ' + formatarData(exp));
 }
 
 // Lê o histórico copiado do portal: "-100Pontos  Expirado:5/7/2026 ..." → [{qtd, data}]

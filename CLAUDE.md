@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.13 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.14 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.14 | `(este)` | Modal rápido do código sem o campo "Nº de códigos" (1 caixa por vez); `?v=` nas tags de `index.html` para o GitHub Pages não servir JS antigo do cache |
 | Site v1.13 | `8b13f1d` | Dolce Gusto CLUB: botão ☕ + Registrar código no card (100 pts, vence em 12 meses), lotes com vencimento, importação do histórico do portal (ganhos e expirados) |
 | Site v1.12 | `2e41325` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
 | Site v1.11 | `f4f3fcb` | Corrige erro de gráfico ao redesenhar Contas (helper `novoGrafico`); folha da Sanepar: serviços e faixas viram tabelas com linhas e cabeçalho alinhado |
@@ -601,7 +602,7 @@ Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser d
 
 | Função (`js/beneficios.js`) | O que faz |
 |---|---|
-| `abrirModalCodigo(id)` | Modal rápido aberto pelo botão **☕ + Registrar código** do card: nº de códigos (1), data do escaneamento (hoje) e **código da caixa** opcional |
+| `abrirModalCodigo(id)` | Modal rápido aberto pelo botão **☕ + Registrar código** do card: **código da caixa** (opcional) e data do escaneamento (hoje). Registra **1 código por vez** — não tem campo de quantidade (v1.14); `registrarCodigos` assume `n = 1` quando `#cod-qtd` não existe. O campo de quantidade segue existindo só no modal de 📦 Lotes, para lançar vários antigos de uma vez |
 | `registrarCodigos(id, rapido)` | Soma `n × 100` pts ao saldo, cria/mescla lote (`adicionarPontosLote`) com vencimento +12 meses, grava histórico. Recusa data futura, data cujo vencimento já passou e **código repetido** (`p.codigos[]`, normalizado por `normCodigo`; com código, 1 por vez) |
 | `adicionarPontosLote(p, qtd, dataISO, estimado)` | Mescla lote de mesma data de vencimento; não mexe no saldo |
 | `salvarPopupSaldo` | Se o saldo sobe em programa com `regraCodigo`, o aumento vira lote `estimado:true` (vence hoje+12m; editável no modal de lotes) |
