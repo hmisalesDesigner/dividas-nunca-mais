@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.14 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.15 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.15 | `(este)` | `lerGanhosPortal` aceita **"Vence em:"** (rótulo real do portal brasileiro) além de "Expiration Date" — antes lia 0 ganhos do histórico colado |
 | Site v1.14 | `2cf99a6` | Modal rápido do código sem o campo "Nº de códigos" (1 caixa por vez); `?v=` nas tags de `index.html` para o GitHub Pages não servir JS antigo do cache |
 | Site v1.13 | `8b13f1d` | Dolce Gusto CLUB: botão ☕ + Registrar código no card (100 pts, vence em 12 meses), lotes com vencimento, importação do histórico do portal (ganhos e expirados) |
 | Site v1.12 | `2e41325` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
@@ -607,7 +608,9 @@ Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser d
 | `adicionarPontosLote(p, qtd, dataISO, estimado)` | Mescla lote de mesma data de vencimento; não mexe no saldo |
 | `salvarPopupSaldo` | Se o saldo sobe em programa com `regraCodigo`, o aumento vira lote `estimado:true` (vence hoje+12m; editável no modal de lotes) |
 | `abrirModalLotes(id)` | Resumo (saldo, vencem em 30/90 dias, já expirados), lotes com data editável (`editarVencLote`), aviso se lotes ≠ saldo, registro de códigos e **📋 Colar histórico do portal** |
-| `lerGanhosPortal` / `lerExpiradosPortal` | Leem do texto copiado do portal: `+100 Pontos · Adicionado: D/M/AAAA · Expiration Date: D/M/AAAA … - CODIGO12` e `-100 Pontos · Expirado: D/M/AAAA`. Ganhos viram lotes com o vencimento real; expirados entram em ⏳ Vencimentos (`origem:'portal'`) |
+| `lerGanhosPortal` / `lerExpiradosPortal` | Leem do texto copiado do portal: `+100 Pontos · Adicionado: D/M/AAAA · Vence em: D/M/AAAA … - CODIGO12` (o rótulo do vencimento pode vir como `Vence em`, `Expira em`, `Validade` ou `Expiration Date` — v1.15) e `-100 Pontos · Expirado: D/M/AAAA`. Ganhos viram lotes com o vencimento real; expirados entram em ⏳ Vencimentos (`origem:'portal'`) |
+
+Ganhos com **"Points used"** no lugar da data de vencimento (pontos já gastos num resgate) são ignorados de propósito, assim como as linhas `-N Pontos Utilizado:` (resgates ainda não são lidos do histórico). Conferido contra o histórico real: 17 ganhos e 17 expirados (1.700 pts) lidos corretamente — `/tmp/tdolce/t.js`.
 
 Colar duas vezes não duplica: ganhos por código (ou por `ganhosPortal` data|qtd quando sem código), expirados por data+quantidade. Ganho já vencido é ignorado (vem pela lista de expirados). Dados reais do usuário (códigos, saldos) ficam só no Drive/localStorage — **nunca no repositório**.
 

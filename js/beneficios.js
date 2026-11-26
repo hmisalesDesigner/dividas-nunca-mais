@@ -1118,7 +1118,7 @@ function lerGanhosPortal(texto) {
   blocos.forEach(b => {
     const q = b.match(/^\+\s*([\d.]+)\s*Pontos/i);
     const a = b.match(/Adicionad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
-    const e = b.match(/Expiration\s*Date\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    const e = b.match(/(?:Expiration\s*Date|Vence\s*em|Expira\s*em|Validade)\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     const c = b.match(/-\s*([A-Z0-9]{12})\b/);
     if (!q || !a || !e) return;
     out.push({ qtd: parseInt(q[1].replace(/\./g, ''), 10), adicionado: iso(a[1], a[2], a[3]), expira: iso(e[1], e[2], e[3]), codigo: c ? c[1] : '' });
