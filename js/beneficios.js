@@ -1120,18 +1120,55 @@ function lerGanhosPortal(texto) {
     const a = b.match(/Adicionad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     const e = b.match(/(?:Expiration\s*Date|Vence\s*em|Expira\s*em|Validade)\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     const c = b.match(/-\s*([A-Z0-9]{12})\b/);
-    if (!q || !a || !e) return;
-    out.push({ qtd: parseInt(q[1].replace(/\./g, ''), 10), adicionado: iso(a[1], a[2], a[3]), expira: iso(e[1], e[2], e[3]), codigo: c ? c[1] : '' });
+    if (!q || !a) return;
+    out.push({ qtd: parseInt(q[1].replace(/\./g, ''), 10), adicionado: iso(a[1], a[2], a[3]),
+      expira: e ? iso(e[1], e[2], e[3]) : '', codigo: c ? c[1] : '', gasto: !e });
   });
   return out;
 }
 
 // Ganhos ainda não lançados e ainda válidos (os já vencidos entram pela lista de expirados)
+// Lê os resgates do portal: "-1500 Pontos Utilizado: 23/7/2024 ..." → [{qtd, data, descricao}]
+function lerResgatesPortal(texto) {
+  const re = /([\d.]+)\s*Pontos\s*Utilizad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})([^]{0,200}?)(?=[+-]\s*[\d.]+\s*Pontos|$)/gi;
+  const out = []; let m;
+  while ((m = re.exec(texto || '')) !== null) {
+    const qtd = parseInt(m[1].replace(/\./g, ''), 10);
+    const data = m[4] + '-' + String(m[3]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+    const ped = (m[5] || '').match(/([A-Z0-9]+-\d{6,})/);
+    if (qtd > 0) out.push({ qtd, data, descricao: 'Resgate no portal' + (ped ? ' (pedido ' + ped[1] + ')' : '') });
+  }
+  return out;
+}
+
+function planoResgatesPortal(p, lidos) {
+  const ja = {};
+  (DB.resgates || []).filter(r => r.programaId === p.id && r.origem === 'portal').forEach(r => {
+    const k = r.data + '|' + r.quantidade; ja[k] = (ja[k] || 0) + 1;
+  });
+  const novos = [];
+  lidos.forEach(l => { const k = l.data + '|' + l.qtd; if (ja[k] > 0) ja[k]--; else novos.push(l); });
+  return novos;
+}
+
+// Códigos de caixas que já venceram ou já foram gastos: guardamos só o registro da caixa
+// (não entram no saldo nem viram lote), para o histórico ficar completo e não registrar de novo.
+function planoCodigosPortal(p, ganhos) {
+  const vivos = {};
+  planoGanhosPortal(p, ganhos).forEach(g => { if (g.codigo) vivos[g.codigo] = 1; });
+  const vistos = {};
+  return ganhos.filter(g => {
+    if (!g.codigo || vivos[g.codigo] || vistos[g.codigo]) return false;
+    if ((p.codigos || []).some(c => c.codigo === g.codigo)) return false;
+    vistos[g.codigo] = 1; return true;
+  });
+}
+
 function planoGanhosPortal(p, ganhos) {
   const usados = {};
   (p.ganhosPortal || []).forEach(k => { usados[k] = (usados[k] || 0) + 1; });
   return ganhos.filter(g => {
-    if (g.expira < hojeISO()) return false;
+    if (!g.expira || g.expira < hojeISO()) return false;
     if (g.codigo) return !(p.codigos || []).some(c => c.codigo === g.codigo);
     const k = g.adicionado + '|' + g.qtd;
     if (usados[k] > 0) { usados[k]--; return false; }
@@ -1144,35 +1181,53 @@ function previaColarHistorico(id) {
   const txt = document.getElementById('hist-texto').value;
   const lidos = lerExpiradosPortal(txt), novos = planoExpiradosPortal(p, lidos);
   const ganhos = lerGanhosPortal(txt), novosG = planoGanhosPortal(p, ganhos);
+  const novosC = planoCodigosPortal(p, ganhos);
+  const resg = lerResgatesPortal(txt), novosR = planoResgatesPortal(p, resg);
   const el = document.getElementById('hist-previa'), btn = document.getElementById('hist-btn');
-  if (!lidos.length && !ganhos.length) { el.textContent = txt.trim() ? 'Não encontrei lançamentos de ganho nem "Expirado" nesse texto.' : ''; btn.disabled = true; return; }
-  const partes = [];
-  if (ganhos.length) partes.push(ganhos.length + ' ganho(s) lido(s) · ' + novosG.length + ' novo(s) (+' + novosG.reduce((s, g) => s + g.qtd, 0).toLocaleString('pt-BR') + ' pts)');
-  if (lidos.length) partes.push(lidos.length + ' expirado(s) lido(s) · ' + novos.length + ' novo(s) (' + novos.reduce((s, l) => s + l.qtd, 0).toLocaleString('pt-BR') + ' pts)');
-  el.textContent = partes.join(' | ');
-  btn.disabled = novos.length + novosG.length === 0;
+  if (!lidos.length && !ganhos.length && !resg.length) {
+    el.innerHTML = txt.trim() ? 'Não encontrei lançamentos nesse texto.' : ''; btn.disabled = true; return;
+  }
+  const linhas = [];
+  if (novosG.length) linhas.push('☕ <b>' + novosG.length + '</b> ganho(s) ainda válido(s): <b>+' + novosG.reduce((s, g) => s + g.qtd, 0).toLocaleString('pt-BR') + ' pts</b> no saldo, com o vencimento real');
+  if (novos.length) linhas.push('⏳ <b>' + novos.length + '</b> vencimento(s): ' + novos.reduce((s, l) => s + l.qtd, 0).toLocaleString('pt-BR') + ' pts que você já perdeu');
+  if (novosR.length) linhas.push('🎁 <b>' + novosR.length + '</b> resgate(s): ' + novosR.reduce((s, r) => s + r.qtd, 0).toLocaleString('pt-BR') + ' pts já trocados');
+  if (novosC.length) linhas.push('📦 <b>' + novosC.length + '</b> caixa(s) antiga(s) só para registro (não mexem no saldo)');
+  const total = novos.length + novosG.length + novosR.length + novosC.length;
+  if (!total) linhas.push('Tudo isso já está registrado — nada novo para lançar.');
+  el.innerHTML = linhas.join('<br>') + '<div style="color:var(--text-secondary);margin-top:6px;font-size:11px;">Lidos no texto: ' +
+    ganhos.length + ' ganho(s), ' + lidos.length + ' expirado(s), ' + resg.length + ' resgate(s).</div>';
+  btn.disabled = total === 0;
 }
 
 function lancarHistoricoColado(id) {
   const p = DB.programas.find(p => p.id === id); if (!p) return;
   const txt = document.getElementById('hist-texto').value;
+  const ganhos = lerGanhosPortal(txt);
   const novos = planoExpiradosPortal(p, lerExpiradosPortal(txt));
-  const novosG = planoGanhosPortal(p, lerGanhosPortal(txt));
-  if (!novos.length && !novosG.length) return;
+  const novosG = planoGanhosPortal(p, ganhos);
+  const novosC = planoCodigosPortal(p, ganhos);
+  const novosR = planoResgatesPortal(p, lerResgatesPortal(txt));
+  if (!novos.length && !novosG.length && !novosC.length && !novosR.length) return;
   if (!DB.vencimentos) DB.vencimentos = [];
+  if (!DB.resgates) DB.resgates = [];
   if (!p.lotes) p.lotes = [];
+  if (!p.codigos) p.codigos = [];
   novosG.forEach(g => {
     const ja = p.lotes.find(l => l.expiracao === g.expira && !l.estimado);
     if (ja) ja.quantidade += g.qtd; else p.lotes.push({ quantidade: g.qtd, expiracao: g.expira });
     p.saldo = (p.saldo || 0) + g.qtd;
-    if (g.codigo) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: g.codigo, data: g.adicionado }); }
+    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado });
     else { if (!p.ganhosPortal) p.ganhosPortal = []; p.ganhosPortal.push(g.adicionado + '|' + g.qtd); }
   });
+  // caixas antigas (ja vencidas ou ja gastas): so o registro do codigo
+  novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true }));
   if (novosG.length) {
     if (!DB.historicoSaldo) DB.historicoSaldo = {};
     if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
     DB.historicoSaldo[id].push({ data: hojeISO(), saldo: p.saldo });
   }
+  novosR.forEach(r => DB.resgates.push({ id: gerarId(), programaId: p.id, quantidade: r.qtd,
+    tipoSaldo: 'pontos', descricao: r.descricao, data: r.data, origem: 'portal' }));
   novos.forEach(l => {
     DB.vencimentos.push({ id: gerarId(), programaId: p.id, quantidade: l.qtd, tipoSaldo: 'pontos',
       descricao: 'Expirado no portal (validade de 12 meses)', data: l.data, origem: 'portal' });
@@ -1181,8 +1236,13 @@ function lancarHistoricoColado(id) {
   });
   p.lotes = p.lotes.filter(x => x.quantidade > 0).sort((a, b) => String(a.expiracao).localeCompare(String(b.expiracao)));
   agendarSync();
+  const r = [];
+  if (novosG.length) r.push(novosG.length + ' ganho(s)');
+  if (novos.length) r.push(novos.length + ' vencimento(s)');
+  if (novosR.length) r.push(novosR.length + ' resgate(s)');
+  if (novosC.length) r.push(novosC.length + ' caixa(s) antiga(s)');
   fecharModal(); abrirModalLotes(id); renderBeneficios();
-  showAlert('✅', (novosG.length ? novosG.length + ' ganho(s) e ' : '') + novos.length + ' vencimento(s) lançado(s).');
+  showAlert('✅', r.join(', ') + ' lançado(s).');
 }
 
 function editarVencLote(id, idx, valor) {
