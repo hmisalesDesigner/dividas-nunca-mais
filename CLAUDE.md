@@ -372,7 +372,7 @@ git push origin main
 
 ## 19. Site pai — Cashback e Pontos (`js/beneficios.js`, v1.4)
 
-App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js`; `css/main.css`). `DB` inteiro vai para o Drive (`dividas-nunca-mais-data.json`) e localStorage (`dnm_db`); `agendarSync()` com debounce de 1,5 s. Versão do site: const `SITE_VERSION` em `js/utils.js` (bumpar a cada publicação; aparece no logo e no cabeçalho do Cashback).
+App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js`; `css/main.css`). `DB` inteiro vai para o Drive (`dividas-nunca-mais-data.json`) e localStorage (`dnm_db`); `agendarSync()` com debounce de 1,5 s. Versão do site: const `SITE_VERSION` em `js/utils.js` (bumpar a cada publicação; aparece no logo e no cabeçalho do Cashback). **Ao publicar, bumpar também o `?v=` das tags `<link>`/`<script>` do `index.html`** (`css/main.css?v=X.Y`, `js/*.js?v=X.Y`) — sem isso o GitHub Pages serve o JS antigo do cache e o usuário não vê a atualização (aconteceu na v1.13).
 
 **Programas** (`DB.programas`): `tipo` `'pontos'` (`saldo` em pts, opcional `saldoCashback` em R$, `lotes[{quantidade,expiracao}]`) ou `'cashback'` (`saldo` em R$). Históricos: `DB.historicoSaldo[id]`, `DB.historicoCashback[id]`. `DB.resgates` (campo `tipoSaldo`), `DB.vencimentos` ({id, programaId, quantidade, tipoSaldo, descricao, data}).
 
