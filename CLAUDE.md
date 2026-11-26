@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.12 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.13 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.13 | `HASH113` | Dolce Gusto CLUB: botão ☕ + Registrar código no card (100 pts, vence em 12 meses), lotes com vencimento, importação do histórico do portal (ganhos e expirados) |
 | Site v1.12 | `2e41325` | Rascunho automático das faturas (a cada digitação); modais com campos não fecham por Esc/clique fora; atalhos Ctrl+… não disparam com modal aberto ou digitando; aviso ao fechar a aba com formulário preenchido |
 | Site v1.11 | `f4f3fcb` | Corrige erro de gráfico ao redesenhar Contas (helper `novoGrafico`); folha da Sanepar: serviços e faixas viram tabelas com linhas e cabeçalho alinhado |
 | Site v1.10 | `9b5473b` | Tema claro/escuro passa a funcionar (antes só gravava a preferência); folha da Sanepar e demais formulários de fatura sem valores/exemplos pré-preenchidos |
@@ -593,3 +594,20 @@ Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser d
 - **Rascunho automático** (`js/contas.js`, fim do arquivo): cada `input`/`change` no modal de fatura grava (300 ms) `localStorage.dnm_rascunho_fatura` = `{tipo, quando, serv, fx, v[]}` (valores na ordem dos campos; `serv`/`fx` = nº de linhas dinâmicas da Sanepar). `abrirModalNovaFatura(tipo)` chama `rascunhoFaturaRestaurar(tipo)` e mostra faixa amarela "Rascunho recuperado" com botão "Descartar". `fecharModal()` explícito, Cancelar e Salvar apagam o rascunho. Se o nº de campos do formulário mudar entre versões, o rascunho é ignorado (não arrisca preencher campo errado).
 - **Se mexer no formulário de fatura**, rode `/tmp/pw/rascunho_test.py` (13 verificações).
 - Limite conhecido: o site não guarda sessão — recarregar a aba exige novo login, mas o rascunho volta ao reabrir a fatura.
+
+## Programas com validade por código — Dolce Gusto CLUB (v1.13)
+
+`p.regraCodigo = { pontosPorCodigo: 100, validadeMeses: 12 }` (definido em `js/data.js` e aplicado por `migrarProgramas()` a qualquer programa de pontos cujo nome contenha "dolce gusto"). Confirmado no portal: ganho em 26/11/2026 vence em 26/11/2027 (mesmo dia, +12 meses; `somaMeses` limita ao último dia do mês, ex.: 29/02 → 28/02).
+
+| Função (`js/beneficios.js`) | O que faz |
+|---|---|
+| `abrirModalCodigo(id)` | Modal rápido aberto pelo botão **☕ + Registrar código** do card: nº de códigos (1), data do escaneamento (hoje) e **código da caixa** opcional |
+| `registrarCodigos(id, rapido)` | Soma `n × 100` pts ao saldo, cria/mescla lote (`adicionarPontosLote`) com vencimento +12 meses, grava histórico. Recusa data futura, data cujo vencimento já passou e **código repetido** (`p.codigos[]`, normalizado por `normCodigo`; com código, 1 por vez) |
+| `adicionarPontosLote(p, qtd, dataISO, estimado)` | Mescla lote de mesma data de vencimento; não mexe no saldo |
+| `salvarPopupSaldo` | Se o saldo sobe em programa com `regraCodigo`, o aumento vira lote `estimado:true` (vence hoje+12m; editável no modal de lotes) |
+| `abrirModalLotes(id)` | Resumo (saldo, vencem em 30/90 dias, já expirados), lotes com data editável (`editarVencLote`), aviso se lotes ≠ saldo, registro de códigos e **📋 Colar histórico do portal** |
+| `lerGanhosPortal` / `lerExpiradosPortal` | Leem do texto copiado do portal: `+100 Pontos · Adicionado: D/M/AAAA · Expiration Date: D/M/AAAA … - CODIGO12` e `-100 Pontos · Expirado: D/M/AAAA`. Ganhos viram lotes com o vencimento real; expirados entram em ⏳ Vencimentos (`origem:'portal'`) |
+
+Colar duas vezes não duplica: ganhos por código (ou por `ganhosPortal` data|qtd quando sem código), expirados por data+quantidade. Ganho já vencido é ignorado (vem pela lista de expirados). Dados reais do usuário (códigos, saldos) ficam só no Drive/localStorage — **nunca no repositório**.
+
+**Teste:** `/tmp/pw/dolce_test.py` (20 verificações; usa programa id 7, dados fictícios).

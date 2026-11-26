@@ -27,6 +27,11 @@ function migrarProgramas() {
       if (h && p.saldo > 0) while (h.length > 1 && h[h.length - 1].saldo === 0) h.pop();
       mudou = true;
     }
+    // Dolce Gusto CLUB: 100 pontos por código, validade de 12 meses
+    if (p.tipo === 'pontos' && nome.includes('dolce gusto') && !p.regraCodigo) {
+      p.regraCodigo = { pontosPorCodigo: 100, validadeMeses: 12 };
+      mudou = true;
+    }
   });
   if (mudou && typeof agendarSync === 'function') agendarSync();
   return mudou;
@@ -277,6 +282,9 @@ function salvarPopupSaldo(id, saldoAnterior) {
     if (lotes.length) { registrarVencimentosLotes(p, lotes); p.lotes = p.lotes.filter(l => !lotes.includes(l)); }
     // O que sobrar da queda (além dos lotes vencidos) segue o motivo escolhido
     registrarQueda(p, (saldoAnterior - novoSaldo) - vencido, motivo, tipoSaldo, hoje);
+    // Programa com validade por código: o que subiu vira lote (vencimento estimado a partir de hoje)
+    const ganho = novoSaldo - (saldoAnterior - vencido);
+    if (p.regraCodigo && ganho > 0) adicionarPontosLote(p, ganho, hoje, true);
     p.saldo = novoSaldo;
   }
 
@@ -468,6 +476,7 @@ function cardBeneficio(p) {
       <div style="font-size:11px;color:${expCor};margin-bottom:12px;">
         ${p.expiracao ? `⏰ Expira: ${formatarData(p.expiracao)} (${expDias}d)` : 'Não expira'}
       </div>
+      ${p.regraCodigo ? `<button onclick="abrirModalCodigo(${p.id})" style="width:100%;margin-bottom:8px;background:#fff7ed;border:1px solid #f59e0b;color:#b45309;padding:8px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">☕ + Registrar código (${p.regraCodigo.pontosPorCodigo} pts)</button>` : ''}
       <div style="display:flex;gap:8px;">
         <button onclick="abrirModalAtualizar(${p.id})" style="flex:1;background:#fff;border:1px solid #217346;color:#217346;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Atualizar</button>
         <button onclick="abrirModalResgatar(${p.id})" style="flex:1;background:#217346;border:none;color:#fff;padding:7px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 4px rgba(33,115,70,0.3);">Resgatar</button>
@@ -980,7 +989,8 @@ function renderGrafLinha() {
 // ===== LOTES DE PONTOS =====
 function renderLotesCard(p) {
   if (!p.lotes || p.lotes.length === 0) return '';
-  const items = p.lotes.map(l => {
+  const maisLotes = p.lotes.length > 4 ? p.lotes.length - 4 : 0;
+  const items = p.lotes.slice(0, 4).map(l => {
     const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
     if (l.expiracao < hojeISO()) {
       return '<div style="font-size:11px;color:#999;margin-bottom:2px;" title="Vencido. Ao atualizar o saldo, o app confere a conta e remove este lote.">⛔ ' + l.quantidade.toLocaleString('pt-BR') + ' pts venceram em ' + formatarData(l.expiracao) + ' (há ' + Math.abs(dias) + 'd)</div>';
@@ -988,37 +998,258 @@ function renderLotesCard(p) {
     const cor = dias <= 7 ? '#ef4444' : dias <= 30 ? '#f59e0b' : '#217346';
     return '<div style="font-size:11px;color:' + cor + ';margin-bottom:2px;">⏰ ' + l.quantidade.toLocaleString('pt-BR') + ' pts vencem em ' + formatarData(l.expiracao) + ' (' + dias + 'd)</div>';
   }).join('');
-  return '<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">' + items + '</div>';
+  return '<div style="margin-top:6px;border-top:1px solid #f0f0f0;padding-top:6px;">' + items
+    + (maisLotes ? '<div style="font-size:11px;color:#999;">+ ' + maisLotes + ' lote(s) — veja em 📦 Lotes</div>' : '') + '</div>';
+}
+
+// ===== LOTES COM VALIDADE POR CÓDIGO (ex.: Dolce Gusto CLUB) =====
+// p.regraCodigo = { pontosPorCodigo, validadeMeses }. Cada lote = { quantidade, expiracao, estimado? }.
+function somaMeses(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const alvo = new Date(y, m - 1 + n, 1);
+  const ultimo = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  return alvo.getFullYear() + '-' + String(alvo.getMonth() + 1).padStart(2, '0') + '-' + String(Math.min(d, ultimo)).padStart(2, '0');
+}
+
+function diasAte(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const h = new Date(); h.setHours(0, 0, 0, 0);
+  return Math.round((new Date(y, m - 1, d) - h) / 86400000);
+}
+
+// Soma pontos a um lote com a mesma data de vencimento (ou cria um). Não mexe no saldo.
+function adicionarPontosLote(p, qtd, dataGanhoISO, estimado) {
+  if (!p.lotes) p.lotes = [];
+  const exp = somaMeses(dataGanhoISO, (p.regraCodigo && p.regraCodigo.validadeMeses) || 12);
+  const ja = p.lotes.find(l => l.expiracao === exp && !!l.estimado === !!estimado);
+  if (ja) ja.quantidade += qtd;
+  else p.lotes.push(estimado ? { quantidade: qtd, expiracao: exp, estimado: true } : { quantidade: qtd, expiracao: exp });
+  p.lotes.sort((a, b) => String(a.expiracao).localeCompare(String(b.expiracao)));
+  return exp;
+}
+
+function previaCodigos(id) {
+  const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
+  const n = parseInt(document.getElementById('cod-qtd').value) || 0;
+  const data = document.getElementById('cod-data').value;
+  const el = document.getElementById('cod-previa'); if (!el) return;
+  if (n <= 0 || !data) { el.textContent = ''; return; }
+  const exp = somaMeses(data, p.regraCodigo.validadeMeses);
+  el.textContent = '= ' + (n * p.regraCodigo.pontosPorCodigo).toLocaleString('pt-BR') + ' pts · vencem em ' + formatarData(exp);
+}
+
+function normCodigo(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+
+// Registro rápido pelo card: abre um modal pequeno (1 código por padrão)
+function abrirModalCodigo(id) {
+  const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
+  abrirModal('☕ Registrar código — ' + p.nome, `
+    <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">${p.regraCodigo.pontosPorCodigo} pontos por código · vencem em ${p.regraCodigo.validadeMeses} meses. Registre aqui o que você já inseriu no site da Nescafé.</p>
+    <div class="form-row">
+      <div class="form-group"><label>Nº de códigos</label><input id="cod-qtd" type="number" min="1" max="500" value="1" oninput="previaCodigos(${id})" /></div>
+      <div class="form-group"><label>Data do escaneamento</label><input id="cod-data" type="date" max="${hojeISO()}" value="${hojeISO()}" oninput="previaCodigos(${id})" /></div>
+    </div>
+    <div class="form-group"><label>Código da caixa (opcional — evita registrar o mesmo duas vezes)</label><input id="cod-caixa" type="text" maxlength="20" autocomplete="off" /></div>
+    <div id="cod-previa" style="font-size:13px;color:var(--green);min-height:18px;margin-bottom:12px;"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button class="btn-primary" onclick="registrarCodigos(${id}, true)">☕ Registrar</button>
+    </div>
+  `, '440px');
+  previaCodigos(id);
+}
+
+function registrarCodigos(id, rapido) {
+  const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
+  const n = parseInt(document.getElementById('cod-qtd').value);
+  const caixa = normCodigo(document.getElementById('cod-caixa') && document.getElementById('cod-caixa').value);
+  if (caixa) {
+    if (caixa.length < 6) { showAlert('⚠️', 'Código muito curto. Confira ou deixe em branco.'); return; }
+    if (n !== 1) { showAlert('⚠️', 'Com código da caixa, registre 1 por vez.'); return; }
+    if ((p.codigos || []).some(c => c.codigo === caixa)) { showAlert('⚠️', 'Esse código já foi registrado antes.'); return; }
+  }
+  const data = document.getElementById('cod-data').value;
+  if (!n || n < 1 || n > 500) { showAlert('⚠️', 'Informe quantos códigos (1 a 500).'); return; }
+  if (!data || data > hojeISO()) { showAlert('⚠️', 'Informe a data em que escaneou (não pode ser futura).'); return; }
+  const exp = somaMeses(data, p.regraCodigo.validadeMeses);
+  if (exp < hojeISO()) { showAlert('⚠️', 'Esses pontos já teriam vencido em ' + formatarData(exp) + '. Use "Colar histórico" para lançar vencidos.'); return; }
+  const pts = n * p.regraCodigo.pontosPorCodigo;
+  adicionarPontosLote(p, pts, data, false);
+  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data }); }
+  p.saldo = (p.saldo || 0) + pts;
+  if (!DB.historicoSaldo) DB.historicoSaldo = {};
+  if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
+  DB.historicoSaldo[id].push({ data: hojeISO(), saldo: p.saldo });
+  agendarSync();
+  fecharModal(); if (!rapido) abrirModalLotes(id); renderBeneficios();
+  showAlert('☕', n + ' código(s) registrado(s): +' + pts.toLocaleString('pt-BR') + ' pts, vencem em ' + formatarData(exp));
+}
+
+// Lê o histórico copiado do portal: "-100Pontos  Expirado:5/7/2026 ..." → [{qtd, data}]
+function lerExpiradosPortal(texto) {
+  const re = /([\d.]+)\s*Pontos\s*Expirad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/gi;
+  const out = []; let m;
+  while ((m = re.exec(texto || '')) !== null) {
+    const qtd = parseInt(m[1].replace(/\./g, ''), 10);
+    const iso = m[4] + '-' + String(m[3]).padStart(2, '0') + '-' + String(m[2]).padStart(2, '0');
+    if (qtd > 0) out.push({ qtd, data: iso });
+  }
+  return out;
+}
+
+// Quantos lançamentos ainda não estão registrados (compara por data, entre os já importados do portal)
+function planoExpiradosPortal(p, lidos) {
+  const ja = {};
+  (DB.vencimentos || []).filter(v => v.programaId === p.id && v.origem === 'portal').forEach(v => {
+    const k = v.data + '|' + v.quantidade; ja[k] = (ja[k] || 0) + 1;
+  });
+  const novos = [];
+  lidos.forEach(l => {
+    const k = l.data + '|' + l.qtd;
+    if (ja[k] > 0) ja[k]--; else novos.push(l);
+  });
+  return novos;
+}
+
+// Lê lançamentos de GANHO do portal: "+100 Pontos  Adicionado: 26/11/2026  Expiration Date: 26/11/2027 ... - CODIGO"
+function lerGanhosPortal(texto) {
+  const iso = (d, m, y) => y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  const blocos = String(texto || '').split(/(?=\+\s*[\d.]+\s*Pontos)/i).filter(b => /^\+\s*[\d.]+\s*Pontos/i.test(b));
+  const out = [];
+  blocos.forEach(b => {
+    const q = b.match(/^\+\s*([\d.]+)\s*Pontos/i);
+    const a = b.match(/Adicionad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    const e = b.match(/Expiration\s*Date\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    const c = b.match(/-\s*([A-Z0-9]{12})\b/);
+    if (!q || !a || !e) return;
+    out.push({ qtd: parseInt(q[1].replace(/\./g, ''), 10), adicionado: iso(a[1], a[2], a[3]), expira: iso(e[1], e[2], e[3]), codigo: c ? c[1] : '' });
+  });
+  return out;
+}
+
+// Ganhos ainda não lançados e ainda válidos (os já vencidos entram pela lista de expirados)
+function planoGanhosPortal(p, ganhos) {
+  const usados = {};
+  (p.ganhosPortal || []).forEach(k => { usados[k] = (usados[k] || 0) + 1; });
+  return ganhos.filter(g => {
+    if (g.expira < hojeISO()) return false;
+    if (g.codigo) return !(p.codigos || []).some(c => c.codigo === g.codigo);
+    const k = g.adicionado + '|' + g.qtd;
+    if (usados[k] > 0) { usados[k]--; return false; }
+    return true;
+  });
+}
+
+function previaColarHistorico(id) {
+  const p = DB.programas.find(p => p.id === id); if (!p) return;
+  const txt = document.getElementById('hist-texto').value;
+  const lidos = lerExpiradosPortal(txt), novos = planoExpiradosPortal(p, lidos);
+  const ganhos = lerGanhosPortal(txt), novosG = planoGanhosPortal(p, ganhos);
+  const el = document.getElementById('hist-previa'), btn = document.getElementById('hist-btn');
+  if (!lidos.length && !ganhos.length) { el.textContent = txt.trim() ? 'Não encontrei lançamentos de ganho nem "Expirado" nesse texto.' : ''; btn.disabled = true; return; }
+  const partes = [];
+  if (ganhos.length) partes.push(ganhos.length + ' ganho(s) lido(s) · ' + novosG.length + ' novo(s) (+' + novosG.reduce((s, g) => s + g.qtd, 0).toLocaleString('pt-BR') + ' pts)');
+  if (lidos.length) partes.push(lidos.length + ' expirado(s) lido(s) · ' + novos.length + ' novo(s) (' + novos.reduce((s, l) => s + l.qtd, 0).toLocaleString('pt-BR') + ' pts)');
+  el.textContent = partes.join(' | ');
+  btn.disabled = novos.length + novosG.length === 0;
+}
+
+function lancarHistoricoColado(id) {
+  const p = DB.programas.find(p => p.id === id); if (!p) return;
+  const txt = document.getElementById('hist-texto').value;
+  const novos = planoExpiradosPortal(p, lerExpiradosPortal(txt));
+  const novosG = planoGanhosPortal(p, lerGanhosPortal(txt));
+  if (!novos.length && !novosG.length) return;
+  if (!DB.vencimentos) DB.vencimentos = [];
+  if (!p.lotes) p.lotes = [];
+  novosG.forEach(g => {
+    const ja = p.lotes.find(l => l.expiracao === g.expira && !l.estimado);
+    if (ja) ja.quantidade += g.qtd; else p.lotes.push({ quantidade: g.qtd, expiracao: g.expira });
+    p.saldo = (p.saldo || 0) + g.qtd;
+    if (g.codigo) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: g.codigo, data: g.adicionado }); }
+    else { if (!p.ganhosPortal) p.ganhosPortal = []; p.ganhosPortal.push(g.adicionado + '|' + g.qtd); }
+  });
+  if (novosG.length) {
+    if (!DB.historicoSaldo) DB.historicoSaldo = {};
+    if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
+    DB.historicoSaldo[id].push({ data: hojeISO(), saldo: p.saldo });
+  }
+  novos.forEach(l => {
+    DB.vencimentos.push({ id: gerarId(), programaId: p.id, quantidade: l.qtd, tipoSaldo: 'pontos',
+      descricao: 'Expirado no portal (validade de 12 meses)', data: l.data, origem: 'portal' });
+    let falta = l.qtd;   // se esse lote ainda estava na lista de a vencer, tira para não contar duas vezes
+    p.lotes.filter(x => x.expiracao === l.data).forEach(x => { const t = Math.min(falta, x.quantidade); x.quantidade -= t; falta -= t; });
+  });
+  p.lotes = p.lotes.filter(x => x.quantidade > 0).sort((a, b) => String(a.expiracao).localeCompare(String(b.expiracao)));
+  agendarSync();
+  fecharModal(); abrirModalLotes(id); renderBeneficios();
+  showAlert('✅', (novosG.length ? novosG.length + ' ganho(s) e ' : '') + novos.length + ' vencimento(s) lançado(s).');
+}
+
+function editarVencLote(id, idx, valor) {
+  const p = DB.programas.find(p => p.id === id);
+  if (!p || !p.lotes || !p.lotes[idx] || !valor) return;
+  p.lotes[idx].expiracao = valor; delete p.lotes[idx].estimado;
+  p.lotes.sort((a, b) => String(a.expiracao).localeCompare(String(b.expiracao)));
+  agendarSync(); fecharModal(); abrirModalLotes(id); renderBeneficios();
 }
 
 function abrirModalLotes(id) {
   const p = DB.programas.find(p => p.id === id);
   if (!p) return;
   if (!p.lotes) p.lotes = [];
+  const rc = p.regraCodigo;
+  const vivos = p.lotes.filter(l => l.expiracao >= hojeISO());
+  const soma = fn => vivos.filter(fn).reduce((s, l) => s + l.quantidade, 0);
+  const pontosVencidos = (DB.vencimentos || []).filter(v => v.programaId === p.id && (v.tipoSaldo || 'pontos') === 'pontos').reduce((s, v) => s + (v.quantidade || 0), 0);
+  const fmt = n => n.toLocaleString('pt-BR');
+  const dif = (p.saldo || 0) - p.lotes.reduce((s, l) => s + l.quantidade, 0);
+  const caixa = (rot, val, cor) => `<div style="flex:1;background:var(--bg-secondary);border-radius:8px;padding:10px;text-align:center;"><div style="font-size:10px;color:var(--text-secondary);">${rot}</div><div style="font-size:17px;font-weight:700;${cor ? 'color:' + cor + ';' : ''}">${val}</div></div>`;
 
   abrirModal(`📦 Lotes de Pontos — ${p.nome}`, `
-    <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">
-      Gerencie lotes de pontos com datas de vencimento diferentes.<br>
-      Total: <strong>${(p.saldo || 0).toLocaleString('pt-BR')} pts</strong>
-    </p>
-    <div id="lotes-lista" style="margin-bottom:16px;">
-      ${p.lotes.map((l, i) => `
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      ${caixa('Saldo', fmt(p.saldo || 0) + ' pts')}
+      ${rc ? caixa('Vencem em 30 dias', fmt(soma(l => diasAte(l.expiracao) <= 30)) + ' pts', soma(l => diasAte(l.expiracao) <= 30) > 0 ? 'var(--yellow)' : '') : ''}
+      ${rc ? caixa('Vencem em 90 dias', fmt(soma(l => diasAte(l.expiracao) <= 90)) + ' pts') : ''}
+      ${caixa('Já expirados', fmt(pontosVencidos) + ' pts', pontosVencidos ? 'var(--red)' : '')}
+    </div>
+    ${dif !== 0 ? `<p style="font-size:11px;color:var(--yellow);margin-bottom:10px;">⚠️ Os lotes somam ${fmt(p.lotes.reduce((s, l) => s + l.quantidade, 0))} pts e o saldo é ${fmt(p.saldo || 0)} pts. Confira se falta algum lote.</p>` : ''}
+    <div id="lotes-lista" style="margin-bottom:16px;max-height:260px;overflow-y:auto;">
+      ${p.lotes.map((l, i) => { const d = diasAte(l.expiracao); const cor = d < 0 ? 'var(--text-muted)' : d <= 7 ? 'var(--red)' : d <= 30 ? 'var(--yellow)' : 'var(--green)'; return `
         <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-secondary);border-radius:8px;margin-bottom:8px;">
           <div style="flex:1;">
-            <div style="font-weight:600;">${l.quantidade.toLocaleString('pt-BR')} pts</div>
-            <div style="font-size:11px;color:var(--text-secondary);">Vence: ${formatarData(l.expiracao)}</div>
+            <div style="font-weight:600;">${l.quantidade.toLocaleString('pt-BR')} pts${rc ? ' <span style="font-size:11px;font-weight:400;color:var(--text-secondary);">(' + (l.quantidade / rc.pontosPorCodigo) + ' cód.)</span>' : ''}</div>
+            <div style="font-size:11px;color:${cor};">${d < 0 ? '⛔ Venceu em ' + formatarData(l.expiracao) : '⏰ Vence em ' + formatarData(l.expiracao) + ' (' + d + ' dias)'}${l.estimado ? ' · <span title="Data estimada: edite se souber a real" style="color:var(--text-secondary);">~ estimado</span>' : ''}</div>
           </div>
-          <button onclick="removerLote(${id}, ${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
-        </div>
-      `).join('')}
+          <input type="date" value="${l.expiracao}" title="Corrigir a data de vencimento" onchange="editarVencLote(${id}, ${i}, this.value)" style="width:130px;font-size:11px;" />
+          <button onclick="removerLote(${id}, ${i})" title="Remover lote" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;">✕</button>
+        </div>`; }).join('')}
       ${p.lotes.length === 0 ? '<p style="color:var(--text-muted);font-size:13px;">Nenhum lote cadastrado.</p>' : ''}
     </div>
+    ${rc ? `
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-bottom:14px;">
+      <h4 style="font-size:13px;margin-bottom:4px;">☕ Registrar códigos escaneados</h4>
+      <p style="font-size:11px;color:var(--text-secondary);margin-bottom:10px;">${rc.pontosPorCodigo} pontos por código · validade de ${rc.validadeMeses} meses a partir do dia do escaneamento.</p>
+      <div class="form-row">
+        <div class="form-group"><label>Nº de códigos</label><input id="cod-qtd" type="number" min="1" max="500" oninput="previaCodigos(${id})" /></div>
+        <div class="form-group"><label>Data do escaneamento</label><input id="cod-data" type="date" max="${hojeISO()}" value="${hojeISO()}" oninput="previaCodigos(${id})" /></div>
+      </div>
+      <div id="cod-previa" style="font-size:12px;color:var(--green);min-height:16px;margin-bottom:8px;"></div>
+      <button class="btn-primary btn-sm" onclick="registrarCodigos(${id})" style="width:100%;">+ Registrar códigos</button>
+    </div>
+    <details style="margin-bottom:14px;">
+      <summary style="cursor:pointer;font-size:13px;font-weight:600;color:var(--text-secondary);">📋 Colar histórico do portal (ganhos e expirados)</summary>
+      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">No portal, copie o histórico ("+100 Pontos · Adicionado…" e "-100 Pontos · Expirado…") e cole aqui. Ganhos viram lotes com o vencimento do portal; expirados entram em ⏳ Vencimentos. Repetir a colagem não duplica.</p>
+      <textarea id="hist-texto" rows="5" oninput="previaColarHistorico(${id})" style="width:100%;font-size:12px;"></textarea>
+      <div id="hist-previa" style="font-size:12px;color:var(--text-secondary);min-height:16px;margin:6px 0;"></div>
+      <button id="hist-btn" class="btn-secondary btn-sm" disabled onclick="lancarHistoricoColado(${id})" style="width:100%;">Lançar vencimentos</button>
+    </details>` : ''}
     <div style="border-top:1px solid var(--border);padding-top:16px;">
-      <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar Lote</h4>
+      <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar lote manual</h4>
       <div class="form-row">
         <div class="form-group">
           <label>Quantidade (pts)</label>
-          <input id="lote-qtd" type="number" placeholder="Ex: 1597" min="1" />
+          <input id="lote-qtd" type="number" min="1" />
         </div>
         <div class="form-group">
           <label>Data de Vencimento</label>
@@ -1030,7 +1261,8 @@ function abrirModalLotes(id) {
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
     </div>
-  `, '480px');
+  `, '520px');
+  if (rc) previaCodigos(id);
 }
 
 function adicionarLote(id) {

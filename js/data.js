@@ -468,7 +468,7 @@ if (!DB.programas) DB.programas = [
   { id: 4, nome: 'Nota Paraná', tipo: 'cashback', categoria: 'governo', saldo: 0, expiracao: null, logo: '📋' },
   { id: 5, nome: 'Meu Posto', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '⛽' },
   { id: 6, nome: 'KMV', tipo: 'pontos', categoria: 'combustivel', saldo: 0, expiracao: null, logo: '🚗' },
-  { id: 7, nome: 'Nescafé Dolce Gusto CLUB', tipo: 'pontos', categoria: 'lifestyle', saldo: 0, expiracao: null, logo: '☕' },
+  { id: 7, nome: 'Nescafé Dolce Gusto CLUB', tipo: 'pontos', categoria: 'lifestyle', saldo: 0, expiracao: null, logo: '☕', regraCodigo: { pontosPorCodigo: 100, validadeMeses: 12 } },
   { id: 8, nome: 'Azul Linhas Aéreas', tipo: 'pontos', categoria: 'aerea', saldo: 0, expiracao: null, logo: '✈️' },
 ];
 if (!DB.resgates) DB.resgates = [];
