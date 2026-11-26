@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.17 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.18 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.18 | `(este)` | Janela de confirmação antes de apagar lote ou vencimento (`pedirConfirmacao` em `js/utils.js`, Cancelar antes de Apagar); "lote manual" recolhido nos programas com código |
 | Site v1.17 | `47b075f` | Rótulos do Colar histórico atualizados (o bloco já lança resgates e caixas antigas, não só ganhos e expirados); botão passa a ser "Lançar histórico" |
 | Site v1.16 | `3a357ca` | Colar histórico aceita o extrato inteiro de uma vez: ganhos vivos, ganhos já gastos ("Points used"), expirados e resgates (`-N Pontos Utilizado:`); prévia em 4 linhas dizendo o que cada parte faz |
 | Site v1.15 | `85a14d6` | `lerGanhosPortal` aceita **"Vence em:"** (rótulo real do portal brasileiro) além de "Expiration Date" — antes lia 0 ganhos do histórico colado |
@@ -622,6 +623,8 @@ Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser d
 | `-N Pontos · Utilizado:` | `DB.resgates` (`origem:'portal'`, nº do pedido na descrição) — `lerResgatesPortal` |
 
 Dedup: ganho/caixa por código, resgate e vencimento por `data|quantidade`. Conferido contra o extrato real do usuário: 33 ganhos, 17 expirados (1.700 pts) e 1 resgate (1.500 pts) lidos; só 1 ganho entra no saldo; colar de novo não lança nada — `/tmp/tdolce/t2.js`.
+
+**Apagar pede confirmação (v1.18).** `pedirConfirmacao(icone, msg, textoOk, onOk)` (`js/utils.js`) reaproveita o `#alert-popup` (z-index 2001, acima de qualquer modal), troca o botão por Cancelar + Apagar (Cancelar vem primeiro e recebe o foco) e restaura o OK ao fechar. Usada em `removerLote` e `removerVencimento`; apagar um lote **não** mexe no saldo (só perde o controle da data). Para novas ações destrutivas, usar este helper em vez de `confirm()`. Teste: `/tmp/pw/conf_test.py`. O bloco "Adicionar lote manual" vira `<details>` recolhido quando o programa tem `regraCodigo`.
 
 Colar duas vezes não duplica: ganhos por código (ou por `ganhosPortal` data|qtd quando sem código), expirados por data+quantidade. Ganho já vencido é ignorado (vem pela lista de expirados). Dados reais do usuário (códigos, saldos) ficam só no Drive/localStorage — **nunca no repositório**.
 

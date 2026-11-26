@@ -124,6 +124,22 @@ function showAlert(icon, msg) {
   document.getElementById('alert-overlay').style.display = 'block';
 }
 
+// Janela de confirmação para ações que apagam dados. Fica acima de qualquer modal
+// (z-index 2001) e o botão de cancelar é o primeiro, para não confirmar sem querer.
+function pedirConfirmacao(icone, msg, textoOk, onOk) {
+  const acoes = document.getElementById('alert-acoes');
+  document.getElementById('alert-icon').textContent = icone;
+  document.getElementById('alert-message').textContent = msg;
+  acoes.innerHTML = '<button id="alert-nao" style="background:var(--bg-tertiary);color:var(--text-primary);margin-right:10px;">Cancelar</button>'
+    + '<button id="alert-sim" style="background:var(--red);color:#fff;">' + (textoOk || 'Apagar') + '</button>';
+  const fim = () => { acoes.innerHTML = '<button onclick="fecharAlert()">OK</button>'; fecharAlert(); };
+  document.getElementById('alert-nao').onclick = fim;
+  document.getElementById('alert-sim').onclick = () => { fim(); onOk(); };
+  document.getElementById('alert-popup').style.display = 'block';
+  document.getElementById('alert-overlay').style.display = 'block';
+  document.getElementById('alert-nao').focus();
+}
+
 function fecharAlert() {
   document.getElementById('alert-popup').style.display = 'none';
   document.getElementById('alert-overlay').style.display = 'none';
@@ -230,7 +246,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.17';
+const SITE_VERSION = 'v1.18';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }

@@ -833,10 +833,14 @@ function adicionarVencimento() {
 }
 
 function removerVencimento(vid) {
-  DB.vencimentos = (DB.vencimentos || []).filter(v => v.id !== vid);
-  agendarSync();
-  abrirModalVencimentos();
-  renderBeneficios();
+  const v = (DB.vencimentos || []).find(x => x.id === vid); if (!v) return;
+  pedirConfirmacao('🗑️', 'Apagar este registro de ' + fmtQtd(v.quantidade, tipoSaldoDe(v)) + ' de '
+    + formatarData(v.data) + '? Não dá para desfazer.', 'Apagar', () => {
+    DB.vencimentos = (DB.vencimentos || []).filter(x => x.id !== vid);
+    agendarSync();
+    abrirModalVencimentos();
+    renderBeneficios();
+  });
 }
 
 function editarPrograma(id) {
@@ -1303,8 +1307,10 @@ function abrirModalLotes(id) {
       <div id="hist-previa" style="font-size:12px;color:var(--text-secondary);min-height:16px;margin:6px 0;"></div>
       <button id="hist-btn" class="btn-secondary btn-sm" disabled onclick="lancarHistoricoColado(${id})" style="width:100%;">Lançar histórico</button>
     </details>` : ''}
-    <div style="border-top:1px solid var(--border);padding-top:16px;">
-      <h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar lote manual</h4>
+    <${rc ? 'details' : 'div'} style="border-top:1px solid var(--border);padding-top:16px;">
+      ${rc ? `<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);">✏️ Adicionar lote à mão</summary>
+      <p style="font-size:11px;color:var(--text-secondary);margin:8px 0;">Você não precisa disto: use "Registrar códigos" acima ou cole o histórico do portal. Serve só se algum lote tiver ficado de fora.</p>`
+        : '<h4 style="font-size:13px;margin-bottom:12px;">+ Adicionar lote manual</h4>'}
       <div class="form-row">
         <div class="form-group">
           <label>Quantidade (pts)</label>
@@ -1316,7 +1322,7 @@ function abrirModalLotes(id) {
         </div>
       </div>
       <button class="btn-primary btn-sm" onclick="adicionarLote(${id})" style="width:100%;">+ Adicionar Lote</button>
-    </div>
+    </${rc ? 'details' : 'div'}>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
     </div>
@@ -1342,12 +1348,19 @@ function adicionarLote(id) {
 
 function removerLote(id, idx) {
   const p = DB.programas.find(p => p.id === id);
-  if (!p || !p.lotes) return;
-  p.lotes.splice(idx, 1);
-  agendarSync();
-  fecharModal();
-  abrirModalLotes(id);
-  renderBeneficios();
+  if (!p || !p.lotes || !p.lotes[idx]) return;
+  const l = p.lotes[idx];
+  const msg = 'Apagar o lote de ' + (l.quantidade || 0).toLocaleString('pt-BR') + ' pts que vence em '
+    + formatarData(l.expiracao) + '? Não dá para desfazer, e o saldo continua ' + (p.saldo || 0).toLocaleString('pt-BR')
+    + ' pts — você perde só o controle de quando esses pontos vencem.'
+    + ' Se a data é que está errada, cancele e corrija no campo de data ao lado.';
+  pedirConfirmacao('🗑️', msg, 'Apagar lote', () => {
+    p.lotes.splice(idx, 1);
+    agendarSync();
+    fecharModal();
+    abrirModalLotes(id);
+    renderBeneficios();
+  });
 }
 
 // ===== SORTEIOS (Nota Paraná) =====
