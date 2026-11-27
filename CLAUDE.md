@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.22 | `(este)` | 🔄 Atualizar de verdade: vê a versão publicada (ignora cache) e recarrega a página se houver uma nova (= Ctrl+R), senão relê o Drive; botão também no cabeçalho do Cashback e Pontos; avisa quando não há sessão do Drive |
+| Site v1.22 | `6dee1ef` | 🔄 Atualizar de verdade: vê a versão publicada (ignora cache) e recarrega a página se houver uma nova (= Ctrl+R), senão relê o Drive; botão também no cabeçalho do Cashback e Pontos; avisa quando não há sessão do Drive |
 | Site v1.21 | `db71472` | Card do Dolce Gusto ganha "📜 Histórico de pontos" no estilo do portal (selo roxo +100/−100, datas, produto e código; 3 últimos + "Ver histórico completo" em modal) |
 | Site v1.20 | `0e3c9fb` | Colar histórico acerta o vencimento de caixas já registradas quando a data do portal difere (o portal conta +1 dia em códigos inseridos à noite); `p.codigos[].expira` guarda a data |
 | Site v1.19 | `9c63dcc` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
