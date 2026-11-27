@@ -997,16 +997,19 @@ function renderGrafLinha() {
 // Junta ganhos (caixas registradas), expirações (⏳ Vencimentos) e resgates, do mais recente ao mais antigo.
 function historicoPontos(p) {
   const rc = p.regraCodigo || {}, out = [];
-  (p.codigos || []).forEach(c => out.push({ tipo: 'ganho', data: c.data, qtd: c.qtd || rc.pontosPorCodigo || 0,
+  (p.codigos || []).forEach((c, i) => out.push({ tipo: 'ganho', data: c.data, ts: c.ts, seq: i, qtd: c.qtd || rc.pontosPorCodigo || 0,
     expira: c.historico && !c.expira ? '' : (c.expira || (rc.validadeMeses ? somaMeses(c.data, rc.validadeMeses) : '')),
     texto: (c.descricao ? 'Pontos por ' + c.descricao + ' - ' : 'Pontos por código ') + c.codigo }));
-  (p.semCodigo || []).forEach(c => out.push({ tipo: 'ganho', data: c.data, qtd: c.qtd, expira: c.expira, texto: 'Pontos registrados sem código' }));
+  (p.semCodigo || []).forEach((c, i) => out.push({ tipo: 'ganho', data: c.data, ts: c.ts, seq: i, qtd: c.qtd, expira: c.expira, texto: 'Pontos registrados sem código' }));
   (DB.vencimentos || []).filter(v => v.programaId === p.id && (v.tipoSaldo || 'pontos') === 'pontos').forEach(v =>
     out.push({ tipo: 'expirado', data: v.data, qtd: v.quantidade, texto: v.origem === 'portal' || !v.descricao ? 'Pontos expirados devido à sua validade de ' + (rc.validadeMeses || 12) + ' meses' : v.descricao }));
   (DB.resgates || []).filter(r => r.programaId === p.id && (r.tipoSaldo || 'pontos') === 'pontos').forEach(r =>
     out.push({ tipo: 'usado', data: r.data, qtd: r.quantidade, texto: r.descricao || 'Resgate' }));
   const ordem = { ganho: 0, usado: 1, expirado: 2 };
-  return out.filter(x => x.data).sort((a, b) => b.data.localeCompare(a.data) || ordem[a.tipo] - ordem[b.tipo]);
+  // Mesmo dia: o mais recente primeiro, como no portal. Com `ts` vale ele (registro pelo botão = hora;
+  // colado do portal = ordem do extrato); sem `ts` (antigos), o último registrado vem antes.
+  const desempate = (a, b) => (a.ts && b.ts) ? b.ts - a.ts : a.ts ? -1 : b.ts ? 1 : (b.seq || 0) - (a.seq || 0);
+  return out.filter(x => x.data).sort((a, b) => b.data.localeCompare(a.data) || ordem[a.tipo] - ordem[b.tipo] || desempate(a, b));
 }
 
 function itemHistoricoHtml(it, compacto) {
@@ -1139,7 +1142,7 @@ function registrarCodigos(id, rapido) {
   if (exp < hojeISO()) { showAlert('⚠️', 'Esses pontos já teriam vencido em ' + formatarData(exp) + '. Use "Colar histórico" para lançar vencidos.'); return; }
   const pts = n * p.regraCodigo.pontosPorCodigo;
   adicionarPontosLote(p, pts, data, false);
-  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data, expira: exp, qtd: pts }); }
+  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data, expira: exp, qtd: pts, ts: Date.now() }); }
   else { if (!p.semCodigo) p.semCodigo = []; p.semCodigo.push({ data, expira: exp, qtd: pts }); }
   p.saldo = (p.saldo || 0) + pts;
   if (!DB.historicoSaldo) DB.historicoSaldo = {};
@@ -1301,11 +1304,13 @@ function lancarHistoricoColado(id) {
   if (!DB.resgates) DB.resgates = [];
   if (!p.lotes) p.lotes = [];
   if (!p.codigos) p.codigos = [];
+  // `ts` guarda a ordem do portal (1ª linha do extrato = mais recente) para desempatar lançamentos do mesmo dia
+  const tsBase = Date.now(); let tsN = 0;
   novosG.forEach(g => {
     const ja = p.lotes.find(l => l.expiracao === g.expira && !l.estimado);
     if (ja) ja.quantidade += g.qtd; else p.lotes.push({ quantidade: g.qtd, expiracao: g.expira });
     p.saldo = (p.saldo || 0) + g.qtd;
-    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado, expira: g.expira, qtd: g.qtd, descricao: g.descricao || '' });
+    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado, expira: g.expira, qtd: g.qtd, descricao: g.descricao || '', ts: tsBase - tsN++ });
     else { if (!p.ganhosPortal) p.ganhosPortal = []; p.ganhosPortal.push(g.adicionado + '|' + g.qtd); }
   });
   // vencimentos acertados para a data do portal: tira do lote antigo e põe no lote da data certa
@@ -1318,7 +1323,7 @@ function lancarHistoricoColado(id) {
     const e = p.codigos.find(x => x.codigo === c.g.codigo && !x.historico); if (e) e.expira = c.g.expira;
   });
   // caixas antigas (ja vencidas ou ja gastas): so o registro do codigo
-  novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true, expira: g.expira || '', qtd: g.qtd, descricao: g.descricao || '' }));
+  novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true, expira: g.expira || '', qtd: g.qtd, descricao: g.descricao || '', ts: tsBase - tsN++ }));
   if (novosG.length) {
     if (!DB.historicoSaldo) DB.historicoSaldo = {};
     if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
