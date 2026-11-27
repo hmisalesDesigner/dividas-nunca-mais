@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.20 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.21 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.21 | `(este)` | Card do Dolce Gusto ganha "📜 Histórico de pontos" no estilo do portal (selo roxo +100/−100, datas, produto e código; 3 últimos + "Ver histórico completo" em modal) |
 | Site v1.20 | `0e3c9fb` | Colar histórico acerta o vencimento de caixas já registradas quando a data do portal difere (o portal conta +1 dia em códigos inseridos à noite); `p.codigos[].expira` guarda a data |
 | Site v1.19 | `9c63dcc` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
 | Site v1.18 | `cba19ec` | Janela de confirmação antes de apagar lote ou vencimento (`pedirConfirmacao` em `js/utils.js`, Cancelar antes de Apagar); "lote manual" recolhido nos programas com código |
@@ -625,6 +626,8 @@ Um modal de fatura meio preenchido sumiu uma vez. Regras, que **não devem ser d
 | `-N Pontos · Utilizado:` | `DB.resgates` (`origem:'portal'`, nº do pedido na descrição) — `lerResgatesPortal` |
 
 Dedup: ganho/caixa por código, resgate e vencimento por `data|quantidade`. Conferido contra o extrato real do usuário: 33 ganhos, 17 expirados (1.700 pts) e 1 resgate (1.500 pts) lidos; só 1 ganho entra no saldo; colar de novo não lança nada — `/tmp/tdolce/t2.js`.
+
+**Histórico de pontos no card (v1.21).** `historicoPontos(p)` junta ganhos (`p.codigos[]` com `qtd`/`descricao`/`expira`, mais `p.semCodigo[]` para registros sem código), expirações (`DB.vencimentos` do programa) e resgates (`DB.resgates`), do mais recente ao mais antigo; `itemHistoricoHtml(it, compacto)` desenha o item (selo roxo `#4f2d7f`); `renderHistoricoCard(p)` mostra os 3 últimos no card (só com `regraCodigo`) e `abrirModalHistorico(id)` a lista completa. `lerGanhosPortal` agora devolve `descricao` ("Café Au Lait 10 Cápsulas"). Caixas coladas antes da v1.21 não têm o nome do produto (aparecem como "Pontos por código XXXX") — colar de novo não atualiza, pois já estão registradas. Teste: `/tmp/pw/hist_test.py`.
 
 **Vencimento real do portal (v1.20).** Observado no extrato: ganho de 26/11/2026 pode vencer em 26/11/2027 **ou** 27/11/2027 (também 23/4/2025 → 24/4/2026) — provavelmente o portal usa data UTC, então códigos inseridos à noite (depois de ~21h em Brasília) vencem 1 dia depois. O site calcula +12 meses do dia informado, então pode errar 1 dia; **o vencimento do portal manda**. `planoCorrecoesPortal` (usada por `previaColarHistorico`/`lancarHistoricoColado`) compara cada caixa já registrada com o "Vence em" colado e, se difere, move os pontos do lote antigo para o lote da data do portal (só se o lote antigo ainda existe). `p.codigos[]` agora guarda `expira`. Teste: `/tmp/pw/venc_test.py`.
 

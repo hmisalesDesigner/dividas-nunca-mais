@@ -472,6 +472,7 @@ function cardBeneficio(p) {
       ${p.tipo === 'pontos' && p.saldoCashback ? `<div style="font-size:14px;font-weight:600;color:#34a85a;margin-bottom:2px;">${formatarMoeda(p.saldoCashback)} cashback</div>` : ''}
       ${p.taxaConversao && p.tipo === 'pontos' ? `<div style="font-size:11px;color:#666;margin-bottom:4px;">≈ ${formatarMoeda((p.saldo || 0) * p.taxaConversao)}</div>` : ''}
       ${renderLotesCard(p)}
+      ${renderHistoricoCard(p)}
       ${renderSorteiosCard(p)}
       <div style="font-size:11px;color:${expCor};margin-bottom:12px;">
         ${p.expiracao ? `⏰ Expira: ${formatarData(p.expiracao)} (${expDias}d)` : 'Não expira'}
@@ -991,6 +992,57 @@ function renderGrafLinha() {
 }
 
 // ===== LOTES DE PONTOS =====
+// ===== Histórico de pontos (no estilo da página "Meu histórico de pontos" do portal) =====
+// Junta ganhos (caixas registradas), expirações (⏳ Vencimentos) e resgates, do mais recente ao mais antigo.
+function historicoPontos(p) {
+  const rc = p.regraCodigo || {}, out = [];
+  (p.codigos || []).forEach(c => out.push({ tipo: 'ganho', data: c.data, qtd: c.qtd || rc.pontosPorCodigo || 0,
+    expira: c.historico && !c.expira ? '' : (c.expira || (rc.validadeMeses ? somaMeses(c.data, rc.validadeMeses) : '')),
+    texto: (c.descricao ? 'Pontos por ' + c.descricao + ' - ' : 'Pontos por código ') + c.codigo }));
+  (p.semCodigo || []).forEach(c => out.push({ tipo: 'ganho', data: c.data, qtd: c.qtd, expira: c.expira, texto: 'Pontos registrados sem código' }));
+  (DB.vencimentos || []).filter(v => v.programaId === p.id && (v.tipoSaldo || 'pontos') === 'pontos').forEach(v =>
+    out.push({ tipo: 'expirado', data: v.data, qtd: v.quantidade, texto: v.origem === 'portal' || !v.descricao ? 'Pontos expirados devido à sua validade de ' + (rc.validadeMeses || 12) + ' meses' : v.descricao }));
+  (DB.resgates || []).filter(r => r.programaId === p.id && (r.tipoSaldo || 'pontos') === 'pontos').forEach(r =>
+    out.push({ tipo: 'usado', data: r.data, qtd: r.quantidade, texto: r.descricao || 'Resgate' }));
+  const ordem = { ganho: 0, usado: 1, expirado: 2 };
+  return out.filter(x => x.data).sort((a, b) => b.data.localeCompare(a.data) || ordem[a.tipo] - ordem[b.tipo]);
+}
+
+function itemHistoricoHtml(it, compacto) {
+  const roxo = '#4f2d7f', n = (it.qtd || 0).toLocaleString('pt-BR');
+  const sinal = it.tipo === 'ganho' ? '+' : '−';
+  const rot = it.tipo === 'ganho' ? 'Adicionado' : it.tipo === 'usado' ? 'Utilizado' : 'Expirado';
+  const datas = '<b>' + rot + ':</b> ' + formatarData(it.data)
+    + (it.tipo === 'ganho' && it.expira ? '<br><b>Vence em:</b> ' + formatarData(it.expira) : '')
+    + (it.tipo === 'ganho' && !it.expira ? '<br><span style="color:#999;">já gasto ou vencido</span>' : '');
+  const icone = it.tipo === 'ganho' ? '' : (it.tipo === 'usado' ? '🎁' : '🚫');
+  const badge = '<div style="flex:none;width:' + (compacto ? 48 : 56) + 'px;background:' + roxo + ';color:#fff;border-radius:5px;text-align:center;padding:6px 2px;line-height:1.15;">'
+    + '<div style="font-size:' + (compacto ? 13 : 15) + 'px;font-weight:800;">' + sinal + n + '</div><div style="font-size:9px;font-weight:600;">Pontos</div></div>';
+  const dt = '<div style="flex:none;font-size:' + (compacto ? 10 : 11) + 'px;color:#555;line-height:1.35;' + (compacto ? '' : 'min-width:96px;') + '">' + datas + '</div>';
+  const tx = '<div style="' + (compacto ? 'flex:1 1 100%;font-size:11px;' : 'flex:1;font-size:12px;') + 'font-weight:700;color:#3b2a2a;line-height:1.3;word-break:break-word;">' + esc(it.texto) + '</div>';
+  const ic = icone ? '<div style="flex:none;font-size:16px;margin-left:auto;">' + icone + '</div>' : '';
+  // card estreito: selo + datas em cima, texto embaixo; modal: tudo na mesma linha
+  return '<div style="display:flex;align-items:center;flex-wrap:' + (compacto ? 'wrap' : 'nowrap') + ';gap:' + (compacto ? '6px 8px' : '12px') + ';border:1px solid #e5e5e5;border-radius:6px;padding:8px;margin-bottom:6px;background:#fff;">'
+    + badge + dt + (compacto ? ic + tx : tx + ic) + '</div>';
+}
+
+function renderHistoricoCard(p) {
+  if (!p.regraCodigo) return '';
+  const h = historicoPontos(p); if (!h.length) return '';
+  return '<div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;">'
+    + '<div style="font-size:12px;font-weight:700;color:#4f2d7f;margin-bottom:6px;">📜 Histórico de pontos</div>'
+    + h.slice(0, 3).map(x => itemHistoricoHtml(x, true)).join('')
+    + '<button onclick="abrirModalHistorico(' + p.id + ')" style="width:100%;background:none;border:1px solid #4f2d7f;color:#4f2d7f;padding:6px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ver histórico completo (' + h.length + ')</button></div>';
+}
+
+function abrirModalHistorico(id) {
+  const p = DB.programas.find(p => p.id === id); if (!p) return;
+  const h = historicoPontos(p);
+  abrirModal('📜 Meu histórico de pontos — ' + p.nome, '<div style="max-height:62vh;overflow-y:auto;padding-right:4px;">'
+    + (h.length ? h.map(x => itemHistoricoHtml(x, false)).join('') : '<p style="color:var(--text-muted);font-size:13px;">Nada registrado ainda.</p>')
+    + '</div><div class="modal-actions"><button class="btn-secondary" onclick="fecharModal()">Fechar</button></div>', '620px');
+}
+
 function renderLotesCard(p) {
   if (!p.lotes || p.lotes.length === 0) return '';
   const maisLotes = p.lotes.length > 4 ? p.lotes.length - 4 : 0;
@@ -1086,7 +1138,8 @@ function registrarCodigos(id, rapido) {
   if (exp < hojeISO()) { showAlert('⚠️', 'Esses pontos já teriam vencido em ' + formatarData(exp) + '. Use "Colar histórico" para lançar vencidos.'); return; }
   const pts = n * p.regraCodigo.pontosPorCodigo;
   adicionarPontosLote(p, pts, data, false);
-  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data, expira: exp }); }
+  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data, expira: exp, qtd: pts }); }
+  else { if (!p.semCodigo) p.semCodigo = []; p.semCodigo.push({ data, expira: exp, qtd: pts }); }
   p.saldo = (p.saldo || 0) + pts;
   if (!DB.historicoSaldo) DB.historicoSaldo = {};
   if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
@@ -1132,9 +1185,10 @@ function lerGanhosPortal(texto) {
     const a = b.match(/Adicionad[oa]\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     const e = b.match(/(?:Expiration\s*Date|Vence\s*em|Expira\s*em|Validade)\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     const c = b.match(/-\s*([A-Z0-9]{12})\b/);
+    const dm = b.match(/Pontos por\s+(.+?)\s*-\s*[A-Z0-9]{12}\b/i);
     if (!q || !a) return;
     out.push({ qtd: parseInt(q[1].replace(/\./g, ''), 10), adicionado: iso(a[1], a[2], a[3]),
-      expira: e ? iso(e[1], e[2], e[3]) : '', codigo: c ? c[1] : '', gasto: !e });
+      expira: e ? iso(e[1], e[2], e[3]) : '', codigo: c ? c[1] : '', gasto: !e, descricao: dm ? dm[1].trim() : '' });
   });
   return out;
 }
@@ -1250,7 +1304,7 @@ function lancarHistoricoColado(id) {
     const ja = p.lotes.find(l => l.expiracao === g.expira && !l.estimado);
     if (ja) ja.quantidade += g.qtd; else p.lotes.push({ quantidade: g.qtd, expiracao: g.expira });
     p.saldo = (p.saldo || 0) + g.qtd;
-    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado, expira: g.expira });
+    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado, expira: g.expira, qtd: g.qtd, descricao: g.descricao || '' });
     else { if (!p.ganhosPortal) p.ganhosPortal = []; p.ganhosPortal.push(g.adicionado + '|' + g.qtd); }
   });
   // vencimentos acertados para a data do portal: tira do lote antigo e põe no lote da data certa
@@ -1263,7 +1317,7 @@ function lancarHistoricoColado(id) {
     const e = p.codigos.find(x => x.codigo === c.g.codigo && !x.historico); if (e) e.expira = c.g.expira;
   });
   // caixas antigas (ja vencidas ou ja gastas): so o registro do codigo
-  novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true }));
+  novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true, expira: g.expira || '', qtd: g.qtd, descricao: g.descricao || '' }));
   if (novosG.length) {
     if (!DB.historicoSaldo) DB.historicoSaldo = {};
     if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
