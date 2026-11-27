@@ -1031,8 +1031,8 @@ function renderHistoricoCard(p) {
   const h = historicoPontos(p); if (!h.length) return '';
   return '<div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;">'
     + '<div style="font-size:12px;font-weight:700;color:#4f2d7f;margin-bottom:6px;">📜 Histórico de pontos</div>'
-    + h.slice(0, 3).map(x => itemHistoricoHtml(x, true)).join('')
-    + '<button onclick="abrirModalHistorico(' + p.id + ')" style="width:100%;background:none;border:1px solid #4f2d7f;color:#4f2d7f;padding:6px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ver histórico completo (' + h.length + ')</button></div>';
+    + itemHistoricoHtml(h[0], true)
+    + '<button onclick="abrirModalHistorico(' + p.id + ')" style="width:100%;background:none;border:1px solid #4f2d7f;color:#4f2d7f;padding:5px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ver histórico completo (' + h.length + ')</button></div>';
 }
 
 function abrirModalHistorico(id) {
