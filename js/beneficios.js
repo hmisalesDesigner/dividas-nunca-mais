@@ -371,7 +371,7 @@ function renderBeneficios() {
     ${renderTotaisPorCategoria()}
 
     <!-- Grid de todos os programas -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;align-items:start;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
       ${DB.programas.length === 0 ? `
         <div style="grid-column:1/-1;text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;">
           <div style="font-size:48px;margin-bottom:12px;">🎁</div>
@@ -484,6 +484,7 @@ function cardBeneficio(p) {
       </div>
       <div style="display:flex;gap:6px;margin-top:6px;">
         ${p.tipo === 'pontos' ? `<button onclick="abrirModalLotes(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">📦 Lotes</button>` : ''}
+        ${p.regraCodigo ? `<button onclick="abrirModalHistorico(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#4f2d7f;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">📜 Histórico</button>` : ''}
         ${ehNotaParana(p) ? `<button onclick="abrirModalSorteios(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">🎰 Sorteios${p.sorteios && p.sorteios.length > 0 ? ` (${p.sorteios.length})` : ''}</button>` : ''}
         <button onclick="abrirModalCupons(${p.id})" style="flex:1;background:#f3f4f6;border:none;color:#666;padding:5px;border-radius:6px;font-size:11px;cursor:pointer;">🎟️ Cupons${p.cupons && p.cupons.length > 0 ? ` (${p.cupons.length})` : ''}</button>
       </div>
@@ -1029,10 +1030,10 @@ function itemHistoricoHtml(it, compacto) {
 function renderHistoricoCard(p) {
   if (!p.regraCodigo) return '';
   const h = historicoPontos(p); if (!h.length) return '';
-  return '<div style="margin-top:8px;border-top:1px solid #f0f0f0;padding-top:8px;">'
-    + '<div style="font-size:12px;font-weight:700;color:#4f2d7f;margin-bottom:6px;">📜 Histórico de pontos</div>'
-    + itemHistoricoHtml(h[0], true)
-    + '<button onclick="abrirModalHistorico(' + p.id + ')" style="width:100%;background:none;border:1px solid #4f2d7f;color:#4f2d7f;padding:5px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">Ver histórico completo (' + h.length + ')</button></div>';
+  const x = h[0];
+  const rot = x.tipo === 'ganho' ? '+' : '−';
+  const r = x.tipo === 'ganho' ? 'adicionado' : (x.tipo === 'usado' ? 'utilizado' : 'expirado');
+  return '<div style="font-size:11px;color:#4f2d7f;margin:4px 0 6px;">📜 Último: <b>' + rot + (x.qtd || 0).toLocaleString('pt-BR') + ' pts</b> · ' + r + ' em ' + formatarData(x.data) + '</div>';
 }
 
 function abrirModalHistorico(id) {
