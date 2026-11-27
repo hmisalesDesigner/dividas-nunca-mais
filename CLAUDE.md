@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.24 | `pendente` | ⏰ Pop-up ao abrir o site quando há lote de pontos vencendo em até 30 dias (1×/dia; com ≤7 dias, toda vez); cards do Cashback não esticam mais pelo vizinho mais alto; texto da tabela Resgates Recentes legível; dias até o vencimento pelo dia local (corrige "364d" à noite) |
+| Site v1.24 | `50633c0` | ⏰ Pop-up ao abrir o site quando há lote de pontos vencendo em até 30 dias (1×/dia; com ≤7 dias, toda vez); cards do Cashback não esticam mais pelo vizinho mais alto; texto da tabela Resgates Recentes legível; dias até o vencimento pelo dia local (corrige "364d" à noite) |
 | Site v1.23 | `65e7372` | Card do Dolce Gusto mostra só o item mais recente do 📜 Histórico (o card não estica mais os vizinhos); o resto fica em "Ver histórico completo" |
 | Site v1.22 | `6dee1ef` | 🔄 Atualizar de verdade: vê a versão publicada (ignora cache) e recarrega a página se houver uma nova (= Ctrl+R), senão relê o Drive; botão também no cabeçalho do Cashback e Pontos; avisa quando não há sessão do Drive |
 | Site v1.21 | `db71472` | Card do Dolce Gusto ganha "📜 Histórico de pontos" no estilo do portal (selo roxo +100/−100, datas, produto e código; 3 últimos + "Ver histórico completo" em modal) |
