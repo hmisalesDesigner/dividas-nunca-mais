@@ -246,7 +246,7 @@ function renderSubcategorias(categoria, selectId) {
 
 // ===== VERSÃO DO SITE =====
 // Ao publicar uma nova versão do site, atualize este número (e a mensagem do commit).
-const SITE_VERSION = 'v1.21';
+const SITE_VERSION = 'v1.22';
 function aplicarVersaoSite() {
   document.querySelectorAll('.site-ver').forEach(el => { el.textContent = SITE_VERSION; });
 }
@@ -254,12 +254,25 @@ document.addEventListener('DOMContentLoaded', aplicarVersaoSite);
 
 // ===== BOTÃO ATUALIZAR (Dashboard) =====
 // Envia o que ainda não foi salvo, traz a versão mais recente do Drive e redesenha a tela.
+// Pergunta ao servidor qual é a versão publicada (ignora o cache). null = não deu para saber.
+async function versaoPublicada() {
+  try {
+    const r = await fetch('js/utils.js?x=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return null;
+    const m = (await r.text()).match(/SITE_VERSION\s*=\s*'([^']+)'/);
+    return m ? m[1] : null;
+  } catch (e) { return null; }
+}
+
+// 🔄 Atualizar: (1) guarda o que ainda não foi salvo, (2) se há versão nova do site, recarrega a página
+// (o mesmo que Ctrl+R), (3) senão relê o Google Drive e redesenha a tela aberta.
 async function atualizarSite() {
-  const btn = document.getElementById('btn-atualizar');
-  if (!btn || btn.disabled) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ Atualizando...';
-  let doDrive = false;
+  const botoes = Array.from(document.querySelectorAll('[data-atualizar]'));
+  if (botoes.some(b => b.disabled)) return;
+  const texto = b => { botoes.forEach(x => { x.textContent = b; }); };
+  botoes.forEach(b => { b.disabled = true; });
+  texto('⏳ Atualizando...');
+  let recarregando = false;
   try {
     if (syncPendente) { // não perde alterações recentes antes de recarregar
       clearTimeout(syncTimeout);
@@ -267,21 +280,32 @@ async function atualizarSite() {
       await salvarNoDrive();
       syncPendente = false;
     }
-    if (typeof accessToken !== 'undefined' && accessToken) doDrive = await carregarDoDrive();
+    const nova = await versaoPublicada();
+    if (nova && nova !== SITE_VERSION) {
+      recarregando = true;
+      showAlert('⬆️', 'Há uma versão nova do site (' + nova + '). Recarregando...');
+      setTimeout(() => location.reload(), 900);
+      return;
+    }
+    const comToken = typeof accessToken !== 'undefined' && !!accessToken;
+    const doDrive = comToken ? await carregarDoDrive() : false;
     if (typeof migrarProgramas === 'function') migrarProgramas();
     salvarLocalStorage();
     atualizarDatetime();
     if (typeof renderizarAlertas === 'function') renderizarAlertas();
     if (typeof atualizarBadgeBeneficios === 'function') atualizarBadgeBeneficios();
     renderDashboard();
-    showAlert('✅', doDrive ? 'Dados atualizados com o Google Drive.' : 'Tela atualizada.');
+    const ben = document.getElementById('beneficios-app');
+    if (ben && ben.style.display !== 'none' && typeof renderBeneficios === 'function') renderBeneficios();
+    showAlert(doDrive ? '✅' : '⚠️', doDrive ? 'Dados atualizados com o Google Drive. Site na versão ' + SITE_VERSION + '.'
+      : comToken ? 'Não consegui ler o Google Drive agora (a sessão pode ter expirado). Mostrando os dados deste navegador.'
+      : 'Sem conexão com o Google Drive neste momento: só a tela foi atualizada, com os dados deste navegador.');
     if (typeof autoImportarSorteios === 'function') setTimeout(() => autoImportarSorteios(), 1200);
   } catch (e) {
     console.warn('Erro ao atualizar:', e);
     showAlert('❌', 'Não foi possível atualizar. Tente novamente.');
   } finally {
-    btn.disabled = false;
-    btn.textContent = '🔄 Atualizar';
+    if (!recarregando) { botoes.forEach(b => { b.disabled = false; b.textContent = '🔄 Atualizar'; }); }
   }
 }
 

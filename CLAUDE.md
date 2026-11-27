@@ -3,7 +3,7 @@
 > **Projeto:** Dívidas Nunca Mais!
 > **Repositório:** `hmisalesDesigner/dividas-nunca-mais` · branch `main`
 > **Publicação:** GitHub Pages → `https://hmisalesdesigner.github.io/dividas-nunca-mais/`
-> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.21 · Extensão v1.2.0
+> **Versão atual:** NFScanner v29.11 · Site (Cashback e Pontos) v1.22 · Extensão v1.2.0
 > **Idioma:** PT-BR · Tema escuro obrigatório
 
 ---
@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.22 | `(este)` | 🔄 Atualizar de verdade: vê a versão publicada (ignora cache) e recarrega a página se houver uma nova (= Ctrl+R), senão relê o Drive; botão também no cabeçalho do Cashback e Pontos; avisa quando não há sessão do Drive |
 | Site v1.21 | `db71472` | Card do Dolce Gusto ganha "📜 Histórico de pontos" no estilo do portal (selo roxo +100/−100, datas, produto e código; 3 últimos + "Ver histórico completo" em modal) |
 | Site v1.20 | `0e3c9fb` | Colar histórico acerta o vencimento de caixas já registradas quando a data do portal difere (o portal conta +1 dia em códigos inseridos à noite); `p.codigos[].expira` guarda a data |
 | Site v1.19 | `9c63dcc` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
@@ -388,7 +389,7 @@ App multi-arquivo (`js/data.js`, `utils.js`, `beneficios.js`, `app.js`, `auth.js
 - Pop-ups de saldo têm escolha Pontos × Cashback (R$) (`popupModo`).
 - Ao atualizar saldo, `confirmarVencidos` confere lotes vencidos (subtração) e registra em Vencimentos; queda restante pergunta resgate × vencimento.
 - Resgatar tem escolha Pontos/Cashback; ⏳ Vencimentos lista e soma o que já expirou.
-- Botão 🔄 Atualizar só no Dashboard (`atualizarSite()`: envia pendências → `carregarDoDrive()` → `migrarProgramas()` → re-render).
+- Botão 🔄 Atualizar (Dashboard e cabeçalho do Cashback e Pontos; qualquer `[data-atualizar]`): `atualizarSite()` envia pendências → `versaoPublicada()` (busca `js/utils.js?x=<agora>` sem cache) → se `SITE_VERSION` publicada ≠ a carregada, `location.reload()` (o que o usuário fazia com Ctrl+R) → senão `carregarDoDrive()` → `migrarProgramas()` → re-render do Dashboard e do Cashback (se aberto). Sem `accessToken` (sessão não é guardada) avisa que só a tela foi atualizada. Teste: `/tmp/pw/atu_test.py` (precisa servir o repo por HTTP: `python3 -m http.server 8765`; `file://` não faz o fetch da versão).
 - **Nota Paraná é cashback do governo (R$), sem pontos**; `migrarProgramas()` corrige programas antigos (idempotente). Tem 🎰 Sorteios (`sorteios[]` no programa): 1 bilhete na primeira compra do período + 1 a cada R$ 200 em notas (até R$ 10.000/nota); bilhete só vale no sorteio do período; prêmio cancelado após 1 ano (`somaUmAno`). Prêmio **não** soma no saldo.
 
 **Testes:** Playwright em `/tmp/pw/` (`ben_test.js`, `ben_all.js`, `ben_mig.js`, `ben_sor.js`); carregar backup `dividas-nunca-mais-backup-2026-11-22-corrigido.json`, stub do OAuth Google. Proxy do sandbox bloqueia CDN/Google (inofensivo).
