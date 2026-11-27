@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.20 | `(este)` | Colar histórico acerta o vencimento de caixas já registradas quando a data do portal difere (o portal conta +1 dia em códigos inseridos à noite); `p.codigos[].expira` guarda a data |
+| Site v1.20 | `0e3c9fb` | Colar histórico acerta o vencimento de caixas já registradas quando a data do portal difere (o portal conta +1 dia em códigos inseridos à noite); `p.codigos[].expira` guarda a data |
 | Site v1.19 | `9c63dcc` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
 | Site v1.18 | `cba19ec` | Janela de confirmação antes de apagar lote ou vencimento (`pedirConfirmacao` em `js/utils.js`, Cancelar antes de Apagar); "lote manual" recolhido nos programas com código |
 | Site v1.17 | `47b075f` | Rótulos do Colar histórico atualizados (o bloco já lança resgates e caixas antigas, não só ganhos e expirados); botão passa a ser "Lançar histórico" |
