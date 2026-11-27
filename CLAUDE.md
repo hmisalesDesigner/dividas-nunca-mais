@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.26 | `pendente` | Histórico de pontos na mesma ordem do portal: no mesmo dia, o lançamento mais recente vem primeiro (`ts` nas caixas: hora do registro pelo botão; ordem do extrato quando colado; sem `ts`, o último registrado vem antes) |
+| Site v1.26 | `177a650` | Histórico de pontos na mesma ordem do portal: no mesmo dia, o lançamento mais recente vem primeiro (`ts` nas caixas: hora do registro pelo botão; ordem do extrato quando colado; sem `ts`, o último registrado vem antes) |
 | Site v1.25 | `c47c81e` | Card do Dolce Gusto compacto: histórico vira 1 linha ("📜 Último: …") + botão 📜 Histórico na linha de baixo (abre o modal completo); grade volta a esticar, então os 4 cards da linha têm a mesma altura (sem vazio abaixo dos cards) |
 | Site v1.24 | `50633c0` | ⏰ Pop-up ao abrir o site quando há lote de pontos vencendo em até 30 dias (1×/dia; com ≤7 dias, toda vez); cards do Cashback não esticam mais pelo vizinho mais alto; texto da tabela Resgates Recentes legível; dias até o vencimento pelo dia local (corrige "364d" à noite) |
 | Site v1.23 | `65e7372` | Card do Dolce Gusto mostra só o item mais recente do 📜 Histórico (o card não estica mais os vizinhos); o resto fica em "Ver histórico completo" |
