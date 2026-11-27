@@ -371,7 +371,7 @@ function renderBeneficios() {
     ${renderTotaisPorCategoria()}
 
     <!-- Grid de todos os programas -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;align-items:start;">
       ${DB.programas.length === 0 ? `
         <div style="grid-column:1/-1;text-align:center;padding:48px;color:#999;background:#fff;border-radius:10px;">
           <div style="font-size:48px;margin-bottom:12px;">🎁</div>
@@ -395,9 +395,9 @@ function renderBeneficios() {
               ${(DB.resgates || []).slice(-8).reverse().map(r => {
                 const prog = DB.programas.find(p => p.id === r.programaId);
                 return `<tr style="border-bottom:1px solid #f3f4f6;">
-                  <td style="padding:10px 12px;">${prog ? prog.logo + ' ' + prog.nome : '-'}</td>
+                  <td style="padding:10px 12px;color:#333;">${prog ? prog.logo + ' ' + esc(prog.nome) : '-'}</td>
                   <td style="padding:10px 12px;font-weight:600;color:#217346;">${fmtQtd(r.quantidade, tipoSaldoDe(r))}</td>
-                  <td style="padding:10px 12px;color:#666;">${r.descricao || '-'}</td>
+                  <td style="padding:10px 12px;color:#666;">${esc(r.descricao || '-')}</td>
                   <td style="padding:10px 12px;color:#666;">${formatarData(r.data)}</td>
                 </tr>`;
               }).join('')}
@@ -1047,7 +1047,7 @@ function renderLotesCard(p) {
   if (!p.lotes || p.lotes.length === 0) return '';
   const maisLotes = p.lotes.length > 4 ? p.lotes.length - 4 : 0;
   const items = p.lotes.slice(0, 4).map(l => {
-    const dias = Math.ceil((new Date(l.expiracao) - new Date()) / (1000*60*60*24));
+    const dias = diasAte(l.expiracao);
     if (l.expiracao < hojeISO()) {
       return '<div style="font-size:11px;color:#999;margin-bottom:2px;" title="Vencido. Ao atualizar o saldo, o app confere a conta e remove este lote.">⛔ ' + l.quantidade.toLocaleString('pt-BR') + ' pts venceram em ' + formatarData(l.expiracao) + ' (há ' + Math.abs(dias) + 'd)</div>';
     }
@@ -1832,6 +1832,62 @@ async function autoImportarSorteios() {
   verificarSorteiosPendentes();
 }
 
+
+// ===== AVISO DE PONTOS VENCENDO (pop-up ao abrir o site) =====
+const AVISO_VENC_DIAS = 30;   // começa a avisar com 30 dias
+const AVISO_VENC_URGENTE = 7; // com 7 dias ou menos avisa toda vez que o site abre
+
+// Lotes ainda válidos que vencem em até `limite` dias, do mais próximo ao mais distante.
+function lotesVencendo(limite) {
+  const lista = [];
+  (DB.programas || []).forEach(function(p) {
+    (p.lotes || []).forEach(function(l) {
+      if (!l.expiracao || !(l.quantidade > 0)) return;
+      const d = diasAte(l.expiracao);
+      if (d >= 0 && d <= limite) lista.push({ programa: p, quantidade: l.quantidade, expiracao: l.expiracao, dias: d });
+    });
+  });
+  return lista.sort(function(a, b) { return a.dias - b.dias; });
+}
+
+function verificarPontosVencendo(tentativa) {
+  tentativa = tentativa || 0;
+  const ben = document.getElementById('beneficios-app');
+  if (ben && ben.style.display !== 'none') return;          // já está no Cashback e Pontos
+  const lista = lotesVencendo(AVISO_VENC_DIAS);
+  if (!lista.length) return;
+  const urgente = lista[0].dias <= AVISO_VENC_URGENTE;
+  let visto = null;
+  try { visto = localStorage.getItem('dnm_venc_aviso'); } catch (e) {}
+  if (!urgente && visto === hojeISO()) return;              // fora da urgência: 1 vez por dia
+  if (telaOcupada()) {
+    if (tentativa < 20) setTimeout(function() { verificarPontosVencendo(tentativa + 1); }, 3000);
+    return;
+  }
+  try { localStorage.setItem('dnm_venc_aviso', hojeISO()); } catch (e) {}
+
+  const fmt = function(n) { return n.toLocaleString('pt-BR'); };
+  const quando = function(d) { return d === 0 ? '<strong>hoje</strong>' : d === 1 ? '<strong>amanhã</strong>' : 'em <strong>' + d + ' dias</strong>'; };
+  const total = lista.reduce(function(t, x) { return t + x.quantidade; }, 0);
+  const linhas = lista.map(function(x) {
+    const cor = x.dias <= AVISO_VENC_URGENTE ? '#ef4444' : '#f59e0b';
+    return '<li style="margin-bottom:8px;color:var(--text-primary);">'
+      + '<span style="color:' + cor + ';font-weight:700;">' + fmt(x.quantidade) + ' pts</span> · ' + esc(x.programa.nome)
+      + '<div style="font-size:12px;color:var(--text-secondary);">vencem ' + quando(x.dias) + ' (' + formatarData(x.expiracao) + ')</div></li>';
+  }).join('');
+
+  abrirModal('⏰ Pontos prestes a vencer', `
+    <p style="color:var(--text-secondary);font-size:13px;line-height:1.5;margin-bottom:12px;">
+      ${fmt(total)} pts vencem nos próximos ${AVISO_VENC_DIAS} dias. Use ou resgate antes do prazo:
+    </p>
+    <ul style="list-style:none;margin:0 0 16px 0;padding:0;">${linhas}</ul>
+    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn-secondary" onclick="fecharModal()">Fechar</button>
+      <button class="btn-primary" onclick="fecharModal();entrarBeneficios()">Abrir Cashback e Pontos</button>
+    </div>
+  `, '460px');
+}
+
 // ===== CUPONS & TICKETS =====
 function renderCuponsList(cupons, id) {
   if (!cupons || cupons.length === 0) return '<p style="color:var(--text-muted);font-size:13px;">Nenhum cupom salvo ainda.</p>';
@@ -1943,7 +1999,7 @@ function atualizarBadgeBeneficios() {
     // Lotes expirando
     if (p.lotes) {
       p.lotes.forEach(l => {
-        const dias = Math.ceil((new Date(l.expiracao) - hoje) / (1000*60*60*24));
+        const dias = diasAte(l.expiracao);
         if (dias <= 30 && dias >= 0) alertas++;
       });
     }

@@ -242,6 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
+| Site v1.24 | `pendente` | ⏰ Pop-up ao abrir o site quando há lote de pontos vencendo em até 30 dias (1×/dia; com ≤7 dias, toda vez); cards do Cashback não esticam mais pelo vizinho mais alto; texto da tabela Resgates Recentes legível; dias até o vencimento pelo dia local (corrige "364d" à noite) |
 | Site v1.23 | `65e7372` | Card do Dolce Gusto mostra só o item mais recente do 📜 Histórico (o card não estica mais os vizinhos); o resto fica em "Ver histórico completo" |
 | Site v1.22 | `6dee1ef` | 🔄 Atualizar de verdade: vê a versão publicada (ignora cache) e recarrega a página se houver uma nova (= Ctrl+R), senão relê o Drive; botão também no cabeçalho do Cashback e Pontos; avisa quando não há sessão do Drive |
 | Site v1.21 | `db71472` | Card do Dolce Gusto ganha "📜 Histórico de pontos" no estilo do portal (selo roxo +100/−100, datas, produto e código; 3 últimos + "Ver histórico completo" em modal) |
@@ -638,5 +639,8 @@ Dedup: ganho/caixa por código, resgate e vencimento por `data|quantidade`. Conf
 **Apagar pede confirmação (v1.18).** `pedirConfirmacao(icone, msg, textoOk, onOk)` (`js/utils.js`) reaproveita o `#alert-popup` (z-index 2001, acima de qualquer modal), troca o botão por Cancelar + Apagar (Cancelar vem primeiro e recebe o foco) e restaura o OK ao fechar. Usada em `removerLote` e `removerVencimento`; apagar um lote **não** mexe no saldo (só perde o controle da data). Para novas ações destrutivas, usar este helper em vez de `confirm()`. Teste: `/tmp/pw/conf_test.py`. O bloco "Adicionar lote manual" vira `<details>` recolhido quando o programa tem `regraCodigo`.
 
 Colar duas vezes não duplica: ganhos por código (ou por `ganhosPortal` data|qtd quando sem código), expirados por data+quantidade. Ganho já vencido é ignorado (vem pela lista de expirados). Dados reais do usuário (códigos, saldos) ficam só no Drive/localStorage — **nunca no repositório**.
+
+**Aviso de pontos vencendo (v1.24).** `lotesVencendo(limite)` lista lotes válidos que vencem em até `limite` dias (todos os programas); `verificarPontosVencendo()` (`js/beneficios.js`, chamada em `iniciarApp()` 3,5 s depois, depois do lembrete de sorteios) abre um `abrirModal` fora do Cashback com total, programa, quantidade e prazo, botão "Abrir Cashback e Pontos". Regras: janela `AVISO_VENC_DIAS = 30`; fora da urgência aparece 1×/dia (`localStorage.dnm_venc_aviso`); com ≤ `AVISO_VENC_URGENTE = 7` dias aparece sempre que o site abre; não abre se o Cashback já estiver aberto; `telaOcupada()` adia (até 20×3 s). Dias sempre via `diasAte()` (dia local) — `Math.ceil(new Date(iso) - agora)` dava 1 dia a menos à noite por causa do UTC. Teste: `/tmp/pw/venc_aviso_test.py`.
+**Layout do Cashback (v1.24):** a grade de cards usa `align-items:start` (o card do Dolce Gusto, mais alto, não estica os outros); `#beneficios-app` tem `color:#333` base — texto sem cor própria herdava o claro do tema escuro e sumia no fundo branco (ex.: Resgates Recentes).
 
 **Teste:** `/tmp/pw/dolce_test.py` (20 verificações; usa programa id 7, dados fictícios).

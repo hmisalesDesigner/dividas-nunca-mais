@@ -23,6 +23,11 @@ function iniciarApp() {
     if (typeof autoImportarSorteios === 'function') autoImportarSorteios();
   }, 2500);
 
+  // Avisa se há pontos vencendo (depois do lembrete de sorteios, que tem prioridade na tela)
+  setTimeout(() => {
+    if (typeof verificarPontosVencendo === 'function') verificarPontosVencendo();
+  }, 3500);
+
   // Atualiza header
   document.getElementById('user-photo').src = DB.usuario.foto || '';
   const benPhoto = document.getElementById('user-photo-ben');
