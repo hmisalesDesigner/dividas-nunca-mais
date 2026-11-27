@@ -1045,12 +1045,20 @@ function previaCodigos(id) {
 
 function normCodigo(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 
+// Código da caixa: 12 caracteres impressos em 3 grupos de 4 ("6WWQ NHA6 79KT").
+// Formata enquanto digita/cola: maiúsculas, só letras e números, espaço a cada 4.
+function formatarCodigo(c) { return normCodigo(c).slice(0, 12).replace(/(.{4})(?=.)/g, '$1 '); }
+function mascararCodigo(el) {
+  const f = formatarCodigo(el.value);
+  if (el.value !== f) el.value = f;
+}
+
 // Registro rápido pelo card: abre um modal pequeno (1 código por padrão)
 function abrirModalCodigo(id) {
   const p = DB.programas.find(p => p.id === id); if (!p || !p.regraCodigo) return;
   abrirModal('☕ Registrar código — ' + p.nome, `
     <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;">${p.regraCodigo.pontosPorCodigo} pontos por código · vencem em ${p.regraCodigo.validadeMeses} meses. Registre aqui o que você já inseriu no site da Nescafé.</p>
-    <div class="form-group"><label>Código da caixa (opcional — evita registrar o mesmo duas vezes)</label><input id="cod-caixa" type="text" maxlength="20" autocomplete="off" /></div>
+    <div class="form-group"><label>Código da caixa (12 caracteres, opcional — evita registrar o mesmo duas vezes)</label><input id="cod-caixa" type="text" maxlength="14" autocomplete="off" autocapitalize="characters" spellcheck="false" oninput="mascararCodigo(this)" /></div>
     <div class="form-group"><label>Data do escaneamento</label><input id="cod-data" type="date" max="${hojeISO()}" value="${hojeISO()}" oninput="previaCodigos(${id})" /></div>
     <div id="cod-previa" style="font-size:13px;color:var(--green);min-height:18px;margin-bottom:12px;"></div>
     <div class="modal-actions">
@@ -1067,7 +1075,7 @@ function registrarCodigos(id, rapido) {
   const n = elQtd ? parseInt(elQtd.value) : 1;
   const caixa = normCodigo(document.getElementById('cod-caixa') && document.getElementById('cod-caixa').value);
   if (caixa) {
-    if (caixa.length < 6) { showAlert('⚠️', 'Código muito curto. Confira ou deixe em branco.'); return; }
+    if (caixa.length !== 12) { showAlert('⚠️', 'O código da caixa tem 12 caracteres (3 grupos de 4). Faltam ' + Math.max(0, 12 - caixa.length) + '. Confira ou deixe em branco.'); return; }
     if (n !== 1) { showAlert('⚠️', 'Com código da caixa, registre 1 por vez.'); return; }
     if ((p.codigos || []).some(c => c.codigo === caixa)) { showAlert('⚠️', 'Esse código já foi registrado antes.'); return; }
   }
