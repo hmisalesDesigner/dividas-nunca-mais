@@ -242,7 +242,7 @@ git push origin main
 
 | Versão | Commit | Resumo |
 |--------|--------|--------|
-| Site v1.19 | `(este)` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
+| Site v1.19 | `9c63dcc` | Código da caixa do Dolce Gusto: máscara 4-4-4 enquanto digita/cola (`6WWQ NHA6 79KT`), exige 12 caracteres |
 | Site v1.18 | `cba19ec` | Janela de confirmação antes de apagar lote ou vencimento (`pedirConfirmacao` em `js/utils.js`, Cancelar antes de Apagar); "lote manual" recolhido nos programas com código |
 | Site v1.17 | `47b075f` | Rótulos do Colar histórico atualizados (o bloco já lança resgates e caixas antigas, não só ganhos e expirados); botão passa a ser "Lançar histórico" |
 | Site v1.16 | `3a357ca` | Colar histórico aceita o extrato inteiro de uma vez: ganhos vivos, ganhos já gastos ("Points used"), expirados e resgates (`-N Pontos Utilizado:`); prévia em 4 linhas dizendo o que cada parte faz |
