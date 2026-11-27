@@ -1086,7 +1086,7 @@ function registrarCodigos(id, rapido) {
   if (exp < hojeISO()) { showAlert('⚠️', 'Esses pontos já teriam vencido em ' + formatarData(exp) + '. Use "Colar histórico" para lançar vencidos.'); return; }
   const pts = n * p.regraCodigo.pontosPorCodigo;
   adicionarPontosLote(p, pts, data, false);
-  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data }); }
+  if (caixa) { if (!p.codigos) p.codigos = []; p.codigos.push({ codigo: caixa, data, expira: exp }); }
   p.saldo = (p.saldo || 0) + pts;
   if (!DB.historicoSaldo) DB.historicoSaldo = {};
   if (!DB.historicoSaldo[id]) DB.historicoSaldo[id] = [];
@@ -1176,6 +1176,25 @@ function planoCodigosPortal(p, ganhos) {
   });
 }
 
+// Caixa já registrada cujo vencimento no site difere do que o portal mostra (ex.: o portal conta
+// um dia a mais para códigos inseridos à noite). Só corrige se o lote antigo ainda existe.
+function planoCorrecoesPortal(p, ganhos) {
+  const rc = p.regraCodigo; if (!rc) return [];
+  const gastos = {}, out = [];
+  ganhos.forEach(g => {
+    if (!g.codigo || !g.expira || g.expira < hojeISO()) return;
+    const c = (p.codigos || []).find(x => x.codigo === g.codigo && !x.historico); if (!c) return;
+    const atual = c.expira || somaMeses(c.data, rc.validadeMeses);
+    if (atual === g.expira) return;
+    const k = atual; gastos[k] = gastos[k] || 0;
+    const lote = (p.lotes || []).find(l => l.expiracao === atual && !l.estimado);
+    if (!lote || lote.quantidade - gastos[k] < g.qtd) return;
+    gastos[k] += g.qtd;
+    out.push({ g, de: atual });
+  });
+  return out;
+}
+
 function planoGanhosPortal(p, ganhos) {
   const usados = {};
   (p.ganhosPortal || []).forEach(k => { usados[k] = (usados[k] || 0) + 1; });
@@ -1194,6 +1213,7 @@ function previaColarHistorico(id) {
   const lidos = lerExpiradosPortal(txt), novos = planoExpiradosPortal(p, lidos);
   const ganhos = lerGanhosPortal(txt), novosG = planoGanhosPortal(p, ganhos);
   const novosC = planoCodigosPortal(p, ganhos);
+  const corrig = planoCorrecoesPortal(p, ganhos);
   const resg = lerResgatesPortal(txt), novosR = planoResgatesPortal(p, resg);
   const el = document.getElementById('hist-previa'), btn = document.getElementById('hist-btn');
   if (!lidos.length && !ganhos.length && !resg.length) {
@@ -1203,8 +1223,9 @@ function previaColarHistorico(id) {
   if (novosG.length) linhas.push('☕ <b>' + novosG.length + '</b> ganho(s) ainda válido(s): <b>+' + novosG.reduce((s, g) => s + g.qtd, 0).toLocaleString('pt-BR') + ' pts</b> no saldo, com o vencimento real');
   if (novos.length) linhas.push('⏳ <b>' + novos.length + '</b> vencimento(s): ' + novos.reduce((s, l) => s + l.qtd, 0).toLocaleString('pt-BR') + ' pts que você já perdeu');
   if (novosR.length) linhas.push('🎁 <b>' + novosR.length + '</b> resgate(s): ' + novosR.reduce((s, r) => s + r.qtd, 0).toLocaleString('pt-BR') + ' pts já trocados');
+  if (corrig.length) linhas.push('📅 <b>' + corrig.length + '</b> vencimento(s) já registrado(s) será(ão) acertado(s) para a data do portal: ' + corrig.map(c => formatarData(c.de) + ' → ' + formatarData(c.g.expira)).join(', '));
   if (novosC.length) linhas.push('📦 <b>' + novosC.length + '</b> caixa(s) antiga(s) só para registro (não mexem no saldo)');
-  const total = novos.length + novosG.length + novosR.length + novosC.length;
+  const total = novos.length + novosG.length + novosR.length + novosC.length + corrig.length;
   if (!total) linhas.push('Tudo isso já está registrado — nada novo para lançar.');
   el.innerHTML = linhas.join('<br>') + '<div style="color:var(--text-secondary);margin-top:6px;font-size:11px;">Lidos no texto: ' +
     ganhos.length + ' ganho(s), ' + lidos.length + ' expirado(s), ' + resg.length + ' resgate(s).</div>';
@@ -1219,7 +1240,8 @@ function lancarHistoricoColado(id) {
   const novosG = planoGanhosPortal(p, ganhos);
   const novosC = planoCodigosPortal(p, ganhos);
   const novosR = planoResgatesPortal(p, lerResgatesPortal(txt));
-  if (!novos.length && !novosG.length && !novosC.length && !novosR.length) return;
+  const corrig = planoCorrecoesPortal(p, ganhos);
+  if (!novos.length && !novosG.length && !novosC.length && !novosR.length && !corrig.length) return;
   if (!DB.vencimentos) DB.vencimentos = [];
   if (!DB.resgates) DB.resgates = [];
   if (!p.lotes) p.lotes = [];
@@ -1228,8 +1250,17 @@ function lancarHistoricoColado(id) {
     const ja = p.lotes.find(l => l.expiracao === g.expira && !l.estimado);
     if (ja) ja.quantidade += g.qtd; else p.lotes.push({ quantidade: g.qtd, expiracao: g.expira });
     p.saldo = (p.saldo || 0) + g.qtd;
-    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado });
+    if (g.codigo) p.codigos.push({ codigo: g.codigo, data: g.adicionado, expira: g.expira });
     else { if (!p.ganhosPortal) p.ganhosPortal = []; p.ganhosPortal.push(g.adicionado + '|' + g.qtd); }
+  });
+  // vencimentos acertados para a data do portal: tira do lote antigo e põe no lote da data certa
+  corrig.forEach(c => {
+    const lote = p.lotes.find(l => l.expiracao === c.de && !l.estimado);
+    if (!lote) return;
+    lote.quantidade -= c.g.qtd;
+    const dest = p.lotes.find(l => l.expiracao === c.g.expira && !l.estimado);
+    if (dest) dest.quantidade += c.g.qtd; else p.lotes.push({ quantidade: c.g.qtd, expiracao: c.g.expira });
+    const e = p.codigos.find(x => x.codigo === c.g.codigo && !x.historico); if (e) e.expira = c.g.expira;
   });
   // caixas antigas (ja vencidas ou ja gastas): so o registro do codigo
   novosC.forEach(g => p.codigos.push({ codigo: g.codigo, data: g.adicionado, historico: true }));
@@ -1253,6 +1284,7 @@ function lancarHistoricoColado(id) {
   if (novos.length) r.push(novos.length + ' vencimento(s)');
   if (novosR.length) r.push(novosR.length + ' resgate(s)');
   if (novosC.length) r.push(novosC.length + ' caixa(s) antiga(s)');
+  if (corrig.length) r.push(corrig.length + ' vencimento(s) acertado(s)');
   fecharModal(); abrirModalLotes(id); renderBeneficios();
   showAlert('✅', r.join(', ') + ' lançado(s).');
 }
